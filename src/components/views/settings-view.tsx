@@ -1470,8 +1470,7 @@ const WEBHOOK_EVENTS = [
 ];
 
 function WebhooksSection() {
-  const [webhooks, setWebhooks] = useState<WebhookDTO[]>([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
   const [createOpen, setCreateOpen] = useState(false);
   const [newUrl, setNewUrl] = useState("");
   const [newSecret, setNewSecret] = useState("");
@@ -1484,68 +1483,76 @@ function WebhooksSection() {
   const [testingId, setTestingId] = useState<string | null>(null);
   const [testResult, setTestResult] = useState<Record<string, { success: boolean; statusCode: number; elapsed: number; responseBody: string }>>({});
 
-  const load = () => {
-    setLoading(true);
-    fetch("/api/webhooks")
-      .then((r) => r.json())
-      .then((data) => {
-        setWebhooks(Array.isArray(data) ? data : []);
-        setLoading(false);
-      })
-      .catch(() => setLoading(false));
-  };
+  const { data: webhooks = [], isLoading: loading } = useQuery({
+    queryKey: ["webhooks"],
+    queryFn: () =>
+      fetch("/api/webhooks").then((r) => r.json()) as Promise<WebhookDTO[]>,
+  });
 
-  useEffect(() => {
-    load();
-  }, []);
+  const createMutation = useMutation({
+    mutationFn: (vars: { url: string; secret: string | null; events: string[] }) =>
+      fetch("/api/webhooks", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(vars),
+      }).then((r) => r.json()),
+    onSuccess: () => {
+      toast.success("Webhook created");
+      queryClient.invalidateQueries({ queryKey: ["webhooks"] });
+      setCreateOpen(false);
+      setNewUrl("");
+      setNewSecret("");
+    },
+    onError: () => toast.error("Failed to create webhook"),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) =>
+      fetch(`/api/webhooks/${id}`, { method: "DELETE" }).then((r) => r.json()),
+    onSuccess: () => {
+      toast.success("Webhook deleted");
+      queryClient.invalidateQueries({ queryKey: ["webhooks"] });
+    },
+    onError: () => toast.error("Failed to delete webhook"),
+  });
+
+  const testMutation = useMutation({
+    mutationFn: (id: string) =>
+      fetch(`/api/webhooks/${id}/test`, { method: "POST" }).then((r) => r.json()),
+    onMutate: (id) => setTestingId(id),
+    onSuccess: (result, id) => {
+      setTestResult((prev) => ({ ...prev, [id]: result }));
+      if (result.success) {
+        toast.success("Test ping succeeded", {
+          description: `HTTP ${result.statusCode} in ${result.elapsed}ms`,
+        });
+      } else {
+        toast.error("Test ping failed", {
+          description: result.responseBody?.slice(0, 100) || `HTTP ${result.statusCode}`,
+        });
+      }
+      queryClient.invalidateQueries({ queryKey: ["webhooks"] });
+    },
+    onError: () => toast.error("Test failed"),
+    onSettled: () => setTestingId(null),
+  });
 
   const handleCreate = () => {
     if (!newUrl.trim()) return;
-    fetch("/api/webhooks", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ url: newUrl, secret: newSecret || null, events: newEvents }),
-    })
-      .then((r) => r.json())
-      .then(() => {
-        toast.success("Webhook created");
-        setCreateOpen(false);
-        setNewUrl("");
-        setNewSecret("");
-        load();
-      })
-      .catch(() => toast.error("Failed to create webhook"));
+    createMutation.mutate({
+      url: newUrl,
+      secret: newSecret || null,
+      events: newEvents,
+    });
   };
 
   const handleDelete = (id: string) => {
     if (!confirm("Delete this webhook?")) return;
-    fetch(`/api/webhooks/${id}`, { method: "DELETE" })
-      .then(() => {
-        toast.success("Webhook deleted");
-        load();
-      })
-      .catch(() => toast.error("Failed to delete webhook"));
+    deleteMutation.mutate(id);
   };
 
   const handleTest = (id: string) => {
-    setTestingId(id);
-    fetch(`/api/webhooks/${id}/test`, { method: "POST" })
-      .then((r) => r.json())
-      .then((result) => {
-        setTestResult((prev) => ({ ...prev, [id]: result }));
-        if (result.success) {
-          toast.success("Test ping succeeded", {
-            description: `HTTP ${result.statusCode} in ${result.elapsed}ms`,
-          });
-        } else {
-          toast.error("Test ping failed", {
-            description: result.responseBody?.slice(0, 100) || `HTTP ${result.statusCode}`,
-          });
-        }
-        load();
-      })
-      .catch(() => toast.error("Test failed"))
-      .finally(() => setTestingId(null));
+    testMutation.mutate(id);
   };
 
   const toggleEvent = (event: string) => {

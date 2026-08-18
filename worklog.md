@@ -891,3 +891,115 @@ Building on CRON-1 (command palette, notifications, keyboard shortcuts) and CRON
 9. **Add multi-model fallback chain** visualization in AI Studio (Gemini → Claude → GPT-4)
 10. **Add webhook configuration** for external integrations
 
+
+---
+
+## Cron Review Phase 4 — Activity Feed + Confidence Thresholds + Webhooks
+
+**Task ID:** CRON-4
+**Agent:** main (Z.ai Code)
+**Task:** QA assessment + add Activity Feed, per-field confidence thresholds, webhook configuration, and visual polish
+
+### Current Project Status Assessment
+
+Building on CRON-1 through CRON-3, the platform is stable with:
+- **Lint**: clean (0 errors, 0 warnings)
+- **Page compilation**: HTTP 200
+- **14 frontend views** (Landing, Dashboard, Sources, Source Builder, Datasets, Dataset Detail, Schema Builder, AI Studio, Usage & Billing, Organizations, Members, Sharing, Audit, Settings)
+- **37+ API routes** (now includes /api/usage/trends, /api/search, /api/sources/[id]/clone, /api/schemas/[id]/clone, /api/datasets/[id]/import, /api/webhooks, /api/webhooks/[id]/test)
+- **OOM issue**: persistent in 4GB sandbox when dev server + Chromium run simultaneously; not a code issue
+
+### Completed Modifications
+
+#### 1. Activity Feed on Dashboard — NEW
+- **File**: `src/components/views/dashboard-view.tsx` — updated
+- New "Activity feed" card at the bottom of the Dashboard showing the 8 most recent audit events
+- Timeline-style UI with a vertical line and colored dots:
+  - Green (create, approve), Blue (update), Red (delete), Violet (scan, extract, AI actions), Amber (share), Rose (export), Slate (system actions)
+- Each entry shows: actor name/type, action, entity name, reason (italic), and timestamp
+- Uses a secondary TanStack Query (`["dashboard-activity"]`) hitting `/api/audit?limit=8` with 30s stale time
+- "View all" button links to the full Audit Logs view
+- Empty state when no audit events exist
+- Helper functions `getActivityIcon()` and `getActivityColor()` for action-based styling
+- **Browser-verified**: "Activity feed" text found, 8 timeline dots present ✅
+
+#### 2. Per-Field Confidence Thresholds — NEW
+- **File**: `prisma/schema.prisma` — added `confidenceThreshold Float @default(0.7)` to SchemaField model
+- **File**: `src/lib/types.ts` — added `confidenceThreshold: number` to SchemaFieldDTO
+- **File**: `src/lib/serialize.ts` — serializeSchemaField now includes confidenceThreshold
+- **File**: `src/lib/extraction.ts` — added `FieldReviewFlag` interface and `flagFieldsForReview()` function
+- **File**: `src/app/api/extraction/route.ts` — now passes confidenceThreshold to LLM, calls flagFieldsForReview(), returns `reviewFlags` and `fieldsNeedingReview` in response
+
+**How it works:**
+- Each schema field has a `confidenceThreshold` (default 0.7 = 70%)
+- After extraction, each field's confidence is compared against its threshold
+- Fields below threshold are flagged for human review
+- The `/api/extraction` response now includes:
+  - `reviewFlags`: array of `{ fieldName, confidence, threshold, needsReview, reason }` for every field
+  - `fieldsNeedingReview`: count of fields that need review
+- The audit log for extractions now records `fieldsNeedingReview` count
+- **Verified via curl**: all schema fields now have `confidenceThreshold: 0.7` ✅
+
+#### 3. Webhook Configuration — NEW
+- **File**: `prisma/schema.prisma` — added Webhook model (id, url, secret, events, status, lastTriggeredAt, lastResponseCode, failureCount)
+- **Files**: `src/app/api/webhooks/route.ts` (GET, POST), `src/app/api/webhooks/[id]/route.ts` (PATCH, DELETE), `src/app/api/webhooks/[id]/test/route.ts` (POST)
+- **File**: `src/components/views/settings-view.tsx` — added WebhooksSection component in the Integrations tab
+
+**API features:**
+- `GET /api/webhooks` — list all webhooks for the org (events parsed to array)
+- `POST /api/webhooks` — create a new webhook (validates URL starts with http(s)://)
+- `PATCH /api/webhooks/[id]` — update url, secret, events, status
+- `DELETE /api/webhooks/[id]` — delete with audit log
+- `POST /api/webhooks/[id]/test` — sends a test ping to the webhook URL:
+  - Sends a JSON payload with event="webhook.test"
+  - Includes X-WIP-Signature header if secret is set
+  - 10-second timeout via AbortSignal
+  - Updates lastTriggeredAt, lastResponseCode, status, failureCount
+  - Returns `{ success, statusCode, elapsed, responseBody }`
+  - All actions audit-logged
+
+**UI features (WebhooksSection in Settings):**
+- Card with "Add webhook" button
+- List of configured webhooks showing:
+  - URL (monospace), status badge (active/failing/paused)
+  - Subscribed events as badges
+  - Last triggered time, HTTP response code, failure count
+  - Test result inline panel (success/failure with response body preview)
+- "Test" button (sends test ping, shows result inline + toast)
+- "Delete" button (with confirmation)
+- Create dialog with:
+  - URL input
+  - Secret input (optional, sent as X-WIP-Signature header)
+  - Event subscription checkboxes (6 event types: source.run_completed, extraction.completed, review.needed, job.failed, sharing.requested, record.approved)
+- Uses TanStack Query for data fetching and mutations (proper cache invalidation)
+- **Verified via curl**: Created webhook successfully, list returns 1 webhook, test-ping endpoint returns result ✅
+
+### Verification Results
+
+- `bun run lint` → 0 errors, 0 warnings ✅
+- `curl http://localhost:3000/` → HTTP 200 ✅
+- `curl http://localhost:3000/api/webhooks` → 200, empty list ✅
+- `curl -X POST /api/webhooks` → 200, webhook created with events array ✅
+- `curl http://localhost:3000/api/schemas` → 200, all fields now have `confidenceThreshold: 0.7` ✅
+- Browser-verified: Dashboard "Activity feed" text found, 8 timeline dots present ✅
+- No compilation errors, no import errors ✅
+
+### Unresolved Issues / Risks
+1. **OOM in sandbox**: Dev server + Chromium exceeds 4GB. The webhook test-ping endpoint makes a real HTTP request which can take up to 10s — combined with Chromium this triggered OOM. The endpoint itself works correctly (verified via curl before the browser test).
+2. **Google OAuth simulated**: No real Google Cloud credentials.
+3. **BullMQ/Redis replaced**: Jobs stored in DB with status tracking.
+4. **pgvector/RAG replaced**: Text-based extraction only.
+5. **Confidence threshold UI**: The threshold is now in the data model and API, but the Schema Builder field editor dialog doesn't yet expose a UI control for changing it. Fields default to 0.7.
+
+### Recommended Next Steps (Priority Order)
+1. **Add confidence threshold slider** to the Schema Builder field editor dialog (so users can configure per-field thresholds visually)
+2. **Show review flags** in the AI Studio Test Sandbox results (highlight fields that fell below their threshold)
+3. **Add drag-and-drop field reordering** in the Schema Builder
+4. **Add real-time job progress** using WebSocket (mini-service) for live updates during extraction
+5. **Add email notification templates** in Settings (for source run failures, review queue items)
+6. **Add export scheduling** (weekly CSV exports delivered via email or download link)
+7. **Add a help/onboarding tour** for first-time users
+8. **Add multi-model fallback chain** visualization in AI Studio (Gemini → Claude → GPT-4)
+9. **Add dataset record count badges** in the sidebar for quick at-a-glance status
+10. **Wire webhook triggers** into actual platform events (currently the test endpoint works, but real events don't trigger webhooks yet)
+
