@@ -3,7 +3,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api-client";
 import { useAppStore } from "@/lib/store";
-import type { DashboardData } from "@/lib/types";
+import type { DashboardData, AuditLogDTO } from "@/lib/types";
 import { PageHeader, StatCard, LoadingState, EmptyState } from "@/components/ui/page-elements";
 import { StatusBadge, ConfidenceBadge, JobTypeBadge } from "@/components/ui/status-badge";
 import { Button } from "@/components/ui/button";
@@ -28,6 +28,11 @@ import {
   Eye,
   CheckCircle2,
   ArrowRight,
+  Plus,
+  Pencil,
+  Trash2,
+  Share2,
+  Download,
 } from "lucide-react";
 
 export function DashboardView() {
@@ -40,6 +45,13 @@ export function DashboardView() {
   const { data, isLoading, refetch, isFetching } = useQuery({
     queryKey: ["dashboard"],
     queryFn: () => api.get<DashboardData>("/api/dashboard"),
+  });
+
+  // Activity feed — recent audit events
+  const { data: activityData } = useQuery({
+    queryKey: ["dashboard-activity"],
+    queryFn: () => api.get<{ data: AuditLogDTO[] }>("/api/audit?limit=8"),
+    staleTime: 30_000,
   });
 
   return (
@@ -409,10 +421,118 @@ export function DashboardView() {
               </CardContent>
             </Card>
           </div>
+
+          {/* Activity feed */}
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-3">
+              <CardTitle className="text-base flex items-center gap-2">
+                <Activity className="h-4 w-4" /> Activity feed
+              </CardTitle>
+              <Button variant="ghost" size="sm" onClick={() => setView("audit")}>
+                View all <ArrowRight className="ml-1 h-3 w-3" />
+              </Button>
+            </CardHeader>
+            <CardContent className="p-0">
+              <div className="max-h-[400px] overflow-y-auto">
+                {activityData?.data && activityData.data.length > 0 ? (
+                  <div className="relative px-4 py-3">
+                    {/* Timeline line */}
+                    <div className="absolute left-7 top-3 bottom-3 w-px bg-border" />
+                    {activityData.data.map((log) => {
+                      const icon = getActivityIcon(log.action);
+                      const color = getActivityColor(log.action, log.actorType);
+                      return (
+                        <div key={log.id} className="relative flex gap-3 pb-4 last:pb-0">
+                          <div
+                            className={`relative z-10 flex h-6 w-6 shrink-0 items-center justify-center rounded-full ring-2 ring-background ${color}`}
+                          >
+                            {icon}
+                          </div>
+                          <div className="flex-1 min-w-0 pt-0.5">
+                            <p className="text-xs">
+                              <span className="font-medium">{log.actorName || log.actorType}</span>
+                              {" "}
+                              <span className="text-muted-foreground">{log.action}</span>
+                              {" "}
+                              <span className="font-mono text-[10px] text-muted-foreground">{log.entity}</span>
+                              {log.reason && (
+                                <>
+                                  {" — "}
+                                  <span className="text-muted-foreground italic">{log.reason}</span>
+                                </>
+                              )}
+                            </p>
+                            <p className="text-[10px] text-muted-foreground mt-0.5">
+                              {new Date(log.createdAt).toLocaleString()}
+                            </p>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="p-6">
+                    <EmptyState
+                      icon={<Activity className="h-5 w-5" />}
+                      title="No activity yet"
+                      description="Audit events will appear here as you use the platform."
+                    />
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
         </>
       )}
     </div>
   );
+}
+
+function getActivityIcon(action: string): React.ReactNode {
+  const iconClass = "h-3 w-3 text-white";
+  switch (action) {
+    case "create":
+      return <Plus className={iconClass} />;
+    case "update":
+      return <Pencil className={iconClass} />;
+    case "delete":
+      return <Trash2 className={iconClass} />;
+    case "scan":
+    case "extract":
+      return <Sparkles className={iconClass} />;
+    case "approve":
+      return <CheckCircle2 className={iconClass} />;
+    case "share":
+      return <Share2 className={iconClass} />;
+    case "export":
+      return <Download className={iconClass} />;
+    default:
+      return <Activity className={iconClass} />;
+  }
+}
+
+function getActivityColor(action: string, actorType: string): string {
+  if (actorType === "ai") return "bg-violet-500";
+  if (actorType === "system") return "bg-slate-500";
+  switch (action) {
+    case "create":
+      return "bg-emerald-500";
+    case "update":
+      return "bg-sky-500";
+    case "delete":
+      return "bg-destructive";
+    case "scan":
+    case "extract":
+      return "bg-violet-500";
+    case "approve":
+      return "bg-emerald-500";
+    case "share":
+      return "bg-amber-500";
+    case "export":
+      return "bg-rose-500";
+    default:
+      return "bg-slate-500";
+  }
 }
 
 function timeAgoShort(ts: number): string {

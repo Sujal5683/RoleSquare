@@ -54,6 +54,7 @@ model Organization {
   usageMetrics  UsageMetric[]
   sharingReqs   SharingRequest[]
   sharePerms    SharingPermission[]
+  webhooks      Webhook[]
 }
 
 model OrganizationMember {
@@ -279,15 +280,16 @@ model Schema {
 }
 
 model SchemaField {
-  id           String  @id @default(cuid())
-  schemaId     String
-  name         String
-  type         String  // text | number | date | boolean | enum | array | multiselect
-  description  String?
-  instructions String?
-  required     Boolean @default(false)
-  options      String? // JSON array for enum/multiselect
-  position     Int     @default(0)
+  id                String  @id @default(cuid())
+  schemaId          String
+  name              String
+  type              String  // text | number | date | boolean | enum | array | multiselect
+  description       String?
+  instructions      String?
+  required          Boolean @default(false)
+  options           String? // JSON array for enum/multiselect
+  position          Int     @default(0)
+  confidenceThreshold Float  @default(0.7) // min confidence before routing to review (0..1)
 
   schema Schema @relation(fields: [schemaId], references: [id], onDelete: Cascade)
 
@@ -474,4 +476,22 @@ model UsageMetric {
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   @@index([organizationId, metricType])
+}
+
+model Webhook {
+  id             String   @id @default(cuid())
+  organizationId String
+  url            String
+  secret         String?
+  events         String   @default("source.run_completed,extraction.completed,review.needed,job.failed") // comma-separated
+  status         String   @default("active") // active | paused | failing
+  lastTriggeredAt DateTime?
+  lastResponseCode Int?
+  failureCount   Int      @default(0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
 }

@@ -39,6 +39,7 @@ import {
   Zap,
   Clock,
   ArrowRight,
+  TrendingUp,
   type LucideIcon,
 } from "lucide-react";
 
@@ -230,6 +231,15 @@ export function CommandPalette() {
       action: () => navigate("sharing"),
       group: "Navigate",
       keywords: "permissions access approve",
+    },
+    {
+      id: "nav-usage",
+      label: "Usage & Billing",
+      description: "Token consumption, costs, and quota trends",
+      icon: TrendingUp,
+      action: () => navigate("usage"),
+      group: "Navigate",
+      keywords: "usage billing cost tokens quota metrics charts",
     },
     {
       id: "nav-organizations",

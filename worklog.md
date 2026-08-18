@@ -737,3 +737,157 @@ Building on the previous round (CRON-1), the platform is stable:
 9. **Add dataset record count badges** in the sidebar for quick at-a-glance status
 10. **Add export scheduling** (weekly CSV exports delivered via email or download link)
 
+
+---
+
+## Cron Review Phase 3 — Usage Dashboard + Clone + Import + Animations
+
+**Task ID:** CRON-3
+**Agent:** main (Z.ai Code)
+**Task:** QA assessment + add Usage Dashboard, clone actions, CSV import, and landing page animations
+
+### Current Project Status Assessment
+
+Building on CRON-1 (command palette, notifications, keyboard shortcuts) and CRON-2 (global search, bulk actions, saved views), the platform is stable:
+- **Lint**: clean (0 errors, 0 warnings)
+- **Page compilation**: HTTP 200 on landing page
+- **All API endpoints**: return HTTP 200 with real seeded data
+- **14 frontend views** (now includes Usage & Billing)
+- **37 API routes** (now includes /api/usage/trends, /api/sources/[id]/clone, /api/schemas/[id]/clone, /api/datasets/[id]/import, /api/search)
+- **OOM issue**: persistent in 4GB sandbox; not a code issue
+
+### Completed Modifications
+
+#### 1. Usage & Billing Dashboard — NEW VIEW
+- **File**: `src/components/views/usage-view.tsx` — NEW (14th view)
+- **File**: `src/app/api/usage/trends/route.ts` — NEW API endpoint
+
+**API returns:**
+- `dailyTokens`: 30-day daily AI token consumption with cost
+- `jobTypeData`: job counts by type (GMAIL_SCAN, AI_EXTRACTION, etc.) with color coding
+- `jobStatusData`: job counts by status (success, failed, running, queued, retry, dlq)
+- `costByMetric`: cost breakdown by metric type (ai_tokens, emails_scanned, documents_parsed, exports, storage)
+- `modelUsage`: per-model token counts, call counts, and costs
+- `monthlySummary`: current vs previous month tokens, emails, and cost with trend percentages
+- `quota`: plan-based quota limit, used, remaining, and percentage (free=1K, team=100K, enterprise=1M)
+- `counts`: total sources, datasets, jobs, outputs, and tokens
+
+**View features:**
+- 4 KPI StatCards: Tokens (this month), Cost, Emails scanned, Quota used — each with trend indicators
+- Quota utilization progress bar with color-coded status (green < 60%, amber < 85%, red >= 85%)
+- "Near quota limit" warning when >= 85%
+- "Upgrade plan" link to Settings
+- **Area chart**: 30-day daily token consumption with gradient fill and custom tooltip showing tokens + cost
+- **Horizontal bar chart**: Job type distribution with color-coded bars matching the API colors
+- **Pie/donut chart**: Job status distribution with legend
+- **Model usage table**: Per-model tokens, calls, and cost
+- **Cost breakdown table**: Per-metric units, cost, with total row
+- **Platform summary**: 5 stat items (total jobs, AI outputs, total tokens, sources, datasets)
+- Uses recharts (AreaChart, BarChart, PieChart) with responsive containers and custom tooltips
+
+**Verified via curl**: 482,300 tokens, $482.30 cost, 100% quota (team plan), 30 daily data points, 6 job types, 1 model ✅
+**Browser-verified**: 8 recharts SVG charts present, KPI cards and quota section render correctly ✅
+
+**Navigation:**
+- Added "Usage & Billing" nav item in the sidebar (Workspace group) with TrendingUp icon
+- Added "Usage & Billing" to the command palette navigation (with "usage billing cost tokens quota metrics charts" keywords)
+- Added "usage" to the ViewId type
+
+#### 2. Clone Actions — NEW
+- **Files**: `src/app/api/sources/[id]/clone/route.ts`, `src/app/api/schemas/[id]/clone/route.ts` — NEW API endpoints
+- **Files**: `src/components/views/sources-view.tsx`, `src/components/views/schema-builder-view.tsx` — updated with Clone buttons
+
+**Source clone (`POST /api/sources/[id]/clone`):**
+- Creates a new source with the same: googleConnection, schema, dataset, sourceType, schedule, config, and all rules
+- New source starts as "paused" so the user can review and activate
+- Name is provided in the request body (defaults to "Cloned Source")
+- Description gets "(cloned)" suffix
+- Logs an audit event with `clonedFrom` reference
+- **Verified via curl**: "Cloned Source" created with status=paused ✅
+
+**Schema clone (`POST /api/schemas/[id]/clone`):**
+- Creates a new schema with the same: fields (all copied), promptTemplate, description
+- New schema starts at version 1
+- Logs an audit event
+
+**UI:**
+- Sources view: "Clone" dropdown menu item (with Copy icon) between Pause/Resume and Delete
+- Prompts for a new name (defaults to "{name} (copy)")
+- On success: toast notification + invalidates queries
+- Schema Builder: "Clone" button next to "New schema" button (only visible when a schema is active)
+- Same prompt + toast pattern
+
+#### 3. CSV/JSON Import — NEW
+- **File**: `src/app/api/datasets/[id]/import/route.ts` — NEW API endpoint
+- **File**: `src/components/views/dataset-detail-view.tsx` — updated with Import button and dialog
+
+**API (`POST /api/datasets/[id]/import`):**
+- Accepts `{ format: "csv" | "json", data: string }`
+- CSV parsing: handles quoted fields with commas, header row required, field names matched case-insensitively
+- JSON parsing: expects an array of objects with field-name keys
+- Values are type-coerced based on schema field type:
+  - number → Number()
+  - boolean → /^(true|yes|1|y)$/i test
+  - array/multiselect → split by ";"
+  - date → string (ISO)
+  - text/enum → string
+- All imported records get status="valid", confidence=1.0, evidence="Imported via CSV/JSON upload", modelUsed="manual"
+- Transactionally creates records + values and increments dataset recordCount
+- Logs an audit event
+
+**UI:**
+- "Import" button in the filter bar (next to "Save view" and "Columns")
+- Import dialog with:
+  - Format toggle (CSV / JSON)
+  - "Expected fields" panel showing all schema field names
+  - Large textarea with format-appropriate placeholder
+  - Import button with loading state
+- On success: toast + invalidates queries + closes dialog
+
+#### 4. Landing Page Hero Animations — ENHANCED
+- **File**: `src/app/globals.css` — added 4 new CSS animations
+- **File**: `src/components/views/landing-view.tsx` — applied animations
+
+**New CSS utilities:**
+- `animated-gradient`: 12s animated gradient shift across 5 color stops (violet → fuchsia → cyan → emerald → violet)
+- `pulse-glow`: 4s pulsing box-shadow glow effect
+- `slide-up`: 0.5s slide-up entrance animation
+- `slide-up-stagger`: Staggered slide-up for list items (9 items with 0.05s incremental delays)
+- `hover-lift`: 0.2s transform + box-shadow hover effect
+
+**Landing page hero:**
+- Background: animated gradient at 8% opacity + dot grid pattern at 3% opacity
+- Two glow orbs (violet + fuchsia) with blur and pulse-glow animation
+- Hero text container: slide-up entrance animation
+- Badge: pulse-glow effect on the "AI-native · Evidence-backed · Multi-tenant" badge
+- Pipeline illustration: staggered slide-up (5 steps with incremental delays)
+- Capability cards: hover-lift effect for a more premium feel
+
+### Verification Results
+
+- `bun run lint` → 0 errors, 0 warnings ✅
+- `curl http://localhost:3000/` → HTTP 200 ✅
+- `curl http://localhost:3000/api/usage/trends` → 200 with comprehensive data ✅
+- `curl -X POST /api/sources/[id]/clone` → 200, "Cloned Source" created with status=paused ✅
+- Browser-verified: Usage view renders with 8 recharts charts, all KPIs correct ✅
+- Browser-verified: 482,300 tokens, $482.30 cost, 100% quota, "Near quota limit" warning ✅
+- No compilation errors, no import errors ✅
+
+### Unresolved Issues / Risks
+1. **OOM in sandbox**: Dev server + Chromium exceeds 4GB. Landing page animations couldn't be browser-verified because the server died during the test. The CSS classes are in place and lint-clean.
+2. **Google OAuth simulated**: No real Google Cloud credentials.
+3. **BullMQ/Redis replaced**: Jobs stored in DB with status tracking.
+4. **pgvector/RAG replaced**: Text-based extraction only.
+
+### Recommended Next Steps (Priority Order)
+1. **Add drag-and-drop field reordering** in the Schema Builder (currently uses up/down buttons)
+2. **Add per-field confidence thresholds** in schema builder (auto-route to review if below threshold)
+3. **Add real-time job progress** using WebSocket (mini-service) for live updates during extraction
+4. **Add email notification templates** in Settings (for source run failures, review queue items)
+5. **Add a global activity feed** showing recent audit events as a notification stream
+6. **Add export scheduling** (weekly CSV exports delivered via email or download link)
+7. **Add dataset record count badges** in the sidebar for quick at-a-glance status
+8. **Add a help/onboarding tour** for first-time users
+9. **Add multi-model fallback chain** visualization in AI Studio (Gemini → Claude → GPT-4)
+10. **Add webhook configuration** for external integrations
+

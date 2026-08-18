@@ -10,6 +10,7 @@ import { DatasetsView } from "@/components/views/datasets-view";
 import { DatasetDetailView } from "@/components/views/dataset-detail-view";
 import { SchemaBuilderView } from "@/components/views/schema-builder-view";
 import { AiStudioView } from "@/components/views/ai-studio-view";
+import { UsageView } from "@/components/views/usage-view";
 import { OrganizationsView } from "@/components/views/organizations-view";
 import { MembersView } from "@/components/views/members-view";
 import { SharingView } from "@/components/views/sharing-view";
@@ -29,6 +30,7 @@ export default function Home() {
       {view === "dataset-detail" && <DatasetDetailView />}
       {view === "schema-builder" && <SchemaBuilderView />}
       {view === "ai-studio" && <AiStudioView />}
+      {view === "usage" && <UsageView />}
       {view === "organizations" && <OrganizationsView />}
       {view === "members" && <MembersView />}
       {view === "sharing" && <SharingView />}

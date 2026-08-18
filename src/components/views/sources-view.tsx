@@ -80,6 +80,7 @@ import {
   Activity,
   Zap,
   X,
+  Copy,
 } from "lucide-react";
 
 // ── Helpers ──────────────────────────────────────────────────────────────
@@ -713,6 +714,30 @@ export function SourcesView() {
                                     Pause
                                   </DropdownMenuItem>
                                 )}
+                                <DropdownMenuItem
+                                  onClick={() => {
+                                    const name = prompt("Clone source name:", `${s.name} (copy)`);
+                                    if (name) {
+                                      fetch(`/api/sources/${s.id}/clone`, {
+                                        method: "POST",
+                                        headers: { "Content-Type": "application/json" },
+                                        body: JSON.stringify({ name }),
+                                      })
+                                        .then((r) => r.json())
+                                        .then(() => {
+                                          toast.success("Source cloned", {
+                                            description: `"${name}" created as paused. Review and activate.`,
+                                          });
+                                          queryClient.invalidateQueries({ queryKey: ["sources"] });
+                                          queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+                                        })
+                                        .catch(() => toast.error("Clone failed"));
+                                    }
+                                  }}
+                                >
+                                  <Copy className="mr-2 h-4 w-4" />
+                                  Clone
+                                </DropdownMenuItem>
                                 <DropdownMenuSeparator />
                                 <DropdownMenuItem
                                   className="text-destructive focus:text-destructive"

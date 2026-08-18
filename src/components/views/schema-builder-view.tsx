@@ -63,6 +63,7 @@ import {
   AlertCircle,
   ChevronLeft,
   FileText,
+  Copy,
 } from "lucide-react";
 
 // ── Constants ────────────────────────────────────────────────────────────
@@ -392,6 +393,38 @@ export function SchemaBuilderView() {
               <Plus className="mr-2 h-3.5 w-3.5" />
               New schema
             </Button>
+            {activeSchemaId && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  const name = prompt(
+                    "Cloned schema name:",
+                    `${activeSchema?.name ?? "Schema"} (copy)`
+                  );
+                  if (name && activeSchemaId) {
+                    fetch(`/api/schemas/${activeSchemaId}/clone`, {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ name }),
+                    })
+                      .then((r) => r.json())
+                      .then((cloned) => {
+                        toast.success("Schema cloned", {
+                          description: `"${name}" created with ${cloned.fields?.length ?? 0} fields.`,
+                        });
+                        queryClient.invalidateQueries({ queryKey: ["schemas"] });
+                        setActiveSchemaId(cloned.id);
+                      })
+                      .catch(() => toast.error("Clone failed"));
+                  }
+                }}
+                title="Clone this schema with all its fields"
+              >
+                <Copy className="mr-2 h-3.5 w-3.5" />
+                Clone
+              </Button>
+            )}
           </div>
         </CardContent>
       </Card>

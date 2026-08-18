@@ -97,6 +97,7 @@ import {
   FileText,
   Hash,
   Bookmark,
+  Upload,
 } from "lucide-react";
 
 // ── Helpers ──────────────────────────────────────────────────────────────
@@ -224,6 +225,9 @@ export function DatasetDetailView() {
   });
   const [saveViewDialog, setSaveViewDialog] = useState(false);
   const [newViewName, setNewViewName] = useState("");
+  const [importDialog, setImportDialog] = useState(false);
+  const [importData, setImportData] = useState("");
+  const [importFormat, setImportFormat] = useState<"csv" | "json">("csv");
 
   // Persist saved views to localStorage whenever they change
   const persistSavedViews = (views: typeof savedViews) => {
@@ -330,6 +334,29 @@ export function DatasetDetailView() {
     onError: (err: unknown) => {
       const msg = err instanceof Error ? err.message : "Failed to export";
       toast.error("Export failed", { description: msg });
+    },
+  });
+
+  // ── Import mutation (CSV/JSON) ───────────────────────────────────────
+  const importMutation = useMutation({
+    mutationFn: (vars: { format: "csv" | "json"; data: string }) =>
+      api.post<{ imported: number }>(
+        `/api/datasets/${datasetId}/import`,
+        vars
+      ),
+    onSuccess: (res) => {
+      toast.success("Import complete", {
+        description: `${res.imported} record(s) imported successfully.`,
+      });
+      queryClient.invalidateQueries({ queryKey: ["dataset-records", datasetId] });
+      queryClient.invalidateQueries({ queryKey: ["dataset", datasetId] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+      setImportDialog(false);
+      setImportData("");
+    },
+    onError: (err: unknown) => {
+      const msg = err instanceof Error ? err.message : "Failed to import";
+      toast.error("Import failed", { description: msg });
     },
   });
 
@@ -555,7 +582,7 @@ export function DatasetDetailView() {
               </div>
             </div>
 
-            {/* Save view + Column visibility */}
+            {/* Save view + Import + Column visibility */}
             <div className="flex items-center gap-2 shrink-0">
               <Button
                 variant="outline"
@@ -565,6 +592,15 @@ export function DatasetDetailView() {
               >
                 <Bookmark className="mr-1.5 h-3.5 w-3.5" />
                 Save view
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setImportDialog(true)}
+                title="Bulk import records from CSV or JSON"
+              >
+                <Upload className="mr-1.5 h-3.5 w-3.5" />
+                Import
               </Button>
               <Popover>
               <PopoverTrigger asChild>
@@ -872,6 +908,83 @@ export function DatasetDetailView() {
             >
               <Bookmark className="mr-1.5 h-3.5 w-3.5" />
               Save view
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Import dialog */}
+      <Dialog open={importDialog} onOpenChange={setImportDialog}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Bulk import records</DialogTitle>
+            <DialogDescription>
+              Paste CSV or JSON data to create records in bulk. Field names must
+              match the schema field names (case-insensitive). All imported
+              records are created with status "valid" and 100% confidence
+              (human-verified import).
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <div className="flex items-center gap-2">
+              <Button
+                variant={importFormat === "csv" ? "default" : "outline"}
+                size="sm"
+                onClick={() => setImportFormat("csv")}
+              >
+                CSV format
+              </Button>
+              <Button
+                variant={importFormat === "json" ? "default" : "outline"}
+                size="sm"
+                onClick={() => setImportFormat("json")}
+              >
+                JSON format
+              </Button>
+            </div>
+            <div className="rounded-md border bg-muted/30 p-3 text-xs">
+              <p className="font-medium mb-1">Expected fields:</p>
+              <p className="font-mono text-muted-foreground">
+                {allFields.map((f) => f.name).join(", ")}
+              </p>
+            </div>
+            <div>
+              <Label htmlFor="import-data">
+                {importFormat === "csv" ? "CSV data" : "JSON array"}
+              </Label>
+              <Textarea
+                id="import-data"
+                rows={8}
+                placeholder={
+                  importFormat === "csv"
+                    ? `${allFields.map((f) => f.name).join(",")}\nvalue1,value2,...`
+                    : JSON.stringify(
+                        allFields.reduce(
+                          (acc, f) => ({ ...acc, [f.name]: "..." }),
+                          {}
+                        ),
+                        null,
+                        2
+                      )
+                }
+                value={importData}
+                onChange={(e) => setImportData(e.target.value)}
+                className="font-mono text-xs"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setImportDialog(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={() =>
+                importMutation.mutate({ format: importFormat, data: importData })
+              }
+              disabled={!importData.trim() || importMutation.isPending}
+            >
+              <Upload className="mr-1.5 h-3.5 w-3.5" />
+              {importMutation.isPending ? "Importing…" : `Import ${importFormat.toUpperCase()}`}
             </Button>
           </DialogFooter>
         </DialogContent>

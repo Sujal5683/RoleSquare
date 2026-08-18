@@ -190,6 +190,9 @@ export function SettingsView() {
           </TabsContent>
           <TabsContent value="integrations" className="mt-0">
             <IntegrationsSection />
+            <div className="mt-6">
+              <WebhooksSection />
+            </div>
           </TabsContent>
         </div>
       </Tabs>
@@ -1438,6 +1441,280 @@ function IntegrationsSection() {
             </div>
           ))}
         </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+// ── Webhooks section ─────────────────────────────────────────────────────
+
+interface WebhookDTO {
+  id: string;
+  url: string;
+  secret: string | null;
+  events: string[];
+  status: string;
+  lastTriggeredAt: string | null;
+  lastResponseCode: number | null;
+  failureCount: number;
+  createdAt: string;
+}
+
+const WEBHOOK_EVENTS = [
+  { value: "source.run_completed", label: "Source run completed" },
+  { value: "extraction.completed", label: "Extraction completed" },
+  { value: "review.needed", label: "Review needed" },
+  { value: "job.failed", label: "Job failed" },
+  { value: "sharing.requested", label: "Sharing requested" },
+  { value: "record.approved", label: "Record approved" },
+];
+
+function WebhooksSection() {
+  const [webhooks, setWebhooks] = useState<WebhookDTO[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [createOpen, setCreateOpen] = useState(false);
+  const [newUrl, setNewUrl] = useState("");
+  const [newSecret, setNewSecret] = useState("");
+  const [newEvents, setNewEvents] = useState<string[]>([
+    "source.run_completed",
+    "extraction.completed",
+    "review.needed",
+    "job.failed",
+  ]);
+  const [testingId, setTestingId] = useState<string | null>(null);
+  const [testResult, setTestResult] = useState<Record<string, { success: boolean; statusCode: number; elapsed: number; responseBody: string }>>({});
+
+  const load = () => {
+    setLoading(true);
+    fetch("/api/webhooks")
+      .then((r) => r.json())
+      .then((data) => {
+        setWebhooks(Array.isArray(data) ? data : []);
+        setLoading(false);
+      })
+      .catch(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    load();
+  }, []);
+
+  const handleCreate = () => {
+    if (!newUrl.trim()) return;
+    fetch("/api/webhooks", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ url: newUrl, secret: newSecret || null, events: newEvents }),
+    })
+      .then((r) => r.json())
+      .then(() => {
+        toast.success("Webhook created");
+        setCreateOpen(false);
+        setNewUrl("");
+        setNewSecret("");
+        load();
+      })
+      .catch(() => toast.error("Failed to create webhook"));
+  };
+
+  const handleDelete = (id: string) => {
+    if (!confirm("Delete this webhook?")) return;
+    fetch(`/api/webhooks/${id}`, { method: "DELETE" })
+      .then(() => {
+        toast.success("Webhook deleted");
+        load();
+      })
+      .catch(() => toast.error("Failed to delete webhook"));
+  };
+
+  const handleTest = (id: string) => {
+    setTestingId(id);
+    fetch(`/api/webhooks/${id}/test`, { method: "POST" })
+      .then((r) => r.json())
+      .then((result) => {
+        setTestResult((prev) => ({ ...prev, [id]: result }));
+        if (result.success) {
+          toast.success("Test ping succeeded", {
+            description: `HTTP ${result.statusCode} in ${result.elapsed}ms`,
+          });
+        } else {
+          toast.error("Test ping failed", {
+            description: result.responseBody?.slice(0, 100) || `HTTP ${result.statusCode}`,
+          });
+        }
+        load();
+      })
+      .catch(() => toast.error("Test failed"))
+      .finally(() => setTestingId(null));
+  };
+
+  const toggleEvent = (event: string) => {
+    setNewEvents((prev) =>
+      prev.includes(event) ? prev.filter((e) => e !== event) : [...prev, event]
+    );
+  };
+
+  return (
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between pb-3">
+        <div>
+          <CardTitle className="text-base flex items-center gap-2">
+            <Webhook className="h-4 w-4" /> Webhooks
+          </CardTitle>
+          <p className="text-xs text-muted-foreground mt-1">
+            Send real-time event notifications to external systems.
+          </p>
+        </div>
+        <Button size="sm" onClick={() => setCreateOpen(true)}>
+          <Plus className="mr-1.5 h-3.5 w-3.5" /> Add webhook
+        </Button>
+      </CardHeader>
+      <CardContent>
+        {loading ? (
+          <div className="space-y-3">
+            {[1, 2].map((i) => (
+              <div key={i} className="h-20 rounded-md bg-muted animate-pulse" />
+            ))}
+          </div>
+        ) : webhooks.length === 0 ? (
+          <EmptyState
+            icon={<Webhook className="h-5 w-5" />}
+            title="No webhooks configured"
+            description="Add a webhook to receive real-time event notifications when sources complete runs, extractions finish, or jobs fail."
+            action={
+              <Button size="sm" onClick={() => setCreateOpen(true)}>
+                <Plus className="mr-1.5 h-3.5 w-3.5" /> Add webhook
+              </Button>
+            }
+          />
+        ) : (
+          <div className="space-y-3">
+            {webhooks.map((w) => {
+              const result = testResult[w.id];
+              return (
+                <div key={w.id} className="rounded-lg border p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <code className="text-xs font-mono truncate max-w-md">{w.url}</code>
+                        <Badge
+                          variant={
+                            w.status === "active" ? "default" :
+                            w.status === "failing" ? "destructive" : "secondary"
+                          }
+                          className="text-[9px] capitalize"
+                        >
+                          {w.status}
+                        </Badge>
+                      </div>
+                      <div className="flex flex-wrap gap-1 mb-2">
+                        {w.events.map((e) => (
+                          <Badge key={e} variant="outline" className="text-[9px] font-mono">
+                            {e}
+                          </Badge>
+                        ))}
+                      </div>
+                      <p className="text-[10px] text-muted-foreground">
+                        {w.lastTriggeredAt
+                          ? `Last triggered ${new Date(w.lastTriggeredAt).toLocaleString()}`
+                          : "Never triggered"}
+                        {w.lastResponseCode ? ` · HTTP ${w.lastResponseCode}` : ""}
+                        {w.failureCount > 0 && ` · ${w.failureCount} failures`}
+                      </p>
+                      {result && (
+                        <div className={`mt-2 rounded-md p-2 text-xs ${result.success ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300" : "bg-destructive/10 text-destructive"}`}>
+                          <p className="font-medium">
+                            {result.success ? "✓ Ping succeeded" : "✗ Ping failed"} — HTTP {result.statusCode} in {result.elapsed}ms
+                          </p>
+                          {result.responseBody && (
+                            <pre className="mt-1 text-[10px] opacity-80 overflow-x-auto max-h-20">{result.responseBody}</pre>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex flex-col gap-2 shrink-0">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleTest(w.id)}
+                        disabled={testingId === w.id}
+                      >
+                        {testingId === w.id ? (
+                          <RefreshCw className="mr-1.5 h-3 w-3 animate-spin" />
+                        ) : (
+                          <Zap className="mr-1.5 h-3 w-3" />
+                        )}
+                        Test
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="text-destructive hover:text-destructive"
+                        onClick={() => handleDelete(w.id)}
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Create dialog */}
+        {createOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => setCreateOpen(false)}>
+            <div className="bg-background rounded-lg border p-6 max-w-lg w-full max-h-[80vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+              <h3 className="text-lg font-semibold mb-1">Add webhook</h3>
+              <p className="text-sm text-muted-foreground mb-4">
+                Configure an external endpoint to receive event notifications.
+              </p>
+              <div className="space-y-4">
+                <div>
+                  <Label>Endpoint URL</Label>
+                  <Input
+                    placeholder="https://api.example.com/webhooks/wip"
+                    value={newUrl}
+                    onChange={(e) => setNewUrl(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <Label>Secret (optional)</Label>
+                  <Input
+                    type="password"
+                    placeholder="Sent as X-WIP-Signature header"
+                    value={newSecret}
+                    onChange={(e) => setNewSecret(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <Label>Events to subscribe</Label>
+                  <div className="space-y-2 mt-2">
+                    {WEBHOOK_EVENTS.map((e) => (
+                      <label key={e.value} className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={newEvents.includes(e.value)}
+                          onChange={() => toggleEvent(e.value)}
+                          className="rounded"
+                        />
+                        <span className="text-sm">{e.label}</span>
+                        <code className="text-[10px] text-muted-foreground font-mono">{e.value}</code>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              </div>
+              <div className="flex justify-end gap-2 mt-6">
+                <Button variant="outline" onClick={() => setCreateOpen(false)}>Cancel</Button>
+                <Button onClick={handleCreate} disabled={!newUrl.trim()}>
+                  Create webhook
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
       </CardContent>
     </Card>
   );

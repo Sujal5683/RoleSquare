@@ -63,18 +63,21 @@ export function LandingView() {
 
       {/* Hero */}
       <section className="relative overflow-hidden border-b">
-        <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-primary/10" />
+        <div className="absolute inset-0 animated-gradient opacity-[0.08]" />
         <div
-          className="absolute inset-0 opacity-[0.04]"
+          className="absolute inset-0 opacity-[0.03]"
           style={{
             backgroundImage:
               "radial-gradient(circle at 1px 1px, currentColor 1px, transparent 0)",
             backgroundSize: "32px 32px",
           }}
         />
+        {/* Glow orbs */}
+        <div className="absolute top-0 left-1/4 h-72 w-72 rounded-full bg-violet-500/10 blur-3xl pulse-glow" />
+        <div className="absolute bottom-0 right-1/4 h-96 w-96 rounded-full bg-fuchsia-500/10 blur-3xl" />
         <div className="relative mx-auto max-w-7xl px-4 py-20 sm:px-6 lg:px-8 lg:py-28">
-          <div className="mx-auto max-w-3xl text-center">
-            <Badge variant="outline" className="mb-5 gap-1.5">
+          <div className="mx-auto max-w-3xl text-center slide-up">
+            <Badge variant="outline" className="mb-5 gap-1.5 pulse-glow">
               <Sparkles className="h-3 w-3" /> AI-native · Evidence-backed · Multi-tenant
             </Badge>
             <h1 className="text-4xl font-bold tracking-tight sm:text-5xl lg:text-6xl">
@@ -109,7 +112,7 @@ export function LandingView() {
           </div>
 
           {/* Pipeline illustration */}
-          <div className="mt-16 grid gap-4 sm:grid-cols-3 lg:grid-cols-5">
+          <div className="mt-16 grid gap-4 sm:grid-cols-3 lg:grid-cols-5 slide-up-stagger">
             {[
               { icon: Mail, label: "Gmail/Drive", desc: "Sources" },
               { icon: GitBranch, label: "Rules", desc: "Filter & match" },
@@ -155,7 +158,7 @@ export function LandingView() {
               return (
                 <div
                   key={cap.title}
-                  className="group rounded-xl border bg-card p-6 shadow-sm transition-all hover:shadow-md hover:-translate-y-0.5"
+                  className="group rounded-xl border bg-card p-6 shadow-sm transition-all hover:shadow-md hover:-translate-y-0.5 hover-lift"
                 >
                   <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-lg bg-primary/10 text-primary group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
                     <Icon className="h-5 w-5" />

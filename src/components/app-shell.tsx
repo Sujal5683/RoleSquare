@@ -39,6 +39,7 @@ import {
   HelpCircle,
   LogOut,
   Zap,
+  TrendingUp,
   Command as CommandIcon,
   type LucideIcon,
 } from "lucide-react";
@@ -60,6 +61,7 @@ const NAV_ITEMS: NavItem[] = [
   { id: "datasets", label: "Datasets", icon: Database, group: "Workspace" },
   { id: "schema-builder", label: "Schema Builder", icon: FileJson, group: "Workspace" },
   { id: "ai-studio", label: "AI Studio", icon: Sparkles, group: "Workspace" },
+  { id: "usage", label: "Usage & Billing", icon: TrendingUp, group: "Workspace" },
   { id: "sharing", label: "Sharing Center", icon: Share2, group: "Governance" },
   { id: "organizations", label: "Organizations", icon: Building2, group: "Governance" },
   { id: "members", label: "Members", icon: Users, group: "Governance" },

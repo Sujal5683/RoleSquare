@@ -10,6 +10,7 @@ export type ViewId =
   | "dataset-detail"
   | "schema-builder"
   | "ai-studio"
+  | "usage"
   | "organizations"
   | "members"
   | "sharing"
@@ -101,6 +102,7 @@ export interface SchemaFieldDTO {
   required: boolean;
   options: string[] | null;
   position: number;
+  confidenceThreshold: number;
 }
 
 export interface SchemaDTO {

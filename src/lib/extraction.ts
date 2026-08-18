@@ -25,6 +25,8 @@ export interface SchemaFieldInput {
   instructions?: string | null;
   required?: boolean;
   options?: string[] | null;
+  /** Minimum confidence before this field is routed to human review (0..1). Default 0.7. */
+  confidenceThreshold?: number;
 }
 
 export interface ExtractOptions {
@@ -33,6 +35,14 @@ export interface ExtractOptions {
   sourceFile?: string;
   /** Optional override of the system prompt (e.g. a custom prompt template). */
   systemOverride?: string;
+}
+
+export interface FieldReviewFlag {
+  fieldName: string;
+  confidence: number;
+  threshold: number;
+  needsReview: boolean;
+  reason: string;
 }
 
 /**
@@ -110,4 +120,34 @@ export async function extractWithLLM(
     tokensUsed,
     overallConfidence,
   };
+}
+
+/**
+ * Compares each field's confidence against its schema-defined threshold
+ * and returns a list of fields that need human review.
+ *
+ * Fields with confidence below their threshold are flagged for review.
+ * Fields without a threshold default to 0.7.
+ */
+export function flagFieldsForReview(
+  fields: ExtractionFieldResult[],
+  schemaFields: SchemaFieldInput[]
+): FieldReviewFlag[] {
+  const thresholdByName = new Map(
+    schemaFields.map((f) => [f.name, f.confidenceThreshold ?? 0.7])
+  );
+
+  return fields.map((f) => {
+    const threshold = thresholdByName.get(f.fieldName) ?? 0.7;
+    const needsReview = f.confidence < threshold;
+    return {
+      fieldName: f.fieldName,
+      confidence: f.confidence,
+      threshold,
+      needsReview,
+      reason: needsReview
+        ? `Confidence ${Math.round(f.confidence * 100)}% below threshold ${Math.round(threshold * 100)}%`
+        : `Confidence ${Math.round(f.confidence * 100)}% meets threshold ${Math.round(threshold * 100)}%`,
+    };
+  });
 }

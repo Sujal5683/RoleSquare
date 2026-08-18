@@ -124,6 +124,7 @@ export function serializeSchemaField(f: any): SchemaFieldDTO {
     required: !!f.required,
     options: f.options ? parseJson<string[] | null>(f.options, null) : null,
     position: f.position,
+    confidenceThreshold: f.confidenceThreshold ?? 0.7,
   };
 }
 

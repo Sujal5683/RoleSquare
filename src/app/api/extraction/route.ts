@@ -12,7 +12,7 @@ import { db } from "@/lib/db";
 import { requireOrgContext } from "@/lib/auth";
 import { logAudit } from "@/lib/audit";
 import { bumpUsageMetric } from "@/lib/usage";
-import { extractWithLLM } from "@/lib/extraction";
+import { extractWithLLM, flagFieldsForReview } from "@/lib/extraction";
 import type { ExtractionFieldResult } from "@/lib/types";
 
 export async function POST(req: NextRequest) {
@@ -55,6 +55,7 @@ export async function POST(req: NextRequest) {
         instructions: f.instructions,
         required: f.required,
         options: f.options ? JSON.parse(f.options) : null,
+        confidenceThreshold: f.confidenceThreshold,
       })),
       sourceText,
       sourceFile,
@@ -67,6 +68,10 @@ export async function POST(req: NextRequest) {
     const validatedFields: ExtractionFieldResult[] = result.fields.filter(
       (f) => validFieldNames.has(f.fieldName)
     );
+
+    // Flag fields that fall below their per-field confidence threshold.
+    const reviewFlags = flagFieldsForReview(validatedFields, schema.fields);
+    const fieldsNeedingReview = reviewFlags.filter((f) => f.needsReview).length;
 
     if (result.tokensUsed > 0) {
       await bumpUsageMetric(organizationId, "ai_tokens", result.tokensUsed);
@@ -83,12 +88,15 @@ export async function POST(req: NextRequest) {
         tokensUsed: result.tokensUsed,
         overallConfidence: result.overallConfidence,
         sourceFile,
+        fieldsNeedingReview,
       },
     });
 
     return NextResponse.json({
       ...result,
       fields: validatedFields,
+      reviewFlags,
+      fieldsNeedingReview,
     });
   } catch (err) {
     return NextResponse.json(
