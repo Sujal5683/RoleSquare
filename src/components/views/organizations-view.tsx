@@ -1,0 +1,706 @@
+"use client";
+
+import { useMemo, useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { formatDistanceToNow, format } from "date-fns";
+import { toast } from "sonner";
+import { api } from "@/lib/api-client";
+import { useAppStore } from "@/lib/store";
+import type { OrganizationDTO, MemberDTO, Plan } from "@/lib/types";
+import {
+  PageHeader,
+  EmptyState,
+  LoadingState,
+  ErrorState,
+} from "@/components/ui/page-elements";
+import { PlanBadge } from "@/components/ui/status-badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
+  Building2,
+  Plus,
+  MoreHorizontal,
+  Pencil,
+  Trash2,
+  RefreshCw,
+  ChevronRight,
+  Users,
+  Calendar,
+  Search,
+} from "lucide-react";
+
+// ── Helpers ──────────────────────────────────────────────────────────────
+
+function relativeTime(iso: string | null | undefined): string {
+  if (!iso) return "—";
+  try {
+    return formatDistanceToNow(new Date(iso), { addSuffix: true });
+  } catch {
+    return "—";
+  }
+}
+
+function formatDate(iso: string | null | undefined): string {
+  if (!iso) return "—";
+  try {
+    return format(new Date(iso), "MMM d, yyyy");
+  } catch {
+    return "—";
+  }
+}
+
+function initials(name: string | null | undefined): string {
+  if (!name) return "?";
+  return name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((w) => w[0]?.toUpperCase() ?? "")
+    .join("");
+}
+
+function slugify(s: string): string {
+  return s
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
+}
+
+const PLAN_OPTIONS: { value: Plan; label: string }[] = [
+  { value: "free", label: "Free" },
+  { value: "team", label: "Team" },
+  { value: "enterprise", label: "Enterprise" },
+];
+
+// ── Main component ───────────────────────────────────────────────────────
+
+export function OrganizationsView() {
+  const queryClient = useQueryClient();
+  const setOrganization = useAppStore((s) => s.setOrganization);
+  const setView = useAppStore((s) => s.setView);
+
+  const [search, setSearch] = useState("");
+  const [createOpen, setCreateOpen] = useState(false);
+  const [editTarget, setEditTarget] = useState<OrganizationDTO | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<OrganizationDTO | null>(null);
+
+  // ── Queries ────────────────────────────────────────────────────────────
+  const {
+    data: orgs,
+    isLoading,
+    isError,
+    refetch,
+    isFetching,
+  } = useQuery({
+    queryKey: ["organizations"],
+    queryFn: () => api.get<OrganizationDTO[]>("/api/organizations"),
+  });
+
+  // Fetch members per org (small N — fan out in parallel)
+  const orgIds = useMemo(() => (orgs ?? []).map((o) => o.id), [orgs]);
+  const { data: membersByOrg } = useQuery({
+    queryKey: ["organizations", "members", orgIds],
+    queryFn: async () => {
+      const results: Record<string, MemberDTO[]> = {};
+      await Promise.all(
+        orgIds.map(async (id) => {
+          try {
+            const list = await api.get<MemberDTO[]>(
+              `/api/organizations/${id}/members`
+            );
+            results[id] = list;
+          } catch {
+            results[id] = [];
+          }
+        })
+      );
+      return results;
+    },
+    enabled: orgIds.length > 0,
+  });
+
+  // ── Delete mutation ────────────────────────────────────────────────────
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => api.delete(`/api/organizations/${id}`),
+    onSuccess: () => {
+      toast.success("Organization deleted");
+      queryClient.invalidateQueries({ queryKey: ["organizations"] });
+      queryClient.invalidateQueries({ queryKey: ["session"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+      setDeleteTarget(null);
+    },
+    onError: (err: unknown) => {
+      const msg = err instanceof Error ? err.message : "Failed to delete org";
+      toast.error("Delete failed", { description: msg });
+    },
+  });
+
+  // ── Derived ────────────────────────────────────────────────────────────
+  const filtered = useMemo(() => {
+    if (!orgs) return [];
+    const q = search.trim().toLowerCase();
+    if (!q) return orgs;
+    return orgs.filter(
+      (o) =>
+        o.name.toLowerCase().includes(q) ||
+        o.slug.toLowerCase().includes(q) ||
+        o.plan.toLowerCase().includes(q)
+    );
+  }, [orgs, search]);
+
+  const handleOpen = (org: OrganizationDTO) => {
+    setOrganization(org.id);
+    setView("members");
+  };
+
+  return (
+    <div className="space-y-6">
+      <PageHeader
+        title="Organizations"
+        description="Manage the workspaces you belong to. Each organization has its own sources, datasets, members, and sharing policies."
+        icon={<Building2 className="h-5 w-5" />}
+        actions={
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => refetch()}
+              disabled={isFetching}
+            >
+              <RefreshCw
+                className={`mr-2 h-3.5 w-3.5 ${isFetching ? "animate-spin" : ""}`}
+              />
+              Refresh
+            </Button>
+            <Button size="sm" onClick={() => setCreateOpen(true)}>
+              <Plus className="mr-2 h-3.5 w-3.5" />
+              New organization
+            </Button>
+          </div>
+        }
+      />
+
+      {/* Search */}
+      <Card>
+        <CardContent className="p-4">
+          <div className="relative max-w-md">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              placeholder="Search by name, slug, or plan…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="pl-9"
+            />
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Grid */}
+      {isLoading ? (
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <LoadingState rows={3} />
+        </div>
+      ) : isError ? (
+        <ErrorState
+          message="Failed to load organizations"
+          onRetry={() => refetch()}
+        />
+      ) : filtered.length === 0 ? (
+        <EmptyState
+          icon={<Building2 className="h-5 w-5" />}
+          title={
+            orgs && orgs.length > 0
+              ? "No organizations match your search"
+              : "No organizations yet"
+          }
+          description={
+            orgs && orgs.length > 0
+              ? "Try adjusting your search query."
+              : "Create your first organization to start ingesting sources and building datasets."
+          }
+          action={
+            <Button size="sm" onClick={() => setCreateOpen(true)}>
+              <Plus className="mr-2 h-3.5 w-3.5" />
+              New organization
+            </Button>
+          }
+        />
+      ) : (
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {filtered.map((org) => {
+            const members = membersByOrg?.[org.id] ?? [];
+            const firstThree = members.slice(0, 3);
+            const extra = Math.max(0, members.length - 3);
+            return (
+              <Card
+                key={org.id}
+                className="flex flex-col gap-3 p-5 transition-shadow hover:shadow-md"
+              >
+                {/* Header */}
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex min-w-0 items-start gap-3">
+                    <div className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                      <Building2 className="h-5 w-5" />
+                    </div>
+                    <div className="min-w-0 space-y-1">
+                      <button
+                        onClick={() => handleOpen(org)}
+                        className="block text-left text-base font-semibold leading-tight truncate hover:underline"
+                        title={org.name}
+                      >
+                        {org.name}
+                      </button>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <PlanBadge plan={org.plan} />
+                        <code className="text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
+                          {org.slug}
+                        </code>
+                      </div>
+                    </div>
+                  </div>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 shrink-0"
+                        aria-label="Organization actions"
+                      >
+                        <MoreHorizontal className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-44">
+                      <DropdownMenuItem onClick={() => setEditTarget(org)}>
+                        <Pencil className="mr-2 h-4 w-4" />
+                        Edit
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => handleOpen(org)}>
+                        <Users className="mr-2 h-4 w-4" />
+                        Members
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem
+                        className="text-destructive focus:text-destructive"
+                        onClick={() => setDeleteTarget(org)}
+                      >
+                        <Trash2 className="mr-2 h-4 w-4" />
+                        Delete
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+
+                {/* Member avatars */}
+                <div className="flex items-center gap-2">
+                  {firstThree.length === 0 ? (
+                    <span className="text-xs text-muted-foreground">
+                      No members yet
+                    </span>
+                  ) : (
+                    <>
+                      <div className="flex -space-x-2">
+                        {firstThree.map((m) => (
+                          <Avatar
+                            key={m.id}
+                            className="h-7 w-7 border-2 border-background"
+                          >
+                            <AvatarFallback className="text-[10px] font-medium">
+                              {initials(m.user.name ?? m.user.email)}
+                            </AvatarFallback>
+                          </Avatar>
+                        ))}
+                      </div>
+                      {extra > 0 && (
+                        <span className="text-xs text-muted-foreground">
+                          +{extra} more
+                        </span>
+                      )}
+                    </>
+                  )}
+                </div>
+
+                {/* Meta */}
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                  <span className="inline-flex items-center gap-1">
+                    <Users className="h-3 w-3" />
+                    <span className="tabular-nums font-medium text-foreground">
+                      {org.memberCount ?? members.length}
+                    </span>{" "}
+                    member(s)
+                  </span>
+                  <span
+                    className="inline-flex items-center gap-1"
+                    title={formatDate(org.createdAt)}
+                  >
+                    <Calendar className="h-3 w-3" />
+                    {relativeTime(org.createdAt)}
+                  </span>
+                </div>
+
+                {/* Footer */}
+                <div className="mt-auto flex items-center justify-end border-t pt-3">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleOpen(org)}
+                  >
+                    Open
+                    <ChevronRight className="ml-1.5 h-3.5 w-3.5" />
+                  </Button>
+                </div>
+              </Card>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Create dialog */}
+      <CreateOrgDialog open={createOpen} onClose={() => setCreateOpen(false)} />
+
+      {/* Edit dialog */}
+      <EditOrgDialog
+        target={editTarget}
+        onClose={() => setEditTarget(null)}
+      />
+
+      {/* Delete confirmation */}
+      <AlertDialog
+        open={!!deleteTarget}
+        onOpenChange={(open) => {
+          if (!open) setDeleteTarget(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete organization?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete{" "}
+              <span className="font-medium text-foreground">
+                {deleteTarget?.name}
+              </span>{" "}
+              and remove all of its members, sources, datasets, and audit
+              history. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleteMutation.isPending}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={deleteMutation.isPending}
+              onClick={(e) => {
+                e.preventDefault();
+                if (deleteTarget) deleteMutation.mutate(deleteTarget.id);
+              }}
+            >
+              {deleteMutation.isPending ? "Deleting…" : "Delete organization"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
+  );
+}
+
+// ── Create dialog ────────────────────────────────────────────────────────
+
+function CreateOrgDialog({
+  open,
+  onClose,
+}: {
+  open: boolean;
+  onClose: () => void;
+}) {
+  const queryClient = useQueryClient();
+  const [name, setName] = useState("");
+  const [slug, setSlug] = useState("");
+  const [plan, setPlan] = useState<Plan>("free");
+
+  const createMutation = useMutation({
+    mutationFn: (payload: {
+      name: string;
+      slug: string;
+      plan: string;
+    }) => api.post<OrganizationDTO>("/api/organizations", payload),
+    onSuccess: (o) => {
+      toast.success("Organization created", { description: o.name });
+      queryClient.invalidateQueries({ queryKey: ["organizations"] });
+      queryClient.invalidateQueries({ queryKey: ["session"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+      setName("");
+      setSlug("");
+      setPlan("free");
+      onClose();
+    },
+    onError: (err: unknown) => {
+      const msg = err instanceof Error ? err.message : "Failed to create org";
+      toast.error("Create failed", { description: msg });
+    },
+  });
+
+  const handleNameChange = (v: string) => {
+    setName(v);
+    // Auto-fill slug while user has not customised it
+    if (!slug || slug === slugify(name)) {
+      setSlug(slugify(v));
+    }
+  };
+
+  const handleSubmit = () => {
+    const trimmedName = name.trim();
+    const trimmedSlug = (slug.trim() || slugify(trimmedName)).trim();
+    if (!trimmedName) {
+      toast.error("Name is required");
+      return;
+    }
+    if (!trimmedSlug) {
+      toast.error("Slug is required");
+      return;
+    }
+    createMutation.mutate({ name: trimmedName, slug: trimmedSlug, plan });
+  };
+
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(o) => {
+        if (!o) onClose();
+      }}
+    >
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>New organization</DialogTitle>
+          <DialogDescription>
+            Create a workspace to group sources, datasets, and members. You
+            will become the owner of the new organization.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4 py-2">
+          <div className="space-y-1.5">
+            <Label htmlFor="org-name">
+              Name <span className="text-destructive">*</span>
+            </Label>
+            <Input
+              id="org-name"
+              placeholder="e.g. Acme Intelligence"
+              value={name}
+              onChange={(e) => handleNameChange(e.target.value)}
+              autoFocus
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="org-slug">Slug</Label>
+            <Input
+              id="org-slug"
+              placeholder="acme-intelligence"
+              value={slug}
+              onChange={(e) => setSlug(slugify(e.target.value))}
+            />
+            <p className="text-xs text-muted-foreground">
+              Used in URLs and as a unique identifier. Lowercase letters,
+              numbers, and hyphens only.
+            </p>
+          </div>
+          <div className="space-y-1.5">
+            <Label>Plan</Label>
+            <Select
+              value={plan}
+              onValueChange={(v) => setPlan(v as Plan)}
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {PLAN_OPTIONS.map((p) => (
+                  <SelectItem key={p.value} value={p.value}>
+                    {p.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+        <DialogFooter>
+          <Button
+            variant="outline"
+            onClick={onClose}
+            disabled={createMutation.isPending}
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={handleSubmit}
+            disabled={!name.trim() || createMutation.isPending}
+          >
+            {createMutation.isPending ? (
+              <RefreshCw className="mr-2 h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <Plus className="mr-2 h-3.5 w-3.5" />
+            )}
+            Create organization
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ── Edit dialog ──────────────────────────────────────────────────────────
+
+function EditOrgDialog({
+  target,
+  onClose,
+}: {
+  target: OrganizationDTO | null;
+  onClose: () => void;
+}) {
+  // We render an inner form that is keyed by the target id, so when the
+  // target changes React remounts the form component and its useState
+  // initialisers run with the new target's values — no useEffect required.
+  return (
+    <Dialog
+      open={!!target}
+      onOpenChange={(o) => {
+        if (!o) onClose();
+      }}
+    >
+      <DialogContent className="sm:max-w-md">
+        {target ? (
+          <EditOrgForm key={target.id} target={target} onClose={onClose} />
+        ) : null}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function EditOrgForm({
+  target,
+  onClose,
+}: {
+  target: OrganizationDTO;
+  onClose: () => void;
+}) {
+  const queryClient = useQueryClient();
+  const [name, setName] = useState(target.name);
+  const [plan, setPlan] = useState<Plan>(target.plan);
+
+  const editMutation = useMutation({
+    mutationFn: (payload: { name?: string; plan?: string }) =>
+      api.patch<OrganizationDTO>(`/api/organizations/${target.id}`, payload),
+    onSuccess: (o) => {
+      toast.success("Organization updated", { description: o.name });
+      queryClient.invalidateQueries({ queryKey: ["organizations"] });
+      queryClient.invalidateQueries({ queryKey: ["session"] });
+      onClose();
+    },
+    onError: (err: unknown) => {
+      const msg = err instanceof Error ? err.message : "Failed to update org";
+      toast.error("Update failed", { description: msg });
+    },
+  });
+
+  const handleSubmit = () => {
+    const trimmed = name.trim();
+    if (!trimmed) {
+      toast.error("Name is required");
+      return;
+    }
+    editMutation.mutate({ name: trimmed, plan });
+  };
+
+  return (
+    <>
+      <DialogHeader>
+        <DialogTitle>Edit organization</DialogTitle>
+        <DialogDescription>
+          Update the name or plan for{" "}
+          <span className="font-medium text-foreground">{target.name}</span>.
+        </DialogDescription>
+      </DialogHeader>
+      <div className="space-y-4 py-2">
+        <div className="space-y-1.5">
+          <Label htmlFor="edit-org-name">
+            Name <span className="text-destructive">*</span>
+          </Label>
+          <Input
+            id="edit-org-name"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            autoFocus
+          />
+        </div>
+        <div className="space-y-1.5">
+          <Label>Plan</Label>
+          <Select value={plan} onValueChange={(v) => setPlan(v as Plan)}>
+            <SelectTrigger className="w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {PLAN_OPTIONS.map((p) => (
+                <SelectItem key={p.value} value={p.value}>
+                  {p.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+      <DialogFooter>
+        <Button
+          variant="outline"
+          onClick={onClose}
+          disabled={editMutation.isPending}
+        >
+          Cancel
+        </Button>
+        <Button
+          onClick={handleSubmit}
+          disabled={!name.trim() || editMutation.isPending}
+        >
+          {editMutation.isPending ? (
+            <RefreshCw className="mr-2 h-3.5 w-3.5 animate-spin" />
+          ) : (
+            <Pencil className="mr-2 h-3.5 w-3.5" />
+          )}
+          Save changes
+        </Button>
+      </DialogFooter>
+    </>
+  );
+}

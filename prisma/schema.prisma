@@ -1,0 +1,477 @@
+// Workspace Intelligence Platform — Prisma Schema
+// Multi-tenant, AI-native SaaS for converting Google Workspace content into
+// structured, evidence-backed datasets through schema-driven AI extraction.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Identity & Organization
+// ────────────────────────────────────────────────────────────────────────────
+
+model User {
+  id          String   @id @default(cuid())
+  email       String   @unique
+  name        String?
+  avatarUrl   String?
+  role        String   @default("user") // global role: user | admin
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  organizations  OrganizationMember[]
+  connections    GoogleConnection[]
+  sources        Source[]
+  schemas        Schema[]
+  datasets       Dataset[]
+  auditLogs      AuditLog[]      @relation("AuditActor")
+  sharingReqs    SharingRequest[] @relation("SharingRequester")
+  approvedShares SharingRequest[] @relation("SharingDecider")
+  jobs           AiJob[]
+}
+
+model Organization {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique
+  plan      String   @default("free") // free | team | enterprise
+  createdBy String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  members       OrganizationMember[]
+  connections   GoogleConnection[]
+  sources       Source[]
+  schemas       Schema[]
+  datasets      Dataset[]
+  jobs          AiJob[]
+  auditLogs     AuditLog[]
+  usageMetrics  UsageMetric[]
+  sharingReqs   SharingRequest[]
+  sharePerms    SharingPermission[]
+}
+
+model OrganizationMember {
+  id             String   @id @default(cuid())
+  organizationId String
+  userId         String
+  role           String   @default("member") // owner | admin | manager | member | viewer
+  status         String   @default("active") // invited | active | removed
+  invitedBy      String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, userId])
+  @@index([organizationId])
+  @@index([userId])
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Google Integration (simulated acquisition layer)
+// ────────────────────────────────────────────────────────────────────────────
+
+model GoogleConnection {
+  id             String   @id @default(cuid())
+  userId         String
+  organizationId String?
+  googleEmail    String
+  scopes         String   @default("gmail.readonly,drive.metadata.readonly")
+  status         String   @default("active") // active | expired | revoked | degraded
+  watchExpiresAt DateTime?
+  lastSyncAt     DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  sources      Source[]
+
+  @@index([userId])
+  @@index([organizationId])
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Sources, Rules, Runs
+// ────────────────────────────────────────────────────────────────────────────
+
+model Source {
+  id                 String   @id @default(cuid())
+  organizationId     String
+  ownerUserId        String
+  googleConnectionId String
+  schemaId           String?
+  datasetId          String?
+  name               String
+  description        String?
+  sourceType         String   @default("gmail") // gmail | drive | docs | sheets | forms
+  status             String   @default("active") // active | paused | idle | error
+  runState           String   @default("idle") // idle | scanning | parsing | extracting | validating
+  scheduleMode       String   @default("interval") // interval | cron | manual
+  scheduleExpr       String   @default("6h")
+  config             String   @default("{}") // JSON: processing limits, depth, etc.
+  lastRunAt          DateTime?
+  nextRunAt          DateTime?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  organization     Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  owner            User             @relation(fields: [ownerUserId], references: [id])
+  googleConnection GoogleConnection @relation(fields: [googleConnectionId], references: [id])
+  schema           Schema?          @relation(fields: [schemaId], references: [id], onDelete: SetNull)
+  dataset          Dataset?         @relation(fields: [datasetId], references: [id], onDelete: SetNull)
+  rules            SourceRule[]
+  runs             SourceRun[]
+  emails           Email[]
+
+  @@index([organizationId])
+  @@index([ownerUserId])
+}
+
+model SourceRule {
+  id         String  @id @default(cuid())
+  sourceId   String
+  filterType String  // sender | subject | body | date | attachment | link
+  operator   String  // eq | contains | excludes | regex | domain | gt | lt | required
+  value      String  // JSON-encoded value (array, string, boolean, etc.)
+  position   Int     @default(0)
+
+  source Source @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+
+  @@index([sourceId])
+}
+
+model SourceRun {
+  id         String    @id @default(cuid())
+  sourceId   String
+  startedAt  DateTime  @default(now())
+  finishedAt DateTime?
+  status     String    @default("running") // running | success | failed | partial
+  mode       String    @default("incremental") // historical | incremental
+  stats      String    @default("{}") // JSON: emailsMatched, attachmentsFound, etc.
+  progress   Int       @default(0)
+  errorMessage String?
+
+  source Source @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+
+  @@index([sourceId])
+  @@index([status])
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Email Model
+// ────────────────────────────────────────────────────────────────────────────
+
+model Email {
+  id                String   @id @default(cuid())
+  sourceId          String
+  googleMessageId   String
+  threadId          String?
+  fromAddress       String
+  toAddress         String
+  ccAddresses       String?
+  subject           String
+  snippet           String
+  bodyText          String?
+  bodyHtml          String?
+  receivedAt        DateTime
+  dedupHash         String
+  processingStatus  String   @default("pending") // pending | matched | parsed | extracted | rejected
+  createdAt         DateTime @default(now())
+
+  source      Source             @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+  attachments EmailAttachment[]
+  links       EmailLink[]
+
+  @@unique([sourceId, googleMessageId])
+  @@index([sourceId])
+  @@index([receivedAt])
+}
+
+model EmailAttachment {
+  id         String  @id @default(cuid())
+  emailId    String
+  filename   String
+  mimeType   String
+  size       Int
+  storagePath String?
+  status     String  @default("discovered") // discovered | fetched | parsed | failed
+
+  email Email @relation(fields: [emailId], references: [id], onDelete: Cascade)
+
+  @@index([emailId])
+}
+
+model EmailLink {
+  id           String  @id @default(cuid())
+  emailId      String
+  url          String
+  resourceType String  // drive | docs | sheets | forms | external
+  resourceId   String?
+  resolved     Boolean @default(false)
+
+  email Email @relation(fields: [emailId], references: [id], onDelete: Cascade)
+
+  @@index([emailId])
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Documents & RAG (chunking simulated)
+// ────────────────────────────────────────────────────────────────────────────
+
+model Document {
+  id          String   @id @default(cuid())
+  sourceType  String   // email | attachment | drive | docs | sheets | forms
+  sourceId    String
+  name        String
+  contentText String
+  pageCount   Int      @default(1)
+  status      String   @default("parsed") // fetched | parsed | chunked | indexed | failed
+  createdAt   DateTime @default(now())
+
+  chunks DocumentChunk[]
+
+  @@index([sourceType, sourceId])
+}
+
+model DocumentChunk {
+  id          String  @id @default(cuid())
+  documentId  String
+  chunkIndex  Int
+  content     String
+  tokenCount  Int
+  pageNumber  Int     @default(1)
+
+  document Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@index([documentId])
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Schema-Driven Extraction
+// ────────────────────────────────────────────────────────────────────────────
+
+model Schema {
+  id          String   @id @default(cuid())
+  organizationId String
+  createdBy   String
+  name        String
+  description String?
+  version     Int      @default(1)
+  promptTemplate String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  organization Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  creator      User           @relation(fields: [createdBy], references: [id])
+  fields       SchemaField[]
+  sources      Source[]
+  datasets     Dataset[]
+
+  @@index([organizationId])
+}
+
+model SchemaField {
+  id           String  @id @default(cuid())
+  schemaId     String
+  name         String
+  type         String  // text | number | date | boolean | enum | array | multiselect
+  description  String?
+  instructions String?
+  required     Boolean @default(false)
+  options      String? // JSON array for enum/multiselect
+  position     Int     @default(0)
+
+  schema Schema @relation(fields: [schemaId], references: [id], onDelete: Cascade)
+
+  @@index([schemaId])
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Datasets & Evidence-Backed Values
+// ────────────────────────────────────────────────────────────────────────────
+
+model Dataset {
+  id             String   @id @default(cuid())
+  organizationId String
+  schemaId       String?
+  createdBy      String
+  name           String
+  description    String?
+  recordCount    Int      @default(0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  schema       Schema?        @relation(fields: [schemaId], references: [id], onDelete: SetNull)
+  creator      User           @relation(fields: [createdBy], references: [id])
+  sources      Source[]
+  records      DatasetRecord[]
+  sharePerms   SharingPermission[]
+  sharingReqs  SharingRequest[]
+
+  @@index([organizationId])
+}
+
+model DatasetRecord {
+  id          String   @id @default(cuid())
+  datasetId   String
+  sourceEmailId String?
+  status      String   @default("valid") // valid | needs_review | rejected | approved | updated
+  confidence  Float    @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  dataset Dataset        @relation(fields: [datasetId], references: [id], onDelete: Cascade)
+  values  DatasetValue[]
+
+  @@index([datasetId])
+  @@index([status])
+}
+
+model DatasetValue {
+  id           String   @id @default(cuid())
+  recordId     String
+  fieldId      String
+  value        String   // JSON-encoded value
+  confidence   Float    @default(0)
+  evidence     String   // evidence snippet text
+  sourceFile   String?
+  pageNumber   Int?
+  chunkId      String?
+  modelUsed    String   @default("gemini-1.5-pro")
+  promptVersion String  @default("v1")
+  extractedAt  DateTime @default(now())
+
+  record DatasetRecord @relation(fields: [recordId], references: [id], onDelete: Cascade)
+
+  @@index([recordId])
+  @@index([fieldId])
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Jobs & AI Outputs
+// ────────────────────────────────────────────────────────────────────────────
+
+model AiJob {
+  id             String   @id @default(cuid())
+  organizationId String
+  userId         String?
+  type           String   // GMAIL_SCAN | EMAIL_PARSE | ATTACHMENT_PROCESS | DRIVE_DISCOVERY | DOCUMENT_PARSE | AI_EXTRACTION | AI_VALIDATION | EXPORT
+  status         String   @default("queued") // queued | running | success | failed | retry | dlq
+  payload        String   @default("{}") // JSON
+  attempts       Int      @default(0)
+  progress       Int      @default(0)
+  errorMessage   String?
+  result         String?  // JSON
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  startedAt      DateTime?
+  finishedAt     DateTime?
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User?        @relation(fields: [userId], references: [id])
+  outputs      AiOutput[]
+
+  @@index([organizationId])
+  @@index([status])
+  @@index([type])
+}
+
+model AiOutput {
+  id         String   @id @default(cuid())
+  jobId      String
+  modelUsed  String
+  promptHash String
+  rawResponse String  // JSON
+  tokensUsed Int      @default(0)
+  createdAt  DateTime @default(now())
+
+  job AiJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  @@index([jobId])
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Sharing & Governance
+// ────────────────────────────────────────────────────────────────────────────
+
+model SharingRequest {
+  id            String   @id @default(cuid())
+  organizationId String
+  datasetId     String?
+  requestedBy   String
+  status        String   @default("pending") // pending | approved | rejected
+  decidedBy     String?
+  reason        String?
+  level         String   @default("read") // read | comment | edit | admin
+  fieldScope    String?  // JSON
+  rowFilter     String?  // JSON
+  createdAt     DateTime @default(now())
+  decidedAt     DateTime?
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  dataset      Dataset?     @relation(fields: [datasetId], references: [id], onDelete: SetNull)
+  requester    User         @relation("SharingRequester", fields: [requestedBy], references: [id])
+  decider      User?        @relation("SharingDecider", fields: [decidedBy], references: [id])
+
+  @@index([organizationId])
+  @@index([status])
+}
+
+model SharingPermission {
+  id             String   @id @default(cuid())
+  datasetId      String
+  organizationId String
+  level          String   @default("read")
+  fieldScope     String?  // JSON
+  rowFilter      String?  // JSON
+  createdAt      DateTime @default(now())
+
+  dataset      Dataset      @relation(fields: [datasetId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([datasetId])
+  @@index([organizationId])
+}
+
+model AuditLog {
+  id             String   @id @default(cuid())
+  organizationId String
+  actorType      String   @default("user") // user | system | ai
+  actorId        String?
+  action         String   // create | update | delete | scan | extract | approve | share | export
+  entity         String   // source | dataset | schema | record | connection | member | job
+  entityId       String?
+  before         String?  // JSON
+  after          String?  // JSON
+  reason         String?
+  createdAt      DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  actor       User?        @relation("AuditActor", fields: [actorId], references: [id])
+
+  @@index([organizationId])
+  @@index([entity, entityId])
+}
+
+model UsageMetric {
+  id             String   @id @default(cuid())
+  organizationId String
+  metricType     String   // ai_tokens | emails_scanned | documents_parsed | exports | storage
+  value          Int      @default(0)
+  periodStart    DateTime
+  periodEnd      DateTime
+  createdAt      DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, metricType])
+}

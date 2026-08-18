@@ -1,0 +1,587 @@
+     1→// Workspace Intelligence Platform — Seed Data
+     2→// Run with: bun run prisma/db:seed.ts (or import in API on first load)
+     3→import { db } from "../src/lib/db";
+     4→
+     5→async function main() {
+     6→  // ── Users ──────────────────────────────────────────────────────────────
+     7→  const alice = await db.user.upsert({
+     8→    where: { email: "alice@acme.io" },
+     9→    update: {},
+    10→    create: {
+    11→      email: "alice@acme.io",
+    12→      name: "Alice Chen",
+    13→      avatarUrl: "https://i.pravatar.cc/100?img=1",
+    14→      role: "admin",
+    15→    },
+    16→  });
+    17→  const bob = await db.user.upsert({
+    18→    where: { email: "bob@acme.io" },
+    19→    update: {},
+    20→    create: {
+    21→      email: "bob@acme.io",
+    22→      name: "Bob Martinez",
+    23→      avatarUrl: "https://i.pravatar.cc/100?img=2",
+    24→    },
+    25→  });
+    26→  const cara = await db.user.upsert({
+    27→    where: { email: "cara@acme.io" },
+    28→    update: {},
+    29→    create: {
+    30→      email: "cara@acme.io",
+    31→      name: "Cara Singh",
+    32→      avatarUrl: "https://i.pravatar.cc/100?img=3",
+    33→    },
+    34→  });
+    35→  const dan = await db.user.upsert({
+    36→    where: { email: "dan@partner.com" },
+    37→    update: {},
+    38→    create: {
+    39→      email: "dan@partner.com",
+    40→      name: "Dan Reyes",
+    41→      avatarUrl: "https://i.pravatar.cc/100?img=4",
+    42→    },
+    43→  });
+    44→
+    45→  // ── Organization ───────────────────────────────────────────────────────
+    46→  const acme = await db.organization.upsert({
+    47→    where: { slug: "acme" },
+    48→    update: {},
+    49→    create: {
+    50→      name: "Acme Intelligence",
+    51→      slug: "acme",
+    52→      plan: "team",
+    53→      createdBy: alice.id,
+    54→    },
+    55→  });
+    56→  const partnerOrg = await db.organization.upsert({
+    57→    where: { slug: "partner-co" },
+    58→    update: {},
+    59→    create: {
+    60→      name: "Partner Co",
+    61→      slug: "partner-co",
+    62→      plan: "free",
+    63→      createdBy: dan.id,
+    64→    },
+    65→  });
+    66→
+    67→  // ── Members ────────────────────────────────────────────────────────────
+    68→  await db.organizationMember.upsert({
+    69→    where: { organizationId_userId: { organizationId: acme.id, userId: alice.id } },
+    70→    update: { role: "owner", status: "active" },
+    71→    create: { organizationId: acme.id, userId: alice.id, role: "owner", status: "active" },
+    72→  });
+    73→  await db.organizationMember.upsert({
+    74→    where: { organizationId_userId: { organizationId: acme.id, userId: bob.id } },
+    75→    update: { role: "admin", status: "active" },
+    76→    create: { organizationId: acme.id, userId: bob.id, role: "admin", status: "active", invitedBy: alice.id },
+    77→  });
+    78→  await db.organizationMember.upsert({
+    79→    where: { organizationId_userId: { organizationId: acme.id, userId: cara.id } },
+    80→    update: { role: "member", status: "active" },
+    81→    create: { organizationId: acme.id, userId: cara.id, role: "member", status: "active", invitedBy: alice.id },
+    82→  });
+    83→  await db.organizationMember.upsert({
+    84→    where: { organizationId_userId: { organizationId: partnerOrg.id, userId: dan.id } },
+    85→    update: { role: "owner", status: "active" },
+    86→    create: { organizationId: partnerOrg.id, userId: dan.id, role: "owner", status: "active" },
+    87→  });
+    88→
+    89→  // ── Google Connections (simulated acquisition layer) ───────────────────
+    90→  const conn1 = await db.googleConnection.create({
+    91→    data: {
+    92→      userId: alice.id,
+    93→      organizationId: acme.id,
+    94→      googleEmail: "alice@acme.io",
+    95→      scopes: "gmail.readonly,drive.metadata.readonly,docs.readonly",
+    96→      status: "active",
+    97→      watchExpiresAt: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000),
+    98→      lastSyncAt: new Date(Date.now() - 2 * 60 * 60 * 1000),
+    99→    },
+   100→  });
+   101→  const conn2 = await db.googleConnection.create({
+   102→    data: {
+   103→      userId: bob.id,
+   104→      organizationId: acme.id,
+   105→      googleEmail: "ops@acme.io",
+   106→      scopes: "gmail.readonly",
+   107→      status: "degraded",
+   108→      watchExpiresAt: new Date(Date.now() + 1 * 24 * 60 * 60 * 1000),
+   109→      lastSyncAt: new Date(Date.now() - 26 * 60 * 60 * 1000),
+   110→    },
+   111→  });
+   112→
+   113→  // ── Schemas ────────────────────────────────────────────────────────────
+   114→  const placementSchema = await db.schema.create({
+   115→    data: {
+   116→      organizationId: acme.id,
+   117→      createdBy: alice.id,
+   118→      name: "Placement Records",
+   119→      description: "Schema for extracting placement/internship opportunities from emails.",
+   120→      version: 2,
+   121→      promptTemplate:
+   122→        "Extract structured placement fields from the email bundle. Require explicit evidence for each value.",
+   123→      fields: {
+   124→        create: [
+   125→          { name: "company", type: "text", description: "Hiring company name", instructions: "Use the legal entity name when available.", required: true, position: 0 },
+   126→          { name: "role", type: "text", description: "Job title or role", required: true, position: 1 },
+   127→          { name: "location", type: "text", description: "Work location", position: 2 },
+   128→          { name: "ctc", type: "number", description: "Annual compensation in INR lakhs", position: 3 },
+   129→          { name: "eligibility", type: "array", description: "Eligibility criteria (degrees, branches, GPA)", position: 4 },
+   130→          { name: "deadline", type: "date", description: "Application deadline", required: true, position: 5 },
+   131→          { name: "jobType", type: "enum", description: "Full-time / Internship / Co-op", options: JSON.stringify(["full-time", "internship", "co-op"]), position: 6 },
+   132→          { name: "remoteFriendly", type: "boolean", description: "Whether remote work is allowed", position: 7 },
+   133→        ],
+   134→      },
+   135→    },
+   136→    include: { fields: true },
+   137→  });
+   138→
+   139→  const invoiceSchema = await db.schema.create({
+   140→    data: {
+   141→      organizationId: acme.id,
+   142→      createdBy: bob.id,
+   143→      name: "Vendor Invoices",
+   144→      description: "Extract structured invoice data from vendor emails and PDFs.",
+   145→      version: 1,
+   146→      fields: {
+   147→        create: [
+   148→          { name: "vendor", type: "text", description: "Vendor name", required: true, position: 0 },
+   149→          { name: "invoiceNumber", type: "text", description: "Invoice number", required: true, position: 1 },
+   150→          { name: "amount", type: "number", description: "Invoice total", required: true, position: 2 },
+   151→          { name: "currency", type: "enum", options: JSON.stringify(["USD", "EUR", "INR", "GBP"]), position: 3 },
+   152→          { name: "dueDate", type: "date", description: "Payment due date", position: 4 },
+   153→          { name: "lineItems", type: "array", description: "Line item descriptions", position: 5 },
+   154→        ],
+   155→      },
+   156→    },
+   157→    include: { fields: true },
+   158→  });
+   159→
+   160→  const supportSchema = await db.schema.create({
+   161→    data: {
+   162→      organizationId: acme.id,
+   163→      createdBy: cara.id,
+   164→      name: "Support Tickets",
+   165→      description: "Customer support tickets extracted from Gmail.",
+   166→      version: 1,
+   167→      fields: {
+   168→        create: [
+   169→          { name: "customer", type: "text", description: "Customer name", required: true, position: 0 },
+   170→          { name: "email", type: "text", description: "Customer email", required: true, position: 1 },
+   171→          { name: "priority", type: "enum", options: JSON.stringify(["low", "medium", "high", "urgent"]), position: 2 },
+   172→          { name: "category", type: "text", description: "Issue category", position: 3 },
+   173→          { name: "summary", type: "text", description: "One-line summary", position: 4 },
+   174→          { name: "tags", type: "multiselect", options: JSON.stringify(["billing", "bug", "feature", "account", "security"]), position: 5 },
+   175→        ],
+   176→      },
+   177→    },
+   178→    include: { fields: true },
+   179→  });
+   180→
+   181→  // ── Datasets ───────────────────────────────────────────────────────────
+   182→  const placementDs = await db.dataset.create({
+   183→    data: {
+   184→      organizationId: acme.id,
+   185→      schemaId: placementSchema.id,
+   186→      createdBy: alice.id,
+   187→      name: "Placement Opportunities 2025",
+   188→      description: "All placement opportunities received in 2025 batch.",
+   189→      recordCount: 3,
+   190→    },
+   191→  });
+   192→  const invoiceDs = await db.dataset.create({
+   193→    data: {
+   194→      organizationId: acme.id,
+   195→      schemaId: invoiceSchema.id,
+   196→      createdBy: bob.id,
+   197→      name: "Q3 Vendor Invoices",
+   198→      recordCount: 2,
+   199→    },
+   200→  });
+   201→  const supportDs = await db.dataset.create({
+   202→    data: {
+   203→      organizationId: acme.id,
+   204→      schemaId: supportSchema.id,
+   205→      createdBy: cara.id,
+   206→      name: "Open Support Tickets",
+   207→      recordCount: 2,
+   208→    },
+   209→  });
+   210→
+   211→  // ── Sources ────────────────────────────────────────────────────────────
+   212→  const source1 = await db.source.create({
+   213→    data: {
+   214→      organizationId: acme.id,
+   215→      ownerUserId: alice.id,
+   216→      googleConnectionId: conn1.id,
+   217→      schemaId: placementSchema.id,
+   218→      datasetId: placementDs.id,
+   219→      name: "Placement Cell Gmail",
+   220→      description: "Monitors placement@acme.io for opportunities.",
+   221→      sourceType: "gmail",
+   222→      status: "active",
+   223→      runState: "idle",
+   224→      scheduleMode: "interval",
+   225→      scheduleExpr: "6h",
+   226→      lastRunAt: new Date(Date.now() - 3 * 60 * 60 * 1000),
+   227→      nextRunAt: new Date(Date.now() + 3 * 60 * 60 * 1000),
+   228→      rules: {
+   229→        create: [
+   230→          { filterType: "sender", operator: "domain", value: JSON.stringify(["acme.io", "placements.edu"]), position: 0 },
+   231→          { filterType: "subject", operator: "contains", value: JSON.stringify(["placement", "opportunity", "internship", "job"]), position: 1 },
+   232→          { filterType: "attachment", operator: "required", value: JSON.stringify(true), position: 2 },
+   233→        ],
+   234→      },
+   235→    },
+   236→  });
+   237→  const source2 = await db.source.create({
+   238→    data: {
+   239→      organizationId: acme.id,
+   240→      ownerUserId: bob.id,
+   241→      googleConnectionId: conn2.id,
+   242→      schemaId: invoiceSchema.id,
+   243→      datasetId: invoiceDs.id,
+   244→      name: "Vendor Invoice Inbox",
+   245→      description: "Monitors billing@acme.io for vendor invoices.",
+   246→      sourceType: "gmail",
+   247→      status: "paused",
+   248→      runState: "idle",
+   249→      scheduleMode: "cron",
+   250→      scheduleExpr: "0 9 * * *",
+   251→      lastRunAt: new Date(Date.now() - 28 * 60 * 60 * 1000),
+   252→      rules: {
+   253→        create: [
+   254→          { filterType: "sender", operator: "domain", value: JSON.stringify(["vendor.com", "supplier.co"]), position: 0 },
+   255→          { filterType: "subject", operator: "contains", value: JSON.stringify(["invoice", "bill", "statement"]), position: 1 },
+   256→          { filterType: "attachment", operator: "fileType", value: JSON.stringify(["pdf", "xlsx"]), position: 2 },
+   257→        ],
+   258→      },
+   259→    },
+   260→  });
+   261→  const source3 = await db.source.create({
+   262→    data: {
+   263→      organizationId: acme.id,
+   264→      ownerUserId: cara.id,
+   265→      googleConnectionId: conn1.id,
+   266→      schemaId: supportSchema.id,
+   267→      datasetId: supportDs.id,
+   268→      name: "Customer Support Inbox",
+   269→      description: "Monitors support@acme.io for incoming tickets.",
+   270→      sourceType: "gmail",
+   271→      status: "active",
+   272→      runState: "extracting",
+   273→      scheduleMode: "interval",
+   274→      scheduleExpr: "15m",
+   275→      lastRunAt: new Date(Date.now() - 12 * 60 * 1000),
+   276→      nextRunAt: new Date(Date.now() + 3 * 60 * 1000),
+   277→      rules: {
+   278→        create: [
+   279→          { filterType: "sender", operator: "domain", value: JSON.stringify(["*"]), position: 0 },
+   280→          { filterType: "subject", operator: "contains", value: JSON.stringify(["help", "issue", "support", "ticket"]), position: 1 },
+   281→        ],
+   282→      },
+   283→    },
+   284→  });
+   285→
+   286→  // ── Source Runs ────────────────────────────────────────────────────────
+   287→  await db.sourceRun.create({
+   288→    data: {
+   289→      sourceId: source1.id,
+   290→      status: "success",
+   291→      mode: "incremental",
+   292→      progress: 100,
+   293→      startedAt: new Date(Date.now() - 3 * 60 * 60 * 1000),
+   294→      finishedAt: new Date(Date.now() - 3 * 60 * 60 * 1000 + 90 * 1000),
+   295→      stats: JSON.stringify({ emailsMatched: 12, attachmentsFound: 14, driveLinksDiscovered: 3, recordsExtracted: 11 }),
+   296→    },
+   297→  });
+   298→  await db.sourceRun.create({
+   299→    data: {
+   300→      sourceId: source1.id,
+   301→      status: "partial",
+   302→      mode: "historical",
+   303→      progress: 100,
+   304→      startedAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000),
+   305→      finishedAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000 + 18 * 60 * 1000),
+   306→      stats: JSON.stringify({ emailsMatched: 187, attachmentsFound: 203, recordsExtracted: 165, validationFailures: 22 }),
+   307→      errorMessage: "2 attachments exceeded size limit",
+   308→    },
+   309→  });
+   310→  await db.sourceRun.create({
+   311→    data: {
+   312→      sourceId: source2.id,
+   313→      status: "failed",
+   314→      mode: "incremental",
+   315→      progress: 34,
+   316→      startedAt: new Date(Date.now() - 28 * 60 * 60 * 1000),
+   317→      finishedAt: new Date(Date.now() - 28 * 60 * 60 * 1000 + 5 * 60 * 1000),
+   318→      errorMessage: "Token refresh failed — connection degraded",
+   319→    },
+   320→  });
+   321→  await db.sourceRun.create({
+   322→    data: {
+   323→      sourceId: source3.id,
+   324→      status: "running",
+   325→      mode: "incremental",
+   326→      progress: 64,
+   327→      startedAt: new Date(Date.now() - 4 * 60 * 1000),
+   328→      stats: JSON.stringify({ emailsMatched: 8, attachmentsFound: 2, recordsExtracted: 5 }),
+   329→    },
+   330→  });
+   331→
+   332→  // ── Emails (sample matched) ────────────────────────────────────────────
+   333→  const e1 = await db.email.create({
+   334→    data: {
+   335→      sourceId: source1.id,
+   336→      googleMessageId: "msg-001",
+   337→      threadId: "thread-001",
+   338→      fromAddress: "placements@techcorp.com",
+   339→      toAddress: "placement@acme.io",
+   340→      ccAddresses: "students-batch2025@acme.io",
+   341→      subject: "[Placement] Software Engineer Intern — TechCorp (CTC 28 LPA, Remote)",
+   342→      snippet: "TechCorp is hiring Software Engineer Interns for Summer 2025. Open to CS/IT/EE students with CGPA 7.5+.",
+   343→      bodyText: "TechCorp is hiring Software Engineer Interns for Summer 2025.\n\nLocation: Bangalore (Remote-friendly)\nCTC: 28 LPA\nEligibility: B.Tech CS/IT/EE, CGPA 7.5+\nDeadline: 15 Oct 2025\n\nApply with resume and transcript. Refer attached JD.",
+   344→      receivedAt: new Date(Date.now() - 5 * 60 * 60 * 1000),
+   345→      dedupHash: "hash-001",
+   346→      processingStatus: "extracted",
+   347→      attachments: {
+   348→        create: [
+   349→          { filename: "TechCorp_JD.pdf", mimeType: "application/pdf", size: 184320, status: "parsed" },
+   350→          { filename: "application_form.docx", mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document", size: 42189, status: "parsed" },
+   351→        ],
+   352→      },
+   353→      links: {
+   354→        create: [
+   355→          { url: "https://docs.google.com/document/d/abc123/edit", resourceType: "docs", resourceId: "abc123", resolved: true },
+   356→          { url: "https://forms.gle/xyz789", resourceType: "forms", resourceId: "xyz789", resolved: true },
+   357→        ],
+   358→      },
+   359→    },
+   360→  });
+   361→  const e2 = await db.email.create({
+   362→    data: {
+   363→      sourceId: source1.id,
+   364→      googleMessageId: "msg-002",
+   365→      threadId: "thread-002",
+   366→      fromAddress: "hr@finovate.io",
+   367→      toAddress: "placement@acme.io",
+   368→      subject: "[Internship] Quant Analyst Intern — Finovate (Mumbai, 45k stipend)",
+   369→      snippet: "Finovate is looking for a Quant Analyst Intern in Mumbai. Stipend 45k/month. Apply by 20 Oct 2025.",
+   370→      bodyText: "Finovate is hiring a Quant Analyst Intern.\n\nLocation: Mumbai (Onsite)\nStipend: 45,000 INR/month\nEligibility: B.Tech/M.Tech Math/Stats/CS\nDeadline: 20 Oct 2025",
+   371→      receivedAt: new Date(Date.now() - 28 * 60 * 60 * 1000),
+   372→      dedupHash: "hash-002",
+   373→      processingStatus: "extracted",
+   374→      attachments: { create: [{ filename: "Finovate_Intern.pdf", mimeType: "application/pdf", size: 92116, status: "parsed" }] },
+   375→    },
+   376→  });
+   377→  const e3 = await db.email.create({
+   378→    data: {
+   379→      sourceId: source3.id,
+   380→      googleMessageId: "msg-003",
+   381→      fromAddress: "john.customer@gmail.com",
+   382→      toAddress: "support@acme.io",
+   383→      subject: "URGENT: Cannot login to my account since yesterday",
+   384→      snippet: "Hi, I cannot login to my account since yesterday. Tried resetting password but email never arrives. Please help ASAP.",
+   385→      bodyText: "Hi support,\n\nI cannot login to my account since yesterday. I tried resetting my password but the email never arrives. This is urgent because I have a demo tomorrow.\n\nPlease help ASAP.\n\nJohn",
+   386→      receivedAt: new Date(Date.now() - 25 * 60 * 1000),
+   387→      dedupHash: "hash-003",
+   388→      processingStatus: "extracted",
+   389→    },
+   390→  });
+   391→
+   392→  // ── Dataset Records (with evidence) ────────────────────────────────────
+   393→  const r1 = await db.datasetRecord.create({
+   394→    data: {
+   395→      datasetId: placementDs.id,
+   396→      sourceEmailId: e1.id,
+   397→      status: "approved",
+   398→      confidence: 0.94,
+   399→      values: {
+   400→        create: [
+   401→          { fieldId: placementSchema.fields[0].id, value: JSON.stringify("TechCorp"), confidence: 0.98, evidence: "From: placements@techcorp.com; Subject line: TechCorp", sourceFile: "email-body", pageNumber: 1, modelUsed: "gemini-1.5-pro", promptVersion: "v2" },
+   402→          { fieldId: placementSchema.fields[1].id, value: JSON.stringify("Software Engineer Intern"), confidence: 0.96, evidence: "Subject: Software Engineer Intern — TechCorp", sourceFile: "email-body", pageNumber: 1, modelUsed: "gemini-1.5-pro", promptVersion: "v2" },
+   403→          { fieldId: placementSchema.fields[2].id, value: JSON.stringify("Bangalore (Remote-friendly)"), confidence: 0.91, evidence: "Body: 'Location: Bangalore (Remote-friendly)'", sourceFile: "email-body", pageNumber: 1, modelUsed: "gemini-1.5-pro", promptVersion: "v2" },
+   404→          { fieldId: placementSchema.fields[3].id, value: JSON.stringify(28), confidence: 0.93, evidence: "Body: 'CTC: 28 LPA'", sourceFile: "email-body", pageNumber: 1, modelUsed: "gemini-1.5-pro", promptVersion: "v2" },
+   405→          { fieldId: placementSchema.fields[4].id, value: JSON.stringify(["B.Tech CS", "B.Tech IT", "B.Tech EE", "CGPA 7.5+"]), confidence: 0.88, evidence: "Body: 'Eligibility: B.Tech CS/IT/EE, CGPA 7.5+'", sourceFile: "email-body", pageNumber: 1, modelUsed: "gemini-1.5-pro", promptVersion: "v2" },
+   406→          { fieldId: placementSchema.fields[5].id, value: JSON.stringify("2025-10-15"), confidence: 0.95, evidence: "Body: 'Deadline: 15 Oct 2025'", sourceFile: "email-body", pageNumber: 1, modelUsed: "gemini-1.5-pro", promptVersion: "v2" },
+   407→          { fieldId: placementSchema.fields[6].id, value: JSON.stringify("internship"), confidence: 0.97, evidence: "Subject contains 'Intern'", sourceFile: "email-body", pageNumber: 1, modelUsed: "gemini-1.5-pro", promptVersion: "v2" },
+   408→          { fieldId: placementSchema.fields[7].id, value: JSON.stringify(true), confidence: 0.89, evidence: "Location string contains 'Remote-friendly'", sourceFile: "email-body", pageNumber: 1, modelUsed: "gemini-1.5-pro", promptVersion: "v2" },
+   409→        ],
+   410→      },
+   411→    },
+   412→  });
+   413→  const r2 = await db.datasetRecord.create({
+   414→    data: {
+   415→      datasetId: placementDs.id,
+   416→      sourceEmailId: e2.id,
+   417→      status: "valid",
+   418→      confidence: 0.91,
+   419→      values: {
+   420→        create: [
+   421→          { fieldId: placementSchema.fields[0].id, value: JSON.stringify("Finovate"), confidence: 0.96, evidence: "From: hr@finovate.io", sourceFile: "email-body", pageNumber: 1, modelUsed: "gemini-1.5-pro", promptVersion: "v2" },
+   422→          { fieldId: placementSchema.fields[1].id, value: JSON.stringify("Quant Analyst Intern"), confidence: 0.94, evidence: "Subject: Quant Analyst Intern — Finovate", sourceFile: "email-body", pageNumber: 1, modelUsed: "gemini-1.5-pro", promptVersion: "v2" },
+   423→          { fieldId: placementSchema.fields[2].id, value: JSON.stringify("Mumbai (Onsite)"), confidence: 0.92, evidence: "Body: 'Location: Mumbai (Onsite)'", sourceFile: "email-body", pageNumber: 1, modelUsed: "gemini-1.5-pro", promptVersion: "v2" },
+   424→          { fieldId: placementSchema.fields[3].id, value: JSON.stringify(5.4), confidence: 0.79, evidence: "Body: 'Stipend: 45,000 INR/month' (annualized: 5.4 LPA)", sourceFile: "email-body", pageNumber: 1, modelUsed: "gemini-1.5-pro", promptVersion: "v2" },
+   425→          { fieldId: placementSchema.fields[4].id, value: JSON.stringify(["B.Tech Math", "B.Tech Stats", "B.Tech CS", "M.Tech Math/Stats/CS"]), confidence: 0.86, evidence: "Body: 'Eligibility: B.Tech/M.Tech Math/Stats/CS'", sourceFile: "email-body", pageNumber: 1, modelUsed: "gemini-1.5-pro", promptVersion: "v2" },
+   426→          { fieldId: placementSchema.fields[5].id, value: JSON.stringify("2025-10-20"), confidence: 0.93, evidence: "Body: 'Deadline: 20 Oct 2025'", sourceFile: "email-body", pageNumber: 1, modelUsed: "gemini-1.5-pro", promptVersion: "v2" },
+   427→          { fieldId: placementSchema.fields[6].id, value: JSON.stringify("internship"), confidence: 0.97, evidence: "Subject contains 'Internship'", sourceFile: "email-body", pageNumber: 1, modelUsed: "gemini-1.5-pro", promptVersion: "v2" },
+   428→          { fieldId: placementSchema.fields[7].id, value: JSON.stringify(false), confidence: 0.84, evidence: "Location: 'Mumbai (Onsite)' — no remote mention", sourceFile: "email-body", pageNumber: 1, modelUsed: "gemini-1.5-pro", promptVersion: "v2" },
+   429→        ],
+   430→      },
+   431→    },
+   432→  });
+   433→  const r3 = await db.datasetRecord.create({
+   434→    data: {
+   435→      datasetId: placementDs.id,
+   436→      status: "needs_review",
+   437→      confidence: 0.62,
+   438→      values: {
+   439→        create: [
+   440→          { fieldId: placementSchema.fields[0].id, value: JSON.stringify("Unknown Corp"), confidence: 0.55, evidence: "Subject contained partial match 'Corp' — sender domain was generic", sourceFile: "email-body", pageNumber: 1, modelUsed: "gemini-1.5-pro", promptVersion: "v2" },
+   441→          { fieldId: placementSchema.fields[1].id, value: JSON.stringify("Data Engineer"), confidence: 0.48, evidence: "Subject: 'Data Engineer opening' — inferred from keywords only", sourceFile: "email-body", pageNumber: 1, modelUsed: "gemini-1.5-pro", promptVersion: "v2" },
+   442→          { fieldId: placementSchema.fields[5].id, value: JSON.stringify(null), confidence: 0.1, evidence: "No deadline mentioned in source material", sourceFile: "email-body", pageNumber: 1, modelUsed: "gemini-1.5-pro", promptVersion: "v2" },
+   443→        ],
+   444→      },
+   445→    },
+   446→  });
+   447→
+   448→  // ── Invoice Dataset Records ────────────────────────────────────────────
+   449→  await db.datasetRecord.create({
+   450→    data: {
+   451→      datasetId: invoiceDs.id,
+   452→      status: "approved",
+   453→      confidence: 0.96,
+   454→      values: {
+   455→        create: [
+   456→          { fieldId: invoiceSchema.fields[0].id, value: JSON.stringify("CloudServe Inc"), confidence: 0.97, evidence: "From: billing@cloudserve.com", sourceFile: "invoice_4821.pdf", pageNumber: 1, modelUsed: "gemini-1.5-pro", promptVersion: "v1" },
+   457→          { fieldId: invoiceSchema.fields[1].id, value: JSON.stringify("INV-4821"), confidence: 0.99, evidence: "PDF header: 'Invoice #INV-4821'", sourceFile: "invoice_4821.pdf", pageNumber: 1, modelUsed: "gemini-1.5-pro", promptVersion: "v1" },
+   458→          { fieldId: invoiceSchema.fields[2].id, value: JSON.stringify(12450.00), confidence: 0.98, evidence: "PDF total row: '$12,450.00'", sourceFile: "invoice_4821.pdf", pageNumber: 2, modelUsed: "gemini-1.5-pro", promptVersion: "v1" },
+   459→          { fieldId: invoiceSchema.fields[3].id, value: JSON.stringify("USD"), confidence: 0.95, evidence: "Currency symbol '$' on total", sourceFile: "invoice_4821.pdf", pageNumber: 2, modelUsed: "gemini-1.5-pro", promptVersion: "v1" },
+   460→          { fieldId: invoiceSchema.fields[4].id, value: JSON.stringify("2025-11-30"), confidence: 0.93, evidence: "PDF: 'Due: 30 Nov 2025'", sourceFile: "invoice_4821.pdf", pageNumber: 1, modelUsed: "gemini-1.5-pro", promptVersion: "v1" },
+   461→        ],
+   462→      },
+   463→    },
+   464→  });
+   465→  await db.datasetRecord.create({
+   466→    data: {
+   467→      datasetId: invoiceDs.id,
+   468→      status: "needs_review",
+   469→      confidence: 0.71,
+   470→      values: {
+   471→        create: [
+   472→          { fieldId: invoiceSchema.fields[0].id, value: JSON.stringify("Vendor X"), confidence: 0.65, evidence: "Inferred from sender domain 'vendorx.co'", sourceFile: "email-body", pageNumber: 1, modelUsed: "gemini-1.5-pro", promptVersion: "v1" },
+   473→          { fieldId: invoiceSchema.fields[1].id, value: JSON.stringify("VX-0922"), confidence: 0.82, evidence: "Subject: 'Invoice VX-0922 attached'", sourceFile: "email-body", pageNumber: 1, modelUsed: "gemini-1.5-pro", promptVersion: "v1" },
+   474→          { fieldId: invoiceSchema.fields[2].id, value: JSON.stringify(8200), confidence: 0.61, evidence: "Attachment was image-only; OCR confidence low", sourceFile: "VX-0922.png", pageNumber: 1, modelUsed: "gemini-1.5-pro", promptVersion: "v1" },
+   475→        ],
+   476→      },
+   477→    },
+   478→  });
+   479→
+   480→  // ── Support Dataset Records ────────────────────────────────────────────
+   481→  await db.datasetRecord.create({
+   482→    data: {
+   483→      datasetId: supportDs.id,
+   484→      sourceEmailId: e3.id,
+   485→      status: "valid",
+   486→      confidence: 0.92,
+   487→      values: {
+   488→        create: [
+   489→          { fieldId: supportSchema.fields[0].id, value: JSON.stringify("John Customer"), confidence: 0.89, evidence: "From: john.customer@gmail.com; signature: 'John'", sourceFile: "email-body", pageNumber: 1, modelUsed: "gemini-1.5-pro", promptVersion: "v1" },
+   490→          { fieldId: supportSchema.fields[1].id, value: JSON.stringify("john.customer@gmail.com"), confidence: 0.99, evidence: "From header", sourceFile: "email-body", pageNumber: 1, modelUsed: "gemini-1.5-pro", promptVersion: "v1" },
+   491→          { fieldId: supportSchema.fields[2].id, value: JSON.stringify("urgent"), confidence: 0.95, evidence: "Subject: 'URGENT: Cannot login...'", sourceFile: "email-body", pageNumber: 1, modelUsed: "gemini-1.5-pro", promptVersion: "v1" },
+   492→          { fieldId: supportSchema.fields[3].id, value: JSON.stringify("account"), confidence: 0.87, evidence: "Body: 'cannot login to my account'", sourceFile: "email-body", pageNumber: 1, modelUsed: "gemini-1.5-pro", promptVersion: "v1" },
+   493→          { fieldId: supportSchema.fields[4].id, value: JSON.stringify("User cannot login; password reset email not arriving"), confidence: 0.91, evidence: "Body summary", sourceFile: "email-body", pageNumber: 1, modelUsed: "gemini-1.5-pro", promptVersion: "v1" },
+   494→          { fieldId: supportSchema.fields[5].id, value: JSON.stringify(["account", "bug"]), confidence: 0.84, evidence: "Inferred from 'cannot login' + 'email never arrives'", sourceFile: "email-body", pageNumber: 1, modelUsed: "gemini-1.5-pro", promptVersion: "v1" },
+   495→        ],
+   496→      },
+   497→    },
+   498→  });
+   499→
+   500→  // ── AI Jobs ────────────────────────────────────────────────────────────
+   501→  await db.aiJob.createMany({
+   502→    data: [
+   503→      { organizationId: acme.id, userId: alice.id, type: "GMAIL_SCAN", status: "success", progress: 100, payload: JSON.stringify({ sourceId: source1.id }), result: JSON.stringify({ matched: 12 }), startedAt: new Date(Date.now() - 3 * 60 * 60 * 1000), finishedAt: new Date(Date.now() - 3 * 60 * 60 * 1000 + 90 * 1000) },
+   504→      { organizationId: acme.id, userId: alice.id, type: "AI_EXTRACTION", status: "success", progress: 100, payload: JSON.stringify({ sourceId: source1.id, schemaId: placementSchema.id }), result: JSON.stringify({ recordsExtracted: 11, avgConfidence: 0.89 }), startedAt: new Date(Date.now() - 3 * 60 * 60 * 1000 + 100 * 1000), finishedAt: new Date(Date.now() - 3 * 60 * 60 * 1000 + 240 * 1000) },
+   505→      { organizationId: acme.id, userId: bob.id, type: "GMAIL_SCAN", status: "failed", progress: 34, payload: JSON.stringify({ sourceId: source2.id }), errorMessage: "Token refresh failed", attempts: 3, startedAt: new Date(Date.now() - 28 * 60 * 60 * 1000), finishedAt: new Date(Date.now() - 28 * 60 * 60 * 1000 + 5 * 60 * 1000) },
+   506→      { organizationId: acme.id, userId: cara.id, type: "AI_EXTRACTION", status: "running", progress: 64, payload: JSON.stringify({ sourceId: source3.id, schemaId: supportSchema.id }), startedAt: new Date(Date.now() - 4 * 60 * 1000) },
+   507→      { organizationId: acme.id, type: "DOCUMENT_PARSE", status: "queued", progress: 0, payload: JSON.stringify({ emailId: e1.id, attachment: "TechCorp_JD.pdf" }) },
+   508→      { organizationId: acme.id, type: "DRIVE_DISCOVERY", status: "success", progress: 100, payload: JSON.stringify({ emailId: e1.id }), result: JSON.stringify({ docsFound: 1, formsFound: 1 }) },
+   509→      { organizationId: acme.id, type: "AI_VALIDATION", status: "dlq", progress: 100, attempts: 5, payload: JSON.stringify({ recordIds: [r3.id] }), errorMessage: "Schema validation failed repeatedly", startedAt: new Date(Date.now() - 6 * 60 * 60 * 1000), finishedAt: new Date(Date.now() - 5 * 60 * 60 * 1000) },
+   510→      { organizationId: acme.id, type: "EXPORT", status: "success", progress: 100, payload: JSON.stringify({ datasetId: placementDs.id, format: "csv" }), result: JSON.stringify({ rows: 3, file: "placement_export.csv" }), startedAt: new Date(Date.now() - 24 * 60 * 60 * 1000), finishedAt: new Date(Date.now() - 24 * 60 * 60 * 1000 + 8 * 1000) },
+   511→    ],
+   512→  });
+   513→
+   514→  // ── AI Outputs ─────────────────────────────────────────────────────────
+   515→  const jobs = await db.aiJob.findMany({ where: { organizationId: acme.id } });
+   516→  for (const job of jobs.slice(0, 4)) {
+   517→    await db.aiOutput.create({
+   518→      data: {
+   519→        jobId: job.id,
+   520→        modelUsed: "gemini-1.5-pro",
+   521→        promptHash: "ph_" + job.id.slice(0, 8),
+   522→        rawResponse: JSON.stringify({ extracted: true, tokensIn: 1240, tokensOut: 380 }),
+   523→        tokensUsed: 1620,
+   524→      },
+   525→    });
+   526→  }
+   527→
+   528→  // ── Audit Logs ─────────────────────────────────────────────────────────
+   529→  await db.auditLog.createMany({
+   530→    data: [
+   531→      { organizationId: acme.id, actorType: "user", actorId: alice.id, action: "create", entity: "source", entityId: source1.id, after: JSON.stringify({ name: "Placement Cell Gmail" }), reason: "Created new Gmail source" },
+   532→      { organizationId: acme.id, actorType: "ai", action: "extract", entity: "record", entityId: r1.id, after: JSON.stringify({ confidence: 0.94, fields: 8 }), reason: "AI extraction completed" },
+   533→      { organizationId: acme.id, actorType: "user", actorId: alice.id, action: "approve", entity: "record", entityId: r1.id, before: JSON.stringify({ status: "valid" }), after: JSON.stringify({ status: "approved" }), reason: "Reviewed and approved" },
+   534→      { organizationId: acme.id, actorType: "system", action: "fail", entity: "job", entityId: jobs[2]?.id, after: JSON.stringify({ error: "Token refresh failed" }), reason: "Gmail connection degraded" },
+   535→      { organizationId: acme.id, actorType: "user", actorId: bob.id, action: "update", entity: "source", entityId: source2.id, before: JSON.stringify({ status: "active" }), after: JSON.stringify({ status: "paused" }), reason: "Paused during vendor transition" },
+   536→      { organizationId: acme.id, actorType: "user", actorId: alice.id, action: "export", entity: "dataset", entityId: placementDs.id, after: JSON.stringify({ format: "csv", rows: 3 }), reason: "Exported placement dataset" },
+   537→    ],
+   538→  });
+   539→
+   540→  // ── Sharing ────────────────────────────────────────────────────────────
+   541→  await db.sharingPermission.create({
+   542→    data: {
+   543→      datasetId: placementDs.id,
+   544→      organizationId: partnerOrg.id,
+   545→      level: "read",
+   546→      fieldScope: JSON.stringify({ exclude: ["ctc"] }),
+   547→      rowFilter: JSON.stringify({ jobType: ["internship"] }),
+   548→    },
+   549→  });
+   550→  await db.sharingRequest.create({
+   551→    data: {
+   552→      organizationId: acme.id,
+   553→      datasetId: invoiceDs.id,
+   554→      requestedBy: dan.id,
+   555→      status: "pending",
+   556→      level: "read",
+   557→      reason: "Need to reconcile Q3 invoices for partner billing.",
+   558→    },
+   559→  });
+   560→
+   561→  // ── Usage Metrics ──────────────────────────────────────────────────────
+   562→  const now = new Date();
+   563→  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+   564→  const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+   565→  await db.usageMetric.createMany({
+   566→    data: [
+   567→      { organizationId: acme.id, metricType: "ai_tokens", value: 482300, periodStart: startOfMonth, periodEnd: endOfMonth },
+   568→      { organizationId: acme.id, metricType: "emails_scanned", value: 1847, periodStart: startOfMonth, periodEnd: endOfMonth },
+   569→      { organizationId: acme.id, metricType: "documents_parsed", value: 312, periodStart: startOfMonth, periodEnd: endOfMonth },
+   570→      { organizationId: acme.id, metricType: "exports", value: 18, periodStart: startOfMonth, periodEnd: endOfMonth },
+   571→      { organizationId: acme.id, metricType: "storage", value: 1280, periodStart: startOfMonth, periodEnd: endOfMonth },
+   572→    ],
+   573→  });
+   574→
+   575→  console.log("✅ Seed complete");
+   576→  console.log({ alice: alice.id, acme: acme.id, placementSchema: placementSchema.id, placementDs: placementDs.id });
+   577→}
+   578→
+   579→main()
+   580→  .catch((e) => {
+   581→    console.error(e);
+   582→    process.exit(1);
+   583→  })
+   584→  .finally(async () => {
+   585→    await db.$disconnect();
+   586→  });
+   587→

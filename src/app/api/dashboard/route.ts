@@ -1,0 +1,141 @@
+// GET /api/dashboard — aggregates the data needed by the dashboard view:
+//   - KPIs (connected accounts, active sources, records extracted,
+//     review queue depth, running AI jobs, failed AI jobs)
+//   - recentRuns (last 6 source runs with source name)
+//   - reviewQueue (records with status=needs_review, include values+fields)
+//   - recentDatasets (last 5)
+//   - queueHealth (group ai_jobs by type+status)
+//   - usageMetrics (current month)
+//   - connectionAlerts (connections with status != active OR watchExpiresAt
+//     within 2 days)
+
+import { NextRequest, NextResponse } from "next/server";
+import { db } from "@/lib/db";
+import { requireOrgContext } from "@/lib/auth";
+import { currentMonthUsage } from "@/lib/usage";
+import {
+  attachFieldsToRecords,
+  fieldsByIdMap,
+  serializeDataset,
+  serializeDatasetRecord,
+  serializeGoogleConnection,
+  serializeSourceRun,
+  serializeUsageMetric,
+} from "@/lib/serialize";
+import type { DashboardData } from "@/lib/types";
+
+export async function GET(req: NextRequest) {
+  try {
+    const { organizationId } = await requireOrgContext(req);
+
+    const [
+      connectedAccounts,
+      activeSources,
+      reviewQueueCount,
+      aiJobsRunning,
+      aiJobsFailed,
+      recentRunsRaw,
+      reviewQueueRaw,
+      recentDatasetsRaw,
+      queueHealthRaw,
+      usageRaw,
+      connectionAlertsRaw,
+    ] = await Promise.all([
+      db.googleConnection.count({ where: { organizationId } }),
+      db.source.count({ where: { organizationId, status: "active" } }),
+      db.datasetRecord.count({
+        where: { dataset: { organizationId }, status: "needs_review" },
+      }),
+      db.aiJob.count({
+        where: { organizationId, status: { in: ["queued", "running"] } },
+      }),
+      db.aiJob.count({
+        where: { organizationId, status: { in: ["failed", "dlq"] } },
+      }),
+      db.sourceRun.findMany({
+        take: 6,
+        orderBy: { startedAt: "desc" },
+        where: { source: { organizationId } },
+        include: { source: { select: { id: true, name: true } } },
+      }),
+      db.datasetRecord.findMany({
+        take: 10,
+        orderBy: { updatedAt: "desc" },
+        where: { status: "needs_review", dataset: { organizationId } },
+        include: {
+          values: true,
+          dataset: { select: { id: true, name: true } },
+        },
+      }),
+      db.dataset.findMany({
+        take: 5,
+        orderBy: { createdAt: "desc" },
+        where: { organizationId },
+        include: { schema: { include: { fields: true } } },
+      }),
+      db.aiJob.groupBy({
+        by: ["type", "status"],
+        where: { organizationId },
+        _count: { _all: true },
+      }),
+      currentMonthUsage(organizationId),
+      db.googleConnection.findMany({
+        where: {
+          organizationId,
+          OR: [
+            { status: { not: "active" } },
+            { watchExpiresAt: { lte: new Date(Date.now() + 2 * 86400_000) } },
+          ],
+        },
+      }),
+    ]);
+
+    // recordsExtracted: total count of dataset records across the org.
+    const recordsExtracted = await db.datasetRecord.count({
+      where: { dataset: { organizationId } },
+    });
+
+    // Attach schema field metadata to each review-queue record's values.
+    // `DatasetValue` has no Prisma relation to `SchemaField`, so we fetch
+    // all schema fields for the org and join in JS.
+    const schemaFields = await db.schemaField.findMany({
+      where: { schema: { organizationId } },
+    });
+    const fieldsMap = fieldsByIdMap(schemaFields);
+    const reviewQueueEnriched = attachFieldsToRecords(reviewQueueRaw, fieldsMap);
+
+    const data: DashboardData = {
+      kpis: {
+        connectedAccounts,
+        activeSources,
+        recordsExtracted,
+        reviewQueue: reviewQueueCount,
+        aiJobsRunning,
+        aiJobsFailed,
+      },
+      recentRuns: recentRunsRaw.map((r) => ({
+        ...serializeSourceRun(r),
+        sourceName: r.source?.name ?? null,
+      })) as any,
+      reviewQueue: reviewQueueEnriched.map((r) => ({
+        ...serializeDatasetRecord(r),
+        dataset: r.dataset,
+      })) as any,
+      recentDatasets: recentDatasetsRaw.map(serializeDataset),
+      queueHealth: queueHealthRaw.map((g) => ({
+        type: g.type,
+        status: g.status,
+        count: g._count._all,
+      })),
+      usageMetrics: usageRaw.map(serializeUsageMetric),
+      connectionAlerts: connectionAlertsRaw.map(serializeGoogleConnection),
+    };
+
+    return NextResponse.json(data);
+  } catch (err) {
+    return NextResponse.json(
+      { error: err instanceof Error ? err.message : "Failed to load dashboard" },
+      { status: 500 }
+    );
+  }
+}

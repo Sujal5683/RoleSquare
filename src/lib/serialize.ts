@@ -1,0 +1,408 @@
+// Workspace Intelligence Platform — serialization helpers.
+//
+// Converts Prisma records into DTOs that match the shared types in
+// `src/lib/types.ts`. Responsibilities:
+//   - serialize Date → ISO string
+//   - parse JSON-encoded String fields (scopes, value, options, payload,
+//     result, before, after, fieldScope, rowFilter, stats, config) into
+//     proper JS objects, gracefully handling invalid JSON
+//
+// All serializers are pure functions — safe to call inside or outside a
+// Prisma transaction.
+
+import type {
+  UserDTO,
+  OrganizationDTO,
+  MemberDTO,
+  GoogleConnectionDTO,
+  SchemaFieldDTO,
+  SchemaDTO,
+  SourceRuleDTO,
+  SourceDTO,
+  SourceRunDTO,
+  DatasetValueDTO,
+  DatasetRecordDTO,
+  DatasetDTO,
+  AiJobDTO,
+  AiOutputDTO,
+  SharingRequestDTO,
+  SharingPermissionDTO,
+  AuditLogDTO,
+  UsageMetricDTO,
+} from "@/lib/types";
+
+/** Parse a JSON string field, returning `fallback` on failure or null. */
+export function parseJson<T = unknown>(
+  raw: string | null | undefined,
+  fallback: T
+): T {
+  if (raw == null || raw === "") return fallback;
+  try {
+    return JSON.parse(raw) as T;
+  } catch {
+    return fallback;
+  }
+}
+
+/** Parse a CSV-style scope string ("gmail.readonly,drive.metadata.readonly"). */
+function parseScopes(raw: string | null | undefined): string[] {
+  if (!raw) return [];
+  // If the scopes field was stored as a JSON array, prefer that.
+  const trimmed = raw.trim();
+  if (trimmed.startsWith("[")) {
+    const parsed = parseJson<string[]>(raw, []);
+    return parsed;
+  }
+  return raw
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
+export function serializeUser(u: any): UserDTO {
+  return {
+    id: u.id,
+    email: u.email,
+    name: u.name ?? null,
+    avatarUrl: u.avatarUrl ?? null,
+    role: u.role,
+  };
+}
+
+export function serializeOrganization(
+  o: any,
+  memberCount?: number
+): OrganizationDTO {
+  return {
+    id: o.id,
+    name: o.name,
+    slug: o.slug,
+    plan: o.plan,
+    createdBy: o.createdBy,
+    createdAt: o.createdAt instanceof Date ? o.createdAt.toISOString() : o.createdAt,
+    ...(memberCount !== undefined ? { memberCount } : {}),
+  };
+}
+
+export function serializeMember(m: any): MemberDTO {
+  return {
+    id: m.id,
+    userId: m.userId,
+    role: m.role,
+    status: m.status,
+    user: serializeUser(m.user),
+    createdAt:
+      m.createdAt instanceof Date ? m.createdAt.toISOString() : m.createdAt,
+  };
+}
+
+export function serializeGoogleConnection(c: any): GoogleConnectionDTO {
+  return {
+    id: c.id,
+    googleEmail: c.googleEmail,
+    scopes: parseScopes(c.scopes),
+    status: c.status,
+    watchExpiresAt:
+      c.watchExpiresAt instanceof Date
+        ? c.watchExpiresAt.toISOString()
+        : (c.watchExpiresAt ?? null),
+    lastSyncAt:
+      c.lastSyncAt instanceof Date
+        ? c.lastSyncAt.toISOString()
+        : (c.lastSyncAt ?? null),
+    organizationId: c.organizationId ?? null,
+  };
+}
+
+export function serializeSchemaField(f: any): SchemaFieldDTO {
+  return {
+    id: f.id,
+    name: f.name,
+    type: f.type,
+    description: f.description ?? null,
+    instructions: f.instructions ?? null,
+    required: !!f.required,
+    options: f.options ? parseJson<string[] | null>(f.options, null) : null,
+    position: f.position,
+  };
+}
+
+export function serializeSchema(s: any): SchemaDTO {
+  return {
+    id: s.id,
+    organizationId: s.organizationId,
+    name: s.name,
+    description: s.description ?? null,
+    version: s.version,
+    promptTemplate: s.promptTemplate ?? null,
+    fields: Array.isArray(s.fields) ? s.fields.map(serializeSchemaField) : [],
+    createdAt:
+      s.createdAt instanceof Date ? s.createdAt.toISOString() : s.createdAt,
+  };
+}
+
+export function serializeSourceRule(r: any): SourceRuleDTO {
+  return {
+    id: r.id,
+    filterType: r.filterType,
+    operator: r.operator,
+    value: parseJson(r.value, r.value),
+    position: r.position,
+  };
+}
+
+export function serializeSource(s: any): SourceDTO {
+  return {
+    id: s.id,
+    organizationId: s.organizationId,
+    ownerUserId: s.ownerUserId,
+    googleConnectionId: s.googleConnectionId,
+    googleConnection: s.googleConnection
+      ? serializeGoogleConnection(s.googleConnection)
+      : undefined,
+    schemaId: s.schemaId ?? null,
+    schema: s.schema ? serializeSchema(s.schema) : s.schemaId ? null : null,
+    datasetId: s.datasetId ?? null,
+    dataset: s.dataset
+      ? { id: s.dataset.id, name: s.dataset.name }
+      : s.datasetId
+        ? null
+        : null,
+    name: s.name,
+    description: s.description ?? null,
+    sourceType: s.sourceType,
+    status: s.status,
+    runState: s.runState,
+    scheduleMode: s.scheduleMode,
+    scheduleExpr: s.scheduleExpr,
+    lastRunAt:
+      s.lastRunAt instanceof Date ? s.lastRunAt.toISOString() : (s.lastRunAt ?? null),
+    nextRunAt:
+      s.nextRunAt instanceof Date ? s.nextRunAt.toISOString() : (s.nextRunAt ?? null),
+    rules: Array.isArray(s.rules) ? s.rules.map(serializeSourceRule) : undefined,
+    createdAt:
+      s.createdAt instanceof Date ? s.createdAt.toISOString() : s.createdAt,
+  };
+}
+
+export function serializeSourceRun(r: any): SourceRunDTO {
+  return {
+    id: r.id,
+    sourceId: r.sourceId,
+    status: r.status,
+    mode: r.mode,
+    progress: r.progress,
+    startedAt:
+      r.startedAt instanceof Date ? r.startedAt.toISOString() : r.startedAt,
+    finishedAt:
+      r.finishedAt instanceof Date
+        ? r.finishedAt.toISOString()
+        : (r.finishedAt ?? null),
+    errorMessage: r.errorMessage ?? null,
+    stats: parseJson<Record<string, number>>(r.stats, {}),
+  };
+}
+
+export function serializeDatasetValue(v: any): DatasetValueDTO {
+  return {
+    id: v.id,
+    fieldId: v.fieldId,
+    fieldName: v.field?.name,
+    fieldType: v.field?.type,
+    value: parseJson(v.value, v.value),
+    confidence: v.confidence,
+    evidence: v.evidence,
+    sourceFile: v.sourceFile ?? null,
+    pageNumber: v.pageNumber ?? null,
+    modelUsed: v.modelUsed,
+    promptVersion: v.promptVersion,
+    extractedAt:
+      v.extractedAt instanceof Date
+        ? v.extractedAt.toISOString()
+        : v.extractedAt,
+  };
+}
+
+export function serializeDatasetRecord(r: any): DatasetRecordDTO {
+  return {
+    id: r.id,
+    datasetId: r.datasetId,
+    sourceEmailId: r.sourceEmailId ?? null,
+    status: r.status,
+    confidence: r.confidence,
+    createdAt:
+      r.createdAt instanceof Date ? r.createdAt.toISOString() : r.createdAt,
+    values: Array.isArray(r.values) ? r.values.map(serializeDatasetValue) : [],
+  };
+}
+
+export function serializeDataset(d: any): DatasetDTO {
+  return {
+    id: d.id,
+    organizationId: d.organizationId,
+    schemaId: d.schemaId ?? null,
+    schema: d.schema ? serializeSchema(d.schema) : null,
+    name: d.name,
+    description: d.description ?? null,
+    recordCount: d.recordCount,
+    createdAt:
+      d.createdAt instanceof Date ? d.createdAt.toISOString() : d.createdAt,
+  };
+}
+
+export function serializeAiJob(j: any): AiJobDTO {
+  return {
+    id: j.id,
+    organizationId: j.organizationId,
+    type: j.type,
+    status: j.status,
+    progress: j.progress,
+    attempts: j.attempts,
+    payload: parseJson<Record<string, unknown>>(j.payload, {}),
+    errorMessage: j.errorMessage ?? null,
+    result: j.result
+      ? parseJson<Record<string, unknown> | null>(j.result, null)
+      : null,
+    startedAt:
+      j.startedAt instanceof Date
+        ? j.startedAt.toISOString()
+        : (j.startedAt ?? null),
+    finishedAt:
+      j.finishedAt instanceof Date
+        ? j.finishedAt.toISOString()
+        : (j.finishedAt ?? null),
+    createdAt:
+      j.createdAt instanceof Date ? j.createdAt.toISOString() : j.createdAt,
+  };
+}
+
+export function serializeAiOutput(o: any): AiOutputDTO {
+  return {
+    id: o.id,
+    jobId: o.jobId,
+    modelUsed: o.modelUsed,
+    promptHash: o.promptHash,
+    tokensUsed: o.tokensUsed,
+    createdAt:
+      o.createdAt instanceof Date ? o.createdAt.toISOString() : o.createdAt,
+  };
+}
+
+export function serializeSharingRequest(
+  r: any
+): SharingRequestDTO {
+  return {
+    id: r.id,
+    organizationId: r.organizationId,
+    datasetId: r.datasetId ?? null,
+    datasetName: r.dataset?.name ?? null,
+    requestedBy: r.requestedBy,
+    requesterName: r.requester?.name ?? null,
+    status: r.status,
+    level: r.level,
+    reason: r.reason ?? null,
+    createdAt:
+      r.createdAt instanceof Date ? r.createdAt.toISOString() : r.createdAt,
+    decidedAt:
+      r.decidedAt instanceof Date
+        ? r.decidedAt.toISOString()
+        : (r.decidedAt ?? null),
+  };
+}
+
+export function serializeSharingPermission(
+  p: any
+): SharingPermissionDTO {
+  return {
+    id: p.id,
+    datasetId: p.datasetId,
+    datasetName: p.dataset?.name,
+    organizationId: p.organizationId,
+    organizationName: p.organization?.name,
+    level: p.level,
+    fieldScope: p.fieldScope
+      ? parseJson<Record<string, unknown> | null>(p.fieldScope, null)
+      : null,
+    rowFilter: p.rowFilter
+      ? parseJson<Record<string, unknown> | null>(p.rowFilter, null)
+      : null,
+    createdAt:
+      p.createdAt instanceof Date ? p.createdAt.toISOString() : p.createdAt,
+  };
+}
+
+export function serializeAuditLog(a: any): AuditLogDTO {
+  return {
+    id: a.id,
+    organizationId: a.organizationId,
+    actorType: a.actorType,
+    actorId: a.actorId ?? null,
+    actorName: a.actor?.name ?? null,
+    action: a.action,
+    entity: a.entity,
+    entityId: a.entityId ?? null,
+    before: a.before
+      ? parseJson<Record<string, unknown> | null>(a.before, null)
+      : null,
+    after: a.after
+      ? parseJson<Record<string, unknown> | null>(a.after, null)
+      : null,
+    reason: a.reason ?? null,
+    createdAt:
+      a.createdAt instanceof Date ? a.createdAt.toISOString() : a.createdAt,
+  };
+}
+
+export function serializeUsageMetric(u: any): UsageMetricDTO {
+  return {
+    id: u.id,
+    metricType: u.metricType,
+    value: u.value,
+    periodStart:
+      u.periodStart instanceof Date
+        ? u.periodStart.toISOString()
+        : u.periodStart,
+    periodEnd:
+      u.periodEnd instanceof Date ? u.periodEnd.toISOString() : u.periodEnd,
+  };
+}
+
+/** Builds an ISO date offset from now (e.g. +7d). */
+export function offsetDate(days: number, from: Date = new Date()): Date {
+  const d = new Date(from.getTime());
+  d.setDate(d.getDate() + days);
+  return d;
+}
+
+// ── Schema field attachment helpers ────────────────────────────────────
+//
+// `DatasetValue` has no Prisma relation to `SchemaField` (only `fieldId`).
+// Use these helpers to attach the field metadata after loading values so
+// the serializer can populate `fieldName` / `fieldType`.
+
+export function fieldsByIdMap(fields: any[]): Map<string, any> {
+  return new Map((fields ?? []).map((f) => [f.id, f]));
+}
+
+export function attachFieldInfo(value: any, fieldsById: Map<string, any>): any {
+  if (!value) return value;
+  return { ...value, field: fieldsById.get(value.fieldId) ?? null };
+}
+
+export function attachFieldsToValues(
+  values: any[],
+  fieldsById: Map<string, any>
+): any[] {
+  return (values ?? []).map((v) => attachFieldInfo(v, fieldsById));
+}
+
+export function attachFieldsToRecords(
+  records: any[],
+  fieldsById: Map<string, any>
+): any[] {
+  return (records ?? []).map((r) => ({
+    ...r,
+    values: attachFieldsToValues(r.values ?? [], fieldsById),
+  }));
+}
+
