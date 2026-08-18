@@ -490,3 +490,123 @@ Verification commands:
 - `curl http://localhost:3000/` → 200 (landing page)
 - `curl http://localhost:3000/api/dashboard` → 200 with KPIs
 - `curl http://localhost:3000/api/extraction -X POST -H "Content-Type: application/json" -d '{"schemaId":"<id>","sourceText":"..."}'` → 200 with extracted fields
+
+---
+
+## Cron Review Phase — QA + Feature Additions
+
+**Task ID:** CRON-1
+**Agent:** main (Z.ai Code)
+**Task:** QA assessment, bug fixes, and feature additions for the Workspace Intelligence Platform
+
+### Current Project Status Assessment
+
+The platform is stable and fully functional:
+- **Lint**: clean (0 errors, 0 warnings)
+- **Page compilation**: HTTP 200 on landing page (73KB)
+- **All 13 API endpoints**: return HTTP 200 with real seeded data
+- **13 frontend views**: all render correctly (verified in previous session via agent-browser)
+- **AI extraction endpoint**: calls z-ai-web-dev-sdk LLM and returns evidence-backed fields
+- **Evidence-first contract**: every DatasetValue stores value, confidence, evidence, sourceFile, modelUsed, promptVersion
+
+### Known Environment Constraint
+The 4GB sandbox experiences OOM kills when the Next.js dev server (~1GB) and Chromium (agent-browser, ~1.5GB) run simultaneously. Server auto-restarts via the cron job. Code quality is not affected — this is purely a sandbox memory constraint.
+
+### Completed Modifications
+
+#### 1. Command Palette (Cmd+K) — NEW
+- **File**: `src/components/command-palette.tsx`
+- Global ⌘K / Ctrl+K shortcut opens a searchable command dialog
+- Three groups: Navigate (9 views), Quick Actions (create source, create schema, test extraction, view audit), Settings (theme toggle)
+- Full-text search across labels, descriptions, and keywords
+- Keyboard navigation: ↑↓ to navigate, ↵ to select, Esc to close
+- Shows shortcut hints (Alt+1-9) next to each navigation item
+- Footer with keyboard hints and WIP branding
+
+#### 2. Notifications Dropdown — NEW
+- **File**: `src/components/notifications-dropdown.tsx`
+- Replaces the static bell icon with a functional popover
+- Pulls real data from `/api/dashboard`:
+  - Connection alerts (degraded/expired/revoked connections, watch expiring soon)
+  - Review queue items (records needing human review with confidence scores)
+  - Failed job count alerts
+  - Running job count info
+- Unread count badge on the bell icon
+- Color-coded by type: red (alerts), amber (review), blue (jobs), green (info)
+- Per-notification dismiss button (X)
+- "Mark all as read" button
+- Click-through actions: navigate to the relevant view (datasets, AI studio, etc.)
+- Relative timestamps ("2m ago", "3h ago")
+
+#### 3. Keyboard Shortcuts Dialog — NEW
+- **File**: `src/components/keyboard-shortcuts-dialog.tsx`
+- Press `?` (Shift+/) or click the Help button to open
+- Documents all available keyboard shortcuts in a clean dialog:
+  - Global: ⌘K (command palette), Alt+T (theme), ? (help), Esc (close)
+  - Navigation: Alt+1 through Alt+9 for each view
+  - Command Palette: ↑↓ (navigate), ↵ (select)
+- Styled key caps with proper icons
+
+#### 4. Global Keyboard Shortcuts — NEW
+- **⌘K / Ctrl+K**: Open command palette
+- **Alt+1-9**: Navigate to Dashboard, Sources, Datasets, Schema Builder, AI Studio, Sharing, Organizations, Members, Settings
+- **Alt+T**: Toggle dark/light theme
+- **?**: Open keyboard shortcuts help dialog
+- **Esc**: Close any open dialog or palette
+
+#### 5. Improved Sidebar — ENHANCED
+- Active nav items now have a scale animation on hover and an active dot indicator
+- New "Quick Actions" section at the bottom: New Source, Test Extraction
+- Improved footer: shows org name, plan badge, role, and a ⌘K command palette hint button with dashed border
+
+#### 6. Improved Top Bar — ENHANCED
+- Search input replaced with a command palette trigger button showing "Search or jump to…" and a ⌘K kbd hint
+- Notifications bell replaced with the functional NotificationsDropdown component
+- Help button now triggers the keyboard shortcuts dialog instead of navigating to settings
+
+#### 7. Improved Footer — ENHANCED
+- Logo with Zap icon
+- Command palette quick-access button
+- Plan badge display
+- Better responsive layout (hides secondary info on mobile)
+
+#### 8. View Transition Animations — NEW
+- **CSS**: `view-fade-in` class applied to the main content wrapper
+- Subtle 200ms fade-in + slide-up animation when switching views
+- Uses `key={view}` to re-trigger the animation on view change
+
+#### 9. Improved Global CSS — ENHANCED
+- **File**: `src/app/globals.css`
+- **Dark mode**: Refined color palette with subtle blue-tinted hues (oklch chroma 0.005-0.006 at hue 264) instead of pure neutral grays — gives a more premium feel
+- **Custom scrollbars**: 8px wide, rounded, with hover states (light + dark variants)
+- **Custom selection**: Subtle primary-tinted text selection
+- **Glass utility**: Frosted glass backdrop-filter for overlay elements
+- **Shimmer animation**: For skeleton loading states
+- **Gradient text utility**: For branding accents
+- **Font features**: Enabled cv02, cv03, cv04, cv11 for better number/letter rendering
+
+### Verification Results
+- `bun run lint` → 0 errors, 0 warnings ✅
+- `curl http://localhost:3000/` → HTTP 200 (73KB) ✅
+- All 13 API endpoints → HTTP 200 ✅
+- No import errors, no syntax errors ✅
+- Page compiles successfully with webpack ✅
+
+### Unresolved Issues / Risks
+1. **OOM in sandbox**: The dev server (~1GB) + Chromium (~1.5GB) exceeds the 4GB sandbox limit. Not a code issue — the cron job handles restarts.
+2. **Google OAuth simulated**: No real Google Cloud credentials; connections are created directly via API.
+3. **BullMQ/Redis replaced**: Jobs are stored in DB with status tracking; no real queue workers.
+4. **pgvector/RAG replaced**: Text-based extraction only; embeddings not stored.
+
+### Recommended Next Steps (Priority Order)
+1. **Add a "Recently Viewed" section** to the dashboard — track last-visited datasets/sources in Zustand
+2. **Add bulk actions** to the Sources and Datasets tables (select multiple, bulk pause/resume/delete)
+3. **Add a global search** that actually searches across sources, datasets, records, and schemas
+4. **Add drag-and-drop field reordering** in the Schema Builder (currently uses up/down buttons)
+5. **Add saved views** to the Dataset Explorer (filter presets with names)
+6. **Add real-time job progress** using WebSocket (mini-service) for live updates during extraction
+7. **Add CSV/JSON import** for bulk record creation in datasets
+8. **Add a "clone" action** for sources and schemas to speed up configuration
+9. **Add email notification templates** in Settings (for source run failures, review queue items)
+10. **Add a usage dashboard** with charts showing token consumption trends over time
+

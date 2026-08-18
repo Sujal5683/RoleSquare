@@ -31,7 +31,6 @@ import {
   Settings,
   Menu,
   Search,
-  Bell,
   Sun,
   Moon,
   ChevronDown,
@@ -40,9 +39,13 @@ import {
   HelpCircle,
   LogOut,
   Zap,
+  Command as CommandIcon,
   type LucideIcon,
 } from "lucide-react";
 import type { ViewId } from "@/lib/types";
+import { CommandPalette } from "@/components/command-palette";
+import { NotificationsDropdown } from "@/components/notifications-dropdown";
+import { KeyboardShortcutsDialog } from "@/components/keyboard-shortcuts-dialog";
 
 interface NavItem {
   id: ViewId;
@@ -71,6 +74,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const setSidebarOpen = useAppStore((s) => s.setSidebarOpen);
   const theme = useAppStore((s) => s.theme);
   const toggleTheme = useAppStore((s) => s.toggleTheme);
+  const openSource = useAppStore((s) => s.openSource);
 
   const [session, setSession] = useState<SessionUser | null>(null);
   const [orgs, setOrgs] = useState<
@@ -108,6 +112,18 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       })
       .catch(() => {});
   }, []);
+
+  // Alt+T to toggle theme
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.altKey && !e.metaKey && !e.ctrlKey && e.key.toLowerCase() === "t") {
+        e.preventDefault();
+        toggleTheme();
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [toggleTheme]);
 
   // Landing page is rendered without the shell
   if (view === "landing") {
@@ -149,36 +165,84 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                       setSidebarOpen(false);
                     }}
                     className={cn(
-                      "flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+                      "flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-sm font-medium transition-colors group",
                       active
-                        ? "bg-sidebar-primary text-sidebar-primary-foreground"
+                        ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-sm"
                         : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
                     )}
                   >
-                    <Icon className="h-4 w-4 shrink-0" />
+                    <Icon className={cn("h-4 w-4 shrink-0 transition-transform group-hover:scale-110", active && "scale-110")} />
                     <span className="truncate">{item.label}</span>
+                    {active && (
+                      <span className="ml-auto h-1.5 w-1.5 rounded-full bg-sidebar-primary-foreground/70" />
+                    )}
                   </button>
                 );
               })}
             </div>
           </div>
         ))}
+
+        {/* Quick Actions */}
+        <div>
+          <p className="px-3 pb-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+            Quick Actions
+          </p>
+          <div className="space-y-0.5">
+            <button
+              onClick={() => {
+                openSource(null);
+                setSidebarOpen(false);
+              }}
+              className="flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-sm font-medium text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors"
+            >
+              <Plus className="h-4 w-4 shrink-0" />
+              <span className="truncate">New Source</span>
+            </button>
+            <button
+              onClick={() => {
+                setView("ai-studio");
+                setSidebarOpen(false);
+              }}
+              className="flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-sm font-medium text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors"
+            >
+              <Sparkles className="h-4 w-4 shrink-0" />
+              <span className="truncate">Test Extraction</span>
+            </button>
+          </div>
+        </div>
       </nav>
 
       {/* Footer */}
-      <div className="border-t p-3">
+      <div className="border-t p-3 space-y-2">
         <div className="rounded-lg bg-muted/50 p-3">
-          <p className="text-xs font-medium">{activeOrg?.name ?? "Acme Intelligence"}</p>
+          <div className="flex items-center justify-between">
+            <p className="text-xs font-medium truncate">{activeOrg?.name ?? "Acme Intelligence"}</p>
+            <span className="text-[9px] uppercase font-bold rounded px-1.5 py-0.5 bg-primary/10 text-primary">{activeOrg?.plan ?? "free"}</span>
+          </div>
           <p className="mt-0.5 text-[10px] text-muted-foreground">
-            {activeOrg?.plan ?? "free"} plan · {activeOrg?.role ?? "owner"} access
+            {activeOrg?.role ?? "owner"} access
           </p>
         </div>
+        <button
+          onClick={() => {
+            window.dispatchEvent(new KeyboardEvent("keydown", { key: "k", metaKey: true }));
+          }}
+          className="flex w-full items-center justify-between rounded-md border border-dashed px-3 py-1.5 text-xs text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
+        >
+          <span className="flex items-center gap-1.5">
+            <Search className="h-3 w-3" /> Command palette
+          </span>
+          <kbd className="font-mono text-[10px]">⌘K</kbd>
+        </button>
       </div>
     </div>
   );
 
   return (
     <div className="flex min-h-screen flex-col">
+      <CommandPalette />
+      <KeyboardShortcutsDialog />
       {/* Top bar */}
       <header className="sticky top-0 z-40 flex h-14 items-center gap-3 border-b bg-background/95 px-4 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         {/* Mobile menu */}
@@ -229,24 +293,34 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </DropdownMenuContent>
         </DropdownMenu>
 
-        {/* Search */}
-        <div className="relative hidden md:block flex-1 max-w-md">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <input
-            type="search"
-            placeholder="Search sources, datasets, records…"
-            className="w-full rounded-md border bg-background py-1.5 pl-9 pr-3 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          />
-        </div>
+        {/* Search / Command palette trigger */}
+        <button
+          onClick={() => {
+            // Dispatch Cmd+K to open the command palette
+            window.dispatchEvent(new KeyboardEvent("keydown", { key: "k", metaKey: true }));
+          }}
+          className="relative hidden md:flex flex-1 max-w-md items-center gap-2 rounded-md border bg-background py-1.5 px-3 text-sm text-muted-foreground hover:bg-accent transition-colors group"
+        >
+          <Search className="h-4 w-4 shrink-0" />
+          <span className="flex-1 text-left">Search or jump to…</span>
+          <kbd className="pointer-events-none inline-flex h-5 select-none items-center gap-0.5 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground group-hover:bg-background">
+            <CommandIcon className="h-2.5 w-2.5" />K
+          </kbd>
+        </button>
 
         <div className="ml-auto flex items-center gap-1">
-          <Button variant="ghost" size="icon" onClick={toggleTheme} title="Toggle theme">
+          <Button variant="ghost" size="icon" onClick={toggleTheme} title="Toggle theme (Alt+T)">
             {theme === "light" ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />}
           </Button>
-          <Button variant="ghost" size="icon" title="Notifications">
-            <Bell className="h-4 w-4" />
-          </Button>
-          <Button variant="ghost" size="icon" title="Help">
+          <NotificationsDropdown />
+          <Button
+            variant="ghost"
+            size="icon"
+            title="Help & shortcuts (?)"
+            onClick={() => {
+              window.dispatchEvent(new KeyboardEvent("keydown", { key: "?", shiftKey: true }));
+            }}
+          >
             <HelpCircle className="h-4 w-4" />
           </Button>
 
@@ -297,23 +371,36 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
         {/* Main content */}
         <main className="flex-1 overflow-x-hidden">
-          <div className="mx-auto max-w-7xl p-4 sm:p-6 lg:p-8">{children}</div>
+          <div key={view} className="mx-auto max-w-7xl p-4 sm:p-6 lg:p-8 view-fade-in">
+            {children}
+          </div>
         </main>
       </div>
 
       {/* Sticky footer */}
       <footer className="border-t bg-background px-4 py-3">
         <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-2 text-xs text-muted-foreground sm:flex-row">
-          <p>
-            <span className="font-medium text-foreground">Workspace Intelligence Platform</span>{" "}
-            · Evidence-backed AI extraction for Google Workspace
-          </p>
-          <div className="flex items-center gap-4">
-            <span>v1.0 · MVP</span>
+          <div className="flex items-center gap-2">
+            <span className="flex h-4 w-4 items-center justify-center rounded bg-primary text-primary-foreground">
+              <Zap className="h-2.5 w-2.5" />
+            </span>
+            <span className="font-medium text-foreground">Workspace Intelligence Platform</span>
+            <span className="hidden sm:inline">· Evidence-backed AI extraction</span>
+          </div>
+          <div className="flex items-center gap-3">
+            <button
+              className="flex items-center gap-1 hover:text-foreground transition-colors"
+              onClick={() => {
+                window.dispatchEvent(new KeyboardEvent("keydown", { key: "k", metaKey: true }));
+              }}
+            >
+              <kbd className="font-mono text-[10px] rounded border bg-muted px-1 py-0.5">⌘K</kbd>
+              <span className="hidden sm:inline">Command palette</span>
+            </button>
             <span>·</span>
-            <span>Acme Intelligence</span>
-            <span>·</span>
-            <a className="hover:text-foreground" href="#" onClick={(e) => { e.preventDefault(); setView("landing"); }}>
+            <span className="hidden sm:inline">v1.0 · {activeOrg?.plan ?? "team"} plan</span>
+            <span className="hidden sm:inline">·</span>
+            <a className="hover:text-foreground transition-colors" href="#" onClick={(e) => { e.preventDefault(); setView("landing"); }}>
               About
             </a>
           </div>
