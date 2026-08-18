@@ -13,6 +13,15 @@ export interface SessionUser {
   avatarUrl: string | null;
 }
 
+// Recently viewed item — tracked when the user opens a dataset, source,
+// schema, or record. Capped to 10 entries (most recent first).
+export interface RecentItem {
+  id: string;
+  type: "dataset" | "source" | "schema" | "record";
+  name: string;
+  timestamp: number;
+}
+
 interface AppState {
   // Navigation
   view: ViewId;
@@ -42,6 +51,19 @@ interface AppState {
   theme: "light" | "dark";
   toggleTheme: () => void;
   setTheme: (t: "light" | "dark") => void;
+
+  // Recently viewed items (persisted across sessions)
+  recentItems: RecentItem[];
+  addRecent: (item: Omit<RecentItem, "timestamp">) => void;
+  clearRecent: () => void;
+  removeRecent: (id: string) => void;
+}
+
+const MAX_RECENT = 10;
+
+function pushRecent(list: RecentItem[], item: Omit<RecentItem, "timestamp">): RecentItem[] {
+  const next = list.filter((i) => i.id !== item.id);
+  return [{ ...item, timestamp: Date.now() }, ...next].slice(0, MAX_RECENT);
 }
 
 export const useAppStore = create<AppState>()(
@@ -54,13 +76,52 @@ export const useAppStore = create<AppState>()(
       setOrganization: (id) => set({ selectedOrganizationId: id }),
 
       selectedSourceId: null,
-      openSource: (id) => set({ selectedSourceId: id, view: "source-builder" }),
+      openSource: (id) =>
+        set((s) => ({
+          selectedSourceId: id,
+          view: "source-builder",
+          ...(id
+            ? {
+                recentItems: pushRecent(s.recentItems, {
+                  id,
+                  type: "source" as const,
+                  name: id, // name will be enriched by the component that reads it
+                }),
+              }
+            : {}),
+        })),
 
       selectedDatasetId: null,
-      openDataset: (id) => set({ selectedDatasetId: id, view: "dataset-detail" }),
+      openDataset: (id) =>
+        set((s) => ({
+          selectedDatasetId: id,
+          view: "dataset-detail",
+          ...(id
+            ? {
+                recentItems: pushRecent(s.recentItems, {
+                  id,
+                  type: "dataset" as const,
+                  name: id,
+                }),
+              }
+            : {}),
+        })),
 
       selectedSchemaId: null,
-      openSchema: (id) => set({ selectedSchemaId: id, view: "schema-builder" }),
+      openSchema: (id) =>
+        set((s) => ({
+          selectedSchemaId: id,
+          view: "schema-builder",
+          ...(id
+            ? {
+                recentItems: pushRecent(s.recentItems, {
+                  id,
+                  type: "schema" as const,
+                  name: id,
+                }),
+              }
+            : {}),
+        })),
 
       selectedRecordId: null,
       openRecord: (id) => set({ selectedRecordId: id }),
@@ -72,6 +133,13 @@ export const useAppStore = create<AppState>()(
       toggleTheme: () =>
         set({ theme: get().theme === "light" ? "dark" : "light" }),
       setTheme: (t) => set({ theme: t }),
+
+      recentItems: [],
+      addRecent: (item) =>
+        set((s) => ({ recentItems: pushRecent(s.recentItems, item) })),
+      clearRecent: () => set({ recentItems: [] }),
+      removeRecent: (id) =>
+        set((s) => ({ recentItems: s.recentItems.filter((i) => i.id !== id) })),
     }),
     {
       name: "wip-app-store",
@@ -79,6 +147,7 @@ export const useAppStore = create<AppState>()(
         view: s.view,
         selectedOrganizationId: s.selectedOrganizationId,
         theme: s.theme,
+        recentItems: s.recentItems,
       }),
     }
   )

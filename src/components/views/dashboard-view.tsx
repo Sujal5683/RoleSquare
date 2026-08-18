@@ -21,6 +21,7 @@ import {
   RefreshCw,
   Mail,
   FileText,
+  FileJson,
   Brain,
   TrendingUp,
   Zap,
@@ -32,6 +33,9 @@ import {
 export function DashboardView() {
   const setView = useAppStore((s) => s.setView);
   const openDataset = useAppStore((s) => s.openDataset);
+  const openSource = useAppStore((s) => s.openSource);
+  const openSchema = useAppStore((s) => s.openSchema);
+  const recentItems = useAppStore((s) => s.recentItems);
 
   const { data, isLoading, refetch, isFetching } = useQuery({
     queryKey: ["dashboard"],
@@ -289,10 +293,67 @@ export function DashboardView() {
             </Card>
           </div>
 
-          {/* Usage metrics + Recent datasets */}
-          <div className="grid gap-6 lg:grid-cols-2">
-            {/* Usage */}
+          {/* Recently Viewed + Recent datasets */}
+          <div className="grid gap-6 lg:grid-cols-3">
+            {/* Recently viewed (from local store) */}
             <Card>
+              <CardHeader className="flex flex-row items-center justify-between pb-3">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Clock className="h-4 w-4" /> Recently viewed
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-0">
+                {recentItems.length === 0 ? (
+                  <div className="p-6">
+                    <EmptyState
+                      icon={<Clock className="h-5 w-5" />}
+                      title="Nothing yet"
+                      description="Items you open will appear here for quick access."
+                    />
+                  </div>
+                ) : (
+                  <div className="divide-y max-h-[280px] overflow-y-auto">
+                    {recentItems.slice(0, 6).map((item) => {
+                      const Icon =
+                        item.type === "source"
+                          ? Inbox
+                          : item.type === "dataset"
+                          ? Database
+                          : FileJson;
+                      return (
+                        <button
+                          key={item.id}
+                          onClick={() => {
+                            if (item.type === "source") openSource(item.id);
+                            else if (item.type === "dataset") openDataset(item.id);
+                            else if (item.type === "schema") openSchema(item.id);
+                          }}
+                          className="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-muted/40"
+                        >
+                          <div className="flex h-8 w-8 items-center justify-center rounded-md bg-muted text-muted-foreground">
+                            <Icon className="h-3.5 w-3.5" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium capitalize truncate">
+                              {item.type}
+                            </p>
+                            <p className="text-[10px] text-muted-foreground font-mono">
+                              {item.id.slice(0, 16)}…
+                            </p>
+                          </div>
+                          <span className="text-[10px] text-muted-foreground">
+                            {timeAgoShort(item.timestamp)}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Usage */}
+            <Card className="lg:col-span-2">
               <CardHeader className="pb-3">
                 <CardTitle className="text-base flex items-center gap-2">
                   <TrendingUp className="h-4 w-4" /> Usage this month
@@ -352,4 +413,15 @@ export function DashboardView() {
       )}
     </div>
   );
+}
+
+function timeAgoShort(ts: number): string {
+  const seconds = Math.floor((Date.now() - ts) / 1000);
+  if (seconds < 60) return "now";
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h`;
+  const days = Math.floor(hours / 24);
+  return `${days}d`;
 }

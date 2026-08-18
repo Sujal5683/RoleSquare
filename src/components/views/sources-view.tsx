@@ -58,6 +58,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Progress } from "@/components/ui/progress";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Inbox,
   Plus,
@@ -78,6 +79,7 @@ import {
   CheckCircle2,
   Activity,
   Zap,
+  X,
 } from "lucide-react";
 
 // ── Helpers ──────────────────────────────────────────────────────────────
@@ -119,6 +121,7 @@ export function SourcesView() {
   const [statusFilter, setStatusFilter] = useState<"all" | SourceStatus>("all");
   const [runsDialogSource, setRunsDialogSource] = useState<SourceDTO | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<SourceDTO | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   const { data: sources, isLoading, isError, refetch, isFetching } = useQuery({
     queryKey: ["sources"],
@@ -177,6 +180,107 @@ export function SourcesView() {
     },
   });
 
+  // Bulk pause/resume — runs N mutations in parallel and waits for all
+  const bulkUpdateMutation = useMutation({
+    mutationFn: async ({ ids, status }: { ids: string[]; status: SourceStatus }) => {
+      const results = await Promise.allSettled(
+        ids.map((id) => api.patch(`/api/sources/${id}`, { status }))
+      );
+      const failed = results.filter((r) => r.status === "rejected").length;
+      const succeeded = results.length - failed;
+      if (failed > 0 && succeeded === 0) {
+        throw new Error(`All ${failed} updates failed`);
+      }
+      return { succeeded, failed };
+    },
+    onSuccess: ({ succeeded, failed }) => {
+      if (failed > 0) {
+        toast.warning("Bulk update partial", {
+          description: `${succeeded} updated, ${failed} failed.`,
+        });
+      } else {
+        toast.success(`${succeeded} sources updated`);
+      }
+      queryClient.invalidateQueries({ queryKey: ["sources"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+      setSelectedIds(new Set());
+    },
+    onError: (err: unknown) => {
+      const msg = err instanceof Error ? err.message : "Bulk update failed";
+      toast.error("Bulk update failed", { description: msg });
+    },
+  });
+
+  const bulkScanMutation = useMutation({
+    mutationFn: async (ids: string[]) => {
+      const results = await Promise.allSettled(
+        ids.map((id) => api.post(`/api/sources/${id}/scan`, { mode: "incremental" }))
+      );
+      const failed = results.filter((r) => r.status === "rejected").length;
+      const succeeded = results.length - failed;
+      if (succeeded === 0) throw new Error("All scans failed");
+      return { succeeded, failed };
+    },
+    onSuccess: ({ succeeded, failed }) => {
+      if (failed > 0) {
+        toast.warning("Bulk scan partial", {
+          description: `${succeeded} scans queued, ${failed} failed.`,
+        });
+      } else {
+        toast.success(`${succeeded} scans queued`);
+      }
+      queryClient.invalidateQueries({ queryKey: ["sources"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+      setSelectedIds(new Set());
+    },
+    onError: (err: unknown) => {
+      const msg = err instanceof Error ? err.message : "Bulk scan failed";
+      toast.error("Bulk scan failed", { description: msg });
+    },
+  });
+
+  const bulkDeleteMutation = useMutation({
+    mutationFn: async (ids: string[]) => {
+      const results = await Promise.allSettled(
+        ids.map((id) => api.delete(`/api/sources/${id}`))
+      );
+      const failed = results.filter((r) => r.status === "rejected").length;
+      const succeeded = results.length - failed;
+      if (succeeded === 0) throw new Error("All deletes failed");
+      return { succeeded, failed };
+    },
+    onSuccess: ({ succeeded, failed }) => {
+      if (failed > 0) {
+        toast.warning("Bulk delete partial", {
+          description: `${succeeded} deleted, ${failed} failed.`,
+        });
+      } else {
+        toast.success(`${succeeded} sources deleted`);
+      }
+      queryClient.invalidateQueries({ queryKey: ["sources"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+      setSelectedIds(new Set());
+    },
+    onError: (err: unknown) => {
+      const msg = err instanceof Error ? err.message : "Bulk delete failed";
+      toast.error("Bulk delete failed", { description: msg });
+    },
+  });
+
+  // Selection helpers — defined after `filtered` to avoid referencing
+  // a not-yet-initialized const inside the closure.
+  // (toggleSelect is order-independent; toggleSelectAll needs filtered.)
+  const toggleSelect = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const clearSelection = () => setSelectedIds(new Set());
+
   // Filtered sources
   const filtered = useMemo(() => {
     if (!sources) return [];
@@ -187,6 +291,13 @@ export function SourcesView() {
       return true;
     });
   }, [sources, search, statusFilter]);
+
+  const toggleSelectAll = () => {
+    setSelectedIds((prev) => {
+      if (prev.size === filtered.length) return new Set();
+      return new Set(filtered.map((s) => s.id));
+    });
+  };
 
   // Stats
   const stats = useMemo(() => {
@@ -344,10 +455,95 @@ export function SourcesView() {
               />
             </div>
           ) : (
-            <div className="overflow-x-auto">
+            <div className="space-y-3">
+              {/* Bulk action bar */}
+              {selectedIds.size > 0 && (
+                <div className="flex items-center justify-between rounded-lg border bg-primary/5 px-4 py-2.5">
+                  <div className="flex items-center gap-3">
+                    <span className="text-sm font-medium">
+                      {selectedIds.size} selected
+                    </span>
+                    <button
+                      onClick={clearSelection}
+                      className="text-xs text-muted-foreground hover:text-foreground"
+                    >
+                      Clear
+                    </button>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() =>
+                        bulkScanMutation.mutate(Array.from(selectedIds))
+                      }
+                      disabled={bulkScanMutation.isPending}
+                    >
+                      <Play className="mr-1.5 h-3 w-3" />
+                      Scan all
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() =>
+                        bulkUpdateMutation.mutate({
+                          ids: Array.from(selectedIds),
+                          status: "active",
+                        })
+                      }
+                      disabled={bulkUpdateMutation.isPending}
+                    >
+                      <Play className="mr-1.5 h-3 w-3" />
+                      Resume
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() =>
+                        bulkUpdateMutation.mutate({
+                          ids: Array.from(selectedIds),
+                          status: "paused",
+                        })
+                      }
+                      disabled={bulkUpdateMutation.isPending}
+                    >
+                      <Pause className="mr-1.5 h-3 w-3" />
+                      Pause
+                    </Button>
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      onClick={() => {
+                        if (
+                          confirm(
+                            `Delete ${selectedIds.size} source(s)? This cannot be undone.`
+                          )
+                        ) {
+                          bulkDeleteMutation.mutate(Array.from(selectedIds));
+                        }
+                      }}
+                      disabled={bulkDeleteMutation.isPending}
+                    >
+                      <Trash2 className="mr-1.5 h-3 w-3" />
+                      Delete
+                    </Button>
+                  </div>
+                </div>
+              )}
+              <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
+                    <TableHead className="w-10">
+                      <Checkbox
+                        checked={
+                          filtered.length > 0 &&
+                          selectedIds.size === filtered.length
+                        }
+                        onCheckedChange={toggleSelectAll}
+                        aria-label="Select all"
+                      />
+                    </TableHead>
                     <TableHead className="min-w-[200px]">Name</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Run state</TableHead>
@@ -362,8 +558,19 @@ export function SourcesView() {
                   {filtered.map((s) => {
                     const isBusy =
                       s.runState !== "idle" || scanMutation.isPending;
+                    const isSelected = selectedIds.has(s.id);
                     return (
-                      <TableRow key={s.id} className="hover:bg-muted/40">
+                      <TableRow
+                        key={s.id}
+                        className={`hover:bg-muted/40 ${isSelected ? "bg-primary/5" : ""}`}
+                      >
+                        <TableCell>
+                          <Checkbox
+                            checked={isSelected}
+                            onCheckedChange={() => toggleSelect(s.id)}
+                            aria-label={`Select ${s.name}`}
+                          />
+                        </TableCell>
                         <TableCell>
                           <div className="flex items-center gap-3">
                             <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-primary capitalize">
@@ -523,6 +730,7 @@ export function SourcesView() {
                   })}
                 </TableBody>
               </Table>
+              </div>
             </div>
           )}
         </CardContent>

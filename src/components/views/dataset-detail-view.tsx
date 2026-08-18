@@ -96,6 +96,7 @@ import {
   Cpu,
   FileText,
   Hash,
+  Bookmark,
 } from "lucide-react";
 
 // ── Helpers ──────────────────────────────────────────────────────────────
@@ -209,6 +210,62 @@ export function DatasetDetailView() {
   const [selectedRecordId, setSelectedRecordId] = useState<string | null>(
     null
   );
+  const [savedViews, setSavedViews] = useState<
+    { id: string; name: string; statusFilter: string; search: string; hiddenFields: string[] }[]
+  >(() => {
+    if (typeof window === "undefined") return [];
+    try {
+      const key = `wip-saved-views-${datasetId}`;
+      const raw = localStorage.getItem(key);
+      return raw ? JSON.parse(raw) : [];
+    } catch {
+      return [];
+    }
+  });
+  const [saveViewDialog, setSaveViewDialog] = useState(false);
+  const [newViewName, setNewViewName] = useState("");
+
+  // Persist saved views to localStorage whenever they change
+  const persistSavedViews = (views: typeof savedViews) => {
+    setSavedViews(views);
+    if (typeof window !== "undefined") {
+      try {
+        localStorage.setItem(
+          `wip-saved-views-${datasetId}`,
+          JSON.stringify(views)
+        );
+      } catch {
+        // ignore
+      }
+    }
+  };
+
+  const handleSaveView = () => {
+    if (!newViewName.trim()) return;
+    const view = {
+      id: `view-${Date.now()}`,
+      name: newViewName.trim(),
+      statusFilter,
+      search,
+      hiddenFields: Array.from(hiddenFields),
+    };
+    persistSavedViews([...savedViews, view]);
+    setNewViewName("");
+    setSaveViewDialog(false);
+    toast.success("View saved", { description: `"${view.name}" is now available in this dataset.` });
+  };
+
+  const applyView = (view: (typeof savedViews)[0]) => {
+    setStatusFilter(view.statusFilter as "all" | RecordStatus);
+    setSearch(view.search);
+    setHiddenFields(new Set(view.hiddenFields));
+    setPage(1);
+    toast.info(`Applied view: ${view.name}`);
+  };
+
+  const deleteView = (id: string) => {
+    persistSavedViews(savedViews.filter((v) => v.id !== id));
+  };
 
   // ── Dataset detail (for schema + record count) ────────────────────────
   const {
@@ -427,6 +484,40 @@ export function DatasetDetailView() {
         exporting={exportMutation.isPending}
       />
 
+      {/* Saved views bar */}
+      {savedViews.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-xs font-medium text-muted-foreground mr-1">
+            Saved views:
+          </span>
+          {savedViews.map((view) => (
+            <div
+              key={view.id}
+              className="group flex items-center gap-1.5 rounded-md border bg-card px-2.5 py-1 text-xs hover:bg-accent transition-colors"
+            >
+              <button
+                onClick={() => applyView(view)}
+                className="font-medium"
+              >
+                {view.name}
+              </button>
+              {view.statusFilter !== "all" && (
+                <Badge variant="secondary" className="text-[9px] py-0 h-4">
+                  {view.statusFilter}
+                </Badge>
+              )}
+              <button
+                onClick={() => deleteView(view.id)}
+                className="ml-1 opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive transition-opacity"
+                title="Delete view"
+              >
+                ×
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
       {/* Filter bar */}
       <Card>
         <CardContent className="p-4">
@@ -464,8 +555,18 @@ export function DatasetDetailView() {
               </div>
             </div>
 
-            {/* Column visibility */}
-            <Popover>
+            {/* Save view + Column visibility */}
+            <div className="flex items-center gap-2 shrink-0">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setSaveViewDialog(true)}
+                title="Save current filter/column configuration"
+              >
+                <Bookmark className="mr-1.5 h-3.5 w-3.5" />
+                Save view
+              </Button>
+              <Popover>
               <PopoverTrigger asChild>
                 <Button variant="outline" size="sm" className="shrink-0">
                   <Columns3 className="mr-2 h-3.5 w-3.5" />
@@ -527,6 +628,7 @@ export function DatasetDetailView() {
                 </div>
               </PopoverContent>
             </Popover>
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -716,6 +818,64 @@ export function DatasetDetailView() {
         }}
         statusPending={statusMutation.isPending}
       />
+
+      {/* Save view dialog */}
+      <Dialog open={saveViewDialog} onOpenChange={setSaveViewDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Save current view</DialogTitle>
+            <DialogDescription>
+              Capture the current filter and column visibility configuration
+              for quick access later. Saved views are stored locally in your
+              browser and are per-dataset.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <div>
+              <Label htmlFor="view-name">View name</Label>
+              <Input
+                id="view-name"
+                placeholder="e.g. Pending review, low confidence"
+                value={newViewName}
+                onChange={(e) => setNewViewName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") handleSaveView();
+                }}
+                autoFocus
+              />
+            </div>
+            <div className="rounded-md border bg-muted/30 p-3 text-xs space-y-1">
+              <p className="font-medium">Current configuration:</p>
+              <p>
+                <span className="text-muted-foreground">Status filter:</span>{" "}
+                {statusFilter === "all" ? "All statuses" : statusFilter}
+              </p>
+              <p>
+                <span className="text-muted-foreground">Search:</span>{" "}
+                {search || "(empty)"}
+              </p>
+              <p>
+                <span className="text-muted-foreground">Hidden fields:</span>{" "}
+                {hiddenFields.size === 0
+                  ? "None (all visible)"
+                  : `${hiddenFields.size} hidden`}
+              </p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setSaveViewDialog(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleSaveView}
+              disabled={!newViewName.trim()}
+            >
+              <Bookmark className="mr-1.5 h-3.5 w-3.5" />
+              Save view
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

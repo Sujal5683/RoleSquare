@@ -610,3 +610,130 @@ The 4GB sandbox experiences OOM kills when the Next.js dev server (~1GB) and Chr
 9. **Add email notification templates** in Settings (for source run failures, review queue items)
 10. **Add a usage dashboard** with charts showing token consumption trends over time
 
+
+---
+
+## Cron Review Phase 2 — Global Search + Bulk Actions + Saved Views
+
+**Task ID:** CRON-2
+**Agent:** main (Z.ai Code)
+**Task:** QA assessment + add global search, bulk actions, saved views, and recently viewed tracking
+
+### Current Project Status Assessment
+
+Building on the previous round (CRON-1), the platform is stable:
+- **Lint**: clean (0 errors, 0 warnings)
+- **Page compilation**: HTTP 200 on landing page
+- **All API endpoints**: return HTTP 200 with real seeded data
+- **13 frontend views**: all render correctly
+- **Command palette, notifications dropdown, keyboard shortcuts**: all functional (added in CRON-1)
+- **OOM issue**: persistent in 4GB sandbox when dev server + Chromium run simultaneously; not a code issue
+
+### Completed Modifications
+
+#### 1. Recently Viewed Tracking — NEW
+- **File**: `src/lib/store.ts` — updated
+- Added `RecentItem` interface (id, type, name, timestamp) to the Zustand store
+- `openSource(id)`, `openDataset(id)`, `openSchema(id)` now automatically track the opened item in `recentItems`
+- `recentItems` array is persisted in localStorage (max 10 items, most recent first)
+- `addRecent(item)`, `clearRecent()`, `removeRecent(id)` methods for explicit control
+- Deduplication: opening an already-recent item moves it to the top instead of duplicating
+
+- **File**: `src/components/views/dashboard-view.tsx` — updated
+- Added a "Recently Viewed" card on the Dashboard (left column, 3-col grid)
+- Shows the 6 most recently viewed items (sources, datasets, schemas)
+- Each item shows: type icon, type label, truncated ID, relative timestamp
+- Click to reopen the item in its respective view
+- Empty state with "Nothing yet" message when no items have been visited
+- Added `FileJson` icon import and `timeAgoShort()` helper function
+
+#### 2. Global Search API + Command Palette Integration — NEW
+- **File**: `src/app/api/search/route.ts` — NEW endpoint
+- `GET /api/search?q=<query>&limit=<n>` searches across:
+  - **Sources**: name + description (LIKE match)
+  - **Datasets**: name + description
+  - **Schemas**: name + description
+  - **Records**: any DatasetValue's `value` column containing the query string
+- Returns a grouped result set: `{ query, results: { sources, datasets, schemas, records }, total }`
+- Requires `q` to be at least 2 characters; returns empty results for shorter queries
+- Respects organization scope via `requireOrgContext(req)`
+- Attaches schema field metadata to record values for rich display
+- Verified: search for "placement" returns 3 results (1 source, 1 dataset, 1 schema) ✅
+
+- **File**: `src/components/command-palette.tsx` — rewritten
+- Now supports **live global search**: typing 2+ characters triggers a debounced API call (250ms)
+- Search results are grouped by type (Sources, Datasets, Schemas, Records)
+- Each result shows: type-specific icon, name, description/metadata, arrow indicator
+- Color-coded icons: blue (sources), emerald (datasets), violet (schemas), amber (records)
+- Clicking a result navigates to the item (opens source builder, dataset detail, or schema builder)
+- "Recently Viewed" group appears when not searching (shows up to 5 recent items)
+- Static commands (Navigate, Quick Actions, Settings) appear when not searching
+- `shouldFilter={!isSearching}` disables client-side filtering when searching (server results are authoritative)
+- Clear button next to the search input
+- `isSearching` reacts immediately to input, API call is debounced (250ms)
+
+#### 3. Bulk Actions in Sources View — NEW
+- **File**: `src/components/views/sources-view.tsx` — updated
+- Added `selectedIds: Set<string>` state for tracking selected source IDs
+- Added checkbox column to the table (header has "select all" checkbox, rows have individual checkboxes)
+- Selected rows are highlighted with `bg-primary/5` background
+- Bulk action bar appears when `selectedIds.size > 0`:
+  - Shows count of selected sources
+  - "Clear" button to deselect all
+  - **Scan all**: triggers incremental scan on all selected sources (parallel API calls)
+  - **Resume**: sets status to "active" on all selected (parallel)
+  - **Pause**: sets status to "paused" on all selected (parallel)
+  - **Delete**: confirms then deletes all selected (parallel)
+- Uses `Promise.allSettled` for parallel mutations — handles partial failures gracefully
+- Toast notifications: success count, partial failure warning, or full failure error
+- Mutations invalidate `sources` and `dashboard` query keys after completion
+- Selection is cleared after any bulk action completes
+- `toggleSelect(id)`, `toggleSelectAll()`, `clearSelection()` helper functions
+- Added `Checkbox` import and `X` icon import
+
+#### 4. Saved Views in Dataset Explorer — NEW
+- **File**: `src/components/views/dataset-detail-view.tsx` — updated
+- Added `savedViews` state persisted to `localStorage` (key: `wip-saved-views-${datasetId}`)
+- Each saved view captures: `statusFilter`, `search`, `hiddenFields` (column visibility)
+- **Saved views bar** appears above the filter bar when views exist:
+  - Shows clickable chips for each saved view
+  - Status filter badge if the view has a specific status filter
+  - Delete (×) button on hover
+- **"Save view" button** in the filter bar (next to Columns button):
+  - Opens a dialog with a name input
+  - Shows the current configuration summary (status, search, hidden fields count)
+  - Enter key or "Save view" button saves the view
+  - Toast confirmation on save
+- `applyView(view)` restores the saved filter/column configuration
+- `deleteView(id)` removes the view from localStorage
+- Views are per-dataset (each dataset has its own set of saved views)
+- Added `Bookmark` icon import
+
+### Verification Results
+
+- `bun run lint` → 0 errors, 0 warnings ✅
+- `curl http://localhost:3000/` → HTTP 200 ✅
+- `curl http://localhost:3000/api/search?q=placement` → 200 with 3 results (1 source, 1 dataset, 1 schema) ✅
+- Browser-verified: Sources view renders with 4 checkboxes (1 header + 3 rows) ✅
+- Browser-verified: Command palette opens with Cmd+K, shows search input ✅
+- Browser-verified: Sources view shows stats (3 total, 2 active, 1 paused, 1 needs attention) ✅
+- No compilation errors, no import errors ✅
+
+### Unresolved Issues / Risks
+1. **OOM in sandbox**: Dev server + Chromium exceeds 4GB. The command palette's live search couldn't be fully browser-verified because the server died before the debounced API call completed. The API itself was verified via curl (3 results for "placement"). Not a code issue.
+2. **Google OAuth simulated**: No real Google Cloud credentials.
+3. **BullMQ/Redis replaced**: Jobs stored in DB with status tracking.
+4. **pgvector/RAG replaced**: Text-based extraction only.
+
+### Recommended Next Steps (Priority Order)
+1. **Add drag-and-drop field reordering** in the Schema Builder (currently uses up/down buttons)
+2. **Add a usage dashboard view** with recharts charts showing token consumption trends over time
+3. **Add CSV/JSON import** for bulk record creation in datasets
+4. **Add a "clone" action** for sources and schemas to speed up configuration
+5. **Add real-time job progress** using WebSocket (mini-service) for live updates during extraction
+6. **Add email notification templates** in Settings (for source run failures, review queue items)
+7. **Add a global activity feed** showing recent audit events as a notification stream
+8. **Add per-field confidence thresholds** in schema builder (auto-route to review if below threshold)
+9. **Add dataset record count badges** in the sidebar for quick at-a-glance status
+10. **Add export scheduling** (weekly CSV exports delivered via email or download link)
+
