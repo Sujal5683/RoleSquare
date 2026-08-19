@@ -8,6 +8,7 @@ import { db } from "@/lib/db";
 import { requireOrgContext, AuthError, authErrorResponse } from "@/lib/auth";
 import { logAudit } from "@/lib/audit";
 import { serializeSharingRequest } from "@/lib/serialize";
+import { dispatchWebhookEvent } from "@/lib/webhook-dispatcher";
 
 const ROLE_LEVEL: Record<string, number> = {
   owner: 5, admin: 4, manager: 3, member: 2, viewer: 1,
@@ -73,6 +74,18 @@ export async function POST(
       before: { status: existing.status },
       after: { status: "approved", level: updated.level },
       reason: "approve_request",
+    });
+
+    // Dispatch webhook event for sharing approval
+    dispatchWebhookEvent({
+      event: "sharing.approved",
+      organizationId,
+      data: {
+        requestId: id,
+        datasetId: updated.datasetId,
+        level: updated.level,
+        approvedBy: user.id,
+      },
     });
 
     return NextResponse.json(serializeSharingRequest(updated));

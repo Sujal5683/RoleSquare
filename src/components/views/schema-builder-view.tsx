@@ -50,6 +50,8 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
+import { Slider } from "@/components/ui/slider";
+import { Badge } from "@/components/ui/badge";
 import {
   FileJson,
   Plus,
@@ -88,6 +90,7 @@ interface FieldDraft {
   instructions: string;
   required: boolean;
   options: string[];
+  confidenceThreshold: number;
 }
 
 const EMPTY_FIELD: FieldDraft = {
@@ -97,6 +100,7 @@ const EMPTY_FIELD: FieldDraft = {
   instructions: "",
   required: false,
   options: [],
+  confidenceThreshold: 0.7,
 };
 
 // ── Helpers ──────────────────────────────────────────────────────────────
@@ -312,6 +316,7 @@ export function SchemaBuilderView() {
           instructions: field.instructions ?? "",
           required: field.required,
           options: field.options ?? [],
+          confidenceThreshold: field.confidenceThreshold ?? 0.7,
         },
       });
     } else {
@@ -334,6 +339,7 @@ export function SchemaBuilderView() {
         OPTIONS_FIELD_TYPES.includes(field.type) && field.options.length > 0
           ? field.options
           : null,
+      confidenceThreshold: field.confidenceThreshold,
     };
     if (field.id) {
       updateFieldMutation.mutate({ fieldId: field.id, payload });
@@ -977,6 +983,48 @@ function FieldEditorDialog({
                 setDraft((d) => ({ ...d, required: v }))
               }
             />
+          </div>
+
+          {/* Confidence threshold */}
+          <div className="rounded-lg border p-3 space-y-2">
+            <div className="flex items-center justify-between">
+              <div>
+                <Label className="cursor-pointer">
+                  Confidence threshold
+                </Label>
+                <p className="text-[10px] text-muted-foreground">
+                  Fields below this confidence are routed to human review.
+                </p>
+              </div>
+              <Badge
+                variant={
+                  draft.confidenceThreshold >= 0.85
+                    ? "default"
+                    : draft.confidenceThreshold >= 0.6
+                    ? "secondary"
+                    : "outline"
+                }
+                className="tabular-nums"
+              >
+                {Math.round(draft.confidenceThreshold * 100)}%
+              </Badge>
+            </div>
+            <Slider
+              value={[draft.confidenceThreshold]}
+              min={0}
+              max={1}
+              step={0.05}
+              onValueChange={([v]) =>
+                setDraft((d) => ({ ...d, confidenceThreshold: v }))
+              }
+              className="w-full"
+            />
+            <div className="flex justify-between text-[9px] text-muted-foreground">
+              <span>0% (always review)</span>
+              <span>50%</span>
+              <span>70% (default)</span>
+              <span>100% (never review)</span>
+            </div>
           </div>
         </div>
 

@@ -1276,6 +1276,30 @@ function FieldValueCard({
         </blockquote>
       )}
 
+      {/* Original AI value (shown when corrected by a human) */}
+      {value.originalValue != null && value.correctedAt && (
+        <div className="mt-3 rounded-md border border-amber-200 bg-amber-50 p-3 dark:border-amber-900 dark:bg-amber-950/50">
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-[10px] font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-400">
+              Original AI value (preserved)
+            </p>
+            {value.originalConfidence != null && (
+              <Badge variant="outline" className="text-[9px] tabular-nums">
+                {Math.round(value.originalConfidence * 100)}% confidence
+              </Badge>
+            )}
+          </div>
+          <p className="mt-1 text-sm text-amber-900 dark:text-amber-200 break-words">
+            {formatValueCompact(value.originalValue, value.fieldType ?? "text").text ||
+             "—"}
+          </p>
+          <p className="mt-1 text-[10px] text-amber-700/80 dark:text-amber-400/80">
+            Corrected {relativeTime(value.correctedAt)}
+            {value.correctedBy ? ` by ${value.correctedBy.slice(0, 8)}…` : ""}
+          </p>
+        </div>
+      )}
+
       {/* Meta row */}
       <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-muted-foreground sm:grid-cols-3">
         {value.sourceFile && (

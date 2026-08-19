@@ -300,10 +300,20 @@ export interface ExtractionFieldResult {
   pageNumber?: number;
 }
 
+export interface FieldReviewFlag {
+  fieldName: string;
+  confidence: number;
+  threshold: number;
+  needsReview: boolean;
+  reason: string;
+}
+
 export interface ExtractionResult {
   fields: ExtractionFieldResult[];
   modelUsed: string;
   promptVersion: string;
   tokensUsed: number;
   overallConfidence: number;
+  reviewFlags?: FieldReviewFlag[];
+  fieldsNeedingReview?: number;
 }

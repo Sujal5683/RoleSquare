@@ -9,6 +9,7 @@ import { db } from "@/lib/db";
 import { getCurrentUser, requireRole, AuthError, authErrorResponse } from "@/lib/auth";
 import { logAudit } from "@/lib/audit";
 import { serializeMember } from "@/lib/serialize";
+import { dispatchWebhookEvent } from "@/lib/webhook-dispatcher";
 
 export async function GET(
   _req: NextRequest,
@@ -112,6 +113,18 @@ export async function POST(
       entity: "member",
       entityId: member.id,
       after: { email, role, status: "invited" },
+    });
+
+    // Dispatch webhook event for member invite
+    dispatchWebhookEvent({
+      event: "member.invited",
+      organizationId,
+      data: {
+        memberId: member.id,
+        email,
+        role,
+        invitedBy: user.id,
+      },
     });
 
     return NextResponse.json(serializeMember(member), { status: 201 });

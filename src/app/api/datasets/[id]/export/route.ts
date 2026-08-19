@@ -10,6 +10,7 @@ import { db } from "@/lib/db";
 import { requireOrgContext, AuthError, authErrorResponse } from "@/lib/auth";
 import { logAudit } from "@/lib/audit";
 import { bumpUsageMetric } from "@/lib/usage";
+import { dispatchWebhookEvent } from "@/lib/webhook-dispatcher";
 
 function csvEscape(value: unknown): string {
   if (value == null) return "";
@@ -118,6 +119,20 @@ export async function POST(
       entity: "dataset",
       entityId: id,
       after: { format, jobId: job.id, recordCount },
+    });
+
+    // Dispatch webhook event for export completion
+    dispatchWebhookEvent({
+      event: "export.completed",
+      organizationId,
+      data: {
+        datasetId: id,
+        datasetName: dataset.name,
+        format,
+        jobId: job.id,
+        recordCount,
+        exportedBy: user.id,
+      },
     });
 
     return NextResponse.json({

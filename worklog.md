@@ -1141,3 +1141,113 @@ Performed a full audit of all 40+ API routes, 14 view components, 24 Prisma mode
 7. **Create baseline Prisma migration** for deployment readiness
 8. **Wire webhook events** into more platform events (sharing, exports, member changes)
 
+
+---
+
+## Cron Review Phase — Confidence Threshold UI + Evidence Display + Health + Webhooks
+
+**Task ID:** CRON-5
+**Agent:** main (Z.ai Code)
+**Task:** QA + add confidence threshold UI, original AI value display, health endpoint, webhook event wiring, and review flags in AI Studio
+
+### Current Project Status Assessment
+
+Building on the hardening phase (authorization, job runner, evidence preservation), the platform is stable:
+- **Lint**: clean (0 errors, 0 warnings)
+- **Page compilation**: HTTP 200
+- **Cross-tenant access**: blocked with HTTP 403 ✅
+- **Job runner**: processing queued jobs end-to-end ✅
+- **Health endpoint**: all subsystems healthy ✅
+- **14 frontend views** + **40+ API routes**
+- **OOM issue**: persistent in 4GB sandbox when dev server + Chromium run simultaneously
+
+### Completed Modifications
+
+#### 1. Confidence Threshold Slider in Schema Builder — NEW
+- **File**: `src/components/views/schema-builder-view.tsx` — updated
+- Added `confidenceThreshold: number` to `FieldDraft` interface (default 0.7)
+- Updated `handleOpenFieldEditor` to load the threshold from the field
+- Updated `handleSaveField` to send `confidenceThreshold` in the API payload
+- Added a **Slider UI** in the field editor dialog with:
+  - Range: 0 to 1, step 0.05
+  - Live percentage badge (color-coded: default ≥85%, secondary ≥60%, outline <60%)
+  - Scale labels: "0% (always review)" → "50%" → "70% (default)" → "100% (never review)"
+  - Helpful description: "Fields below this confidence are routed to human review"
+- Added `Slider` and `Badge` imports
+
+#### 2. Original AI Value Display in Evidence Drawer — NEW
+- **File**: `src/components/views/dataset-detail-view.tsx` — updated
+- The `FieldValueCard` component now shows an **"Original AI value (preserved)"** panel when a value has been corrected
+- Panel styling: amber-tinted border + background to distinguish from the current value
+- Shows:
+  - Original AI value (formatted via `formatValueCompact`)
+  - Original confidence as a badge
+  - Correction timestamp (relative)
+  - Corrector user ID (truncated)
+- Only appears when `value.originalValue != null && value.correctedAt` is set
+- This completes the evidence-first contract: human corrections preserve the original AI trail
+
+#### 3. Health Endpoint — NEW
+- **File**: `src/app/api/health/route.ts` — NEW (160+ lines)
+- `GET /api/health` — returns operational diagnostics for all subsystems:
+  - **Database**: connectivity check + user/org counts
+  - **Jobs**: queued/running/failed/dlq counts + stale job detection (>10min)
+  - **Connections**: active/degraded/expired/revoked counts + watch expiry warnings
+  - **Quota**: AI token usage vs plan-based quota limit
+  - **Webhooks**: active/failing webhook counts
+- Returns HTTP 200 when healthy, HTTP 503 when any subsystem is unhealthy
+- No authentication required (designed for uptime monitoring)
+- **Verified**: all subsystems return "healthy" with 39ms response time ✅
+
+#### 4. Webhook Event Wiring — ENHANCED
+- **Files updated**:
+  - `sharing/requests/[id]/approve/route.ts` — dispatches `sharing.approved` event
+  - `datasets/[id]/export/route.ts` — dispatches `export.completed` event
+  - `organizations/[id]/members/route.ts` — dispatches `member.invited` event
+- Combined with the previous wiring (scan + extraction), webhooks now fire on:
+  - `source.run_started` — when a scan is triggered
+  - `extraction.completed` — when AI extraction finishes
+  - `review.needed` — when fields fall below confidence threshold
+  - `sharing.approved` — when a sharing request is approved
+  - `export.completed` — when a dataset export completes
+  - `member.invited` — when a new member is invited
+
+#### 5. Review Flags in AI Studio Test Sandbox — NEW
+- **File**: `src/components/views/ai-studio-view.tsx` — updated
+- **File**: `src/lib/types.ts` — added `FieldReviewFlag` interface + updated `ExtractionResult`
+- The test sandbox now displays:
+  - **Review summary banner**: amber if any fields need review, emerald if all pass
+  - Shows count of fields needing review
+  - Lists the flagged field names with their confidence vs threshold
+  - **Per-field review indicators**: 
+    - Amber border on cards with fields below threshold
+    - "Needs review" badge with AlertCircle icon
+    - Threshold percentage displayed next to confidence badge
+- The `SandboxFieldCard` now accepts a `reviewFlag` prop and renders accordingly
+
+### Verification Results
+
+- `bun run lint` → 0 errors, 0 warnings ✅
+- `curl http://localhost:3000/` → HTTP 200 ✅
+- `curl http://localhost:3000/api/health` → HTTP 200, all subsystems healthy ✅
+- Cross-tenant access blocked: HTTP 403 ✅
+- No compilation errors, no import errors ✅
+- Health endpoint response time: 39ms ✅
+
+### Unresolved Issues / Risks
+1. **OOM in sandbox**: Dev server + Chromium still exceeds 4GB. Not a code issue.
+2. **Google OAuth simulated**: No real Google credentials.
+3. **No tests**: Test framework not yet set up.
+4. **No route-level error boundaries**: Missing `error.tsx` files.
+5. **No route-level loading states**: Missing `loading.tsx` files.
+6. **Monolithic view files**: 6 files over 1000 lines.
+
+### Recommended Next Steps (Priority Order)
+1. **Add test framework** (Vitest) + write authorization + evidence preservation tests
+2. **Add route-level error boundaries** (`error.tsx`) and loading states (`loading.tsx`)
+3. **Split monolithic view files** (settings-view 1728 lines, dataset-detail 1520 lines)
+4. **Add real-time job progress** via polling or WebSocket
+5. **Create baseline Prisma migration** for deployment readiness
+6. **Add a health status widget** to the Dashboard
+7. **Add export history** view with download link expiry
+

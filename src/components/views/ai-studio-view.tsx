@@ -20,6 +20,7 @@ import type {
   AuditLogDTO,
   ExtractionResult,
   ExtractionFieldResult,
+  FieldReviewFlag,
   JobType,
   SchemaDTO,
   UsageMetricDTO,
@@ -745,6 +746,48 @@ function TestSandboxTab() {
                 </div>
               </div>
 
+              {/* Review flags summary */}
+              {result.reviewFlags && result.reviewFlags.length > 0 && (
+                <div
+                  className={`rounded-lg border p-3 ${
+                    result.fieldsNeedingReview && result.fieldsNeedingReview > 0
+                      ? "border-amber-300 bg-amber-50 dark:border-amber-900 dark:bg-amber-950/50"
+                      : "border-emerald-300 bg-emerald-50 dark:border-emerald-900 dark:bg-emerald-950/50"
+                  }`}
+                >
+                  <div className="flex items-center gap-2">
+                    {result.fieldsNeedingReview && result.fieldsNeedingReview > 0 ? (
+                      <AlertCircle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                    ) : (
+                      <CheckCircle2 className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                    )}
+                    <p className="text-sm font-medium">
+                      {result.fieldsNeedingReview && result.fieldsNeedingReview > 0
+                        ? `${result.fieldsNeedingReview} field(s) need human review`
+                        : "All fields meet confidence thresholds"}
+                    </p>
+                  </div>
+                  {result.fieldsNeedingReview && result.fieldsNeedingReview > 0 && (
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      {result.reviewFlags
+                        .filter((f) => f.needsReview)
+                        .map((f, i) => (
+                          <Badge
+                            key={i}
+                            variant="outline"
+                            className="text-[10px] gap-1 bg-amber-100/50 dark:bg-amber-950/30"
+                          >
+                            {f.fieldName}
+                            <span className="text-muted-foreground">
+                              {Math.round(f.confidence * 100)}% / {Math.round(f.threshold * 100)}%
+                            </span>
+                          </Badge>
+                        ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
               <div className="flex items-center gap-3 text-xs text-muted-foreground">
                 <Cpu className="h-3 w-3" />
                 <span className="font-mono">{result.modelUsed}</span>
@@ -763,9 +806,16 @@ function TestSandboxTab() {
                     schema field names didn&apos;t match.
                   </p>
                 ) : (
-                  result.fields.map((f, i) => (
-                    <SandboxFieldCard key={`${f.fieldName}-${i}`} field={f} />
-                  ))
+                  result.fields.map((f, i) => {
+                    const flag = result.reviewFlags?.find((rf) => rf.fieldName === f.fieldName);
+                    return (
+                      <SandboxFieldCard
+                        key={`${f.fieldName}-${i}`}
+                        field={f}
+                        reviewFlag={flag}
+                      />
+                    );
+                  })
                 )}
               </div>
             </div>
@@ -776,12 +826,42 @@ function TestSandboxTab() {
   );
 }
 
-function SandboxFieldCard({ field }: { field: ExtractionFieldResult }) {
+function SandboxFieldCard({
+  field,
+  reviewFlag,
+}: {
+  field: ExtractionFieldResult;
+  reviewFlag?: FieldReviewFlag;
+}) {
   return (
-    <div className="rounded-lg border bg-card p-3">
+    <div
+      className={`rounded-lg border bg-card p-3 ${
+        reviewFlag?.needsReview
+          ? "border-amber-300 dark:border-amber-800"
+          : ""
+      }`}
+    >
       <div className="flex items-center justify-between gap-2">
-        <span className="text-sm font-medium">{field.fieldName}</span>
-        <ConfidenceBadge value={field.confidence} />
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-medium">{field.fieldName}</span>
+          {reviewFlag?.needsReview && (
+            <Badge
+              variant="outline"
+              className="text-[9px] gap-0.5 bg-amber-100/50 text-amber-700 dark:bg-amber-950/30 dark:text-amber-400"
+            >
+              <AlertCircle className="h-2.5 w-2.5" />
+              Needs review
+            </Badge>
+          )}
+        </div>
+        <div className="flex items-center gap-2">
+          {reviewFlag && (
+            <span className="text-[10px] text-muted-foreground tabular-nums">
+              threshold: {Math.round(reviewFlag.threshold * 100)}%
+            </span>
+          )}
+          <ConfidenceBadge value={field.confidence} />
+        </div>
       </div>
       <p className="mt-2 break-words text-base font-medium">
         {field.value == null || field.value === "" ? (
