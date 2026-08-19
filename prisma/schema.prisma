@@ -343,6 +343,8 @@ model DatasetValue {
   recordId     String
   fieldId      String
   value        String   // JSON-encoded value
+  originalValue String? // Preserves the original AI-extracted value after human correction
+  originalConfidence Float?
   confidence   Float    @default(0)
   evidence     String   // evidence snippet text
   sourceFile   String?
@@ -351,6 +353,8 @@ model DatasetValue {
   modelUsed    String   @default("gemini-1.5-pro")
   promptVersion String  @default("v1")
   extractedAt  DateTime @default(now())
+  correctedAt  DateTime?
+  correctedBy  String?
 
   record DatasetRecord @relation(fields: [recordId], references: [id], onDelete: Cascade)
 

@@ -4,7 +4,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { requireOrgContext } from "@/lib/auth";
+import { requireOrgContext, AuthError, authErrorResponse } from "@/lib/auth";
 import { logAudit } from "@/lib/audit";
 import { serializeSource } from "@/lib/serialize";
 
@@ -38,6 +38,7 @@ export async function GET(
     }
     return NextResponse.json(serializeSource(source));
   } catch (err) {
+    if (err instanceof AuthError) return authErrorResponse(err);
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Failed to load source" },
       { status: 500 }
@@ -85,6 +86,7 @@ export async function PATCH(
 
     return NextResponse.json(serializeSource(updated));
   } catch (err) {
+    if (err instanceof AuthError) return authErrorResponse(err);
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Failed to update source" },
       { status: 500 }
@@ -119,6 +121,7 @@ export async function DELETE(
 
     return NextResponse.json({ ok: true });
   } catch (err) {
+    if (err instanceof AuthError) return authErrorResponse(err);
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Failed to delete source" },
       { status: 500 }

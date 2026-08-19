@@ -3,7 +3,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { requireOrgContext } from "@/lib/auth";
+import { requireOrgContext, AuthError, authErrorResponse } from "@/lib/auth";
 import { logAudit } from "@/lib/audit";
 import { serializeSchemaField } from "@/lib/serialize";
 
@@ -40,6 +40,9 @@ export async function PATCH(
       data.options = body.options ? JSON.stringify(body.options) : null;
     }
     if (typeof body?.position === "number") data.position = body.position;
+    if (typeof body?.confidenceThreshold === "number") {
+      data.confidenceThreshold = Math.max(0, Math.min(1, body.confidenceThreshold));
+    }
 
     const field = await db.schemaField.update({ where: { id: fieldId }, data });
 
@@ -56,6 +59,7 @@ export async function PATCH(
 
     return NextResponse.json(serializeSchemaField(field));
   } catch (err) {
+    if (err instanceof AuthError) return authErrorResponse(err);
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Failed to update field" },
       { status: 500 }
@@ -91,6 +95,7 @@ export async function DELETE(
 
     return NextResponse.json({ ok: true });
   } catch (err) {
+    if (err instanceof AuthError) return authErrorResponse(err);
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Failed to delete field" },
       { status: 500 }

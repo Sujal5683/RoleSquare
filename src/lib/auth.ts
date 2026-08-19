@@ -1,35 +1,65 @@
-// Workspace Intelligence Platform — mock auth helpers.
+// Workspace Intelligence Platform — server-side authorization helpers.
 //
-// This is a single-org demo: the "session" is hardcoded to alice@acme.io,
-// owner of the Acme Intelligence org. No real auth is performed.
-// `requireOrgContext` returns the current user plus the active org id,
-// sourced either from the `organizationId` query param or the user's
-// first org as fallback.
+// This module provides the ONLY entry point for resolving the current
+// session user and their active organization context. All API routes
+// MUST use `requireOrgContext` (or a role-specific variant) to ensure:
+//
+//   1. The user is a real, active member of the organization.
+//   2. The user has the required role for the action.
+//   3. Removed/invited members cannot access data.
+//   4. Cross-tenant access via `?organizationId=<other_org>` is blocked.
+//
+// The session is currently mock-authenticated as alice@acme.io. When real
+// auth is added, only `getCurrentUser` needs to change — the role checks
+// and membership enforcement stay the same.
 
-import { NextRequest } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 
 const SESSION_EMAIL = "alice@acme.io";
+
+export type Role = "owner" | "admin" | "manager" | "member" | "viewer";
+
+// Role hierarchy: a role can perform actions allowed to its level OR
+// any level below it. owner > admin > manager > member > viewer.
+const ROLE_LEVEL: Record<Role, number> = {
+  owner: 5,
+  admin: 4,
+  manager: 3,
+  member: 2,
+  viewer: 1,
+};
+
+export interface OrgMembership {
+  id: string; // OrganizationMember.id
+  organizationId: string;
+  userId: string;
+  role: Role;
+  status: string; // active | invited | removed
+}
 
 export interface SessionUser {
   id: string;
   email: string;
   name: string | null;
   avatarUrl: string | null;
-  role: string;
+  role: string; // global role: user | admin
+  memberships: OrgMembership[];
+  // Convenience: organizations the user is an ACTIVE member of.
   organizations: {
     id: string;
     name: string;
     slug: string;
     plan: string;
-    role: string;
+    role: Role;
     status: string;
   }[];
 }
 
 /**
- * Returns the mock session user (alice@acme.io) together with the list of
- * organizations she belongs to and her role in each.
+ * Returns the mock session user (alice@acme.io) with all organization
+ * memberships. Only memberships with status="active" are included in the
+ * `organizations` convenience array.
  */
 export async function getCurrentUser(): Promise<SessionUser> {
   const user = await db.user.findFirst({
@@ -41,62 +71,195 @@ export async function getCurrentUser(): Promise<SessionUser> {
   if (!user) {
     throw new Error("Session user not found — did the seed run?");
   }
+
+  const memberships: OrgMembership[] = user.organizations.map((m) => ({
+    id: m.id,
+    organizationId: m.organizationId,
+    userId: m.userId,
+    role: m.role as Role,
+    status: m.status,
+  }));
+
   return {
     id: user.id,
     email: user.email,
     name: user.name,
     avatarUrl: user.avatarUrl,
     role: user.role,
-    organizations: user.organizations.map((m) => ({
-      id: m.organization.id,
-      name: m.organization.name,
-      slug: m.organization.slug,
-      plan: m.organization.plan,
-      role: m.role,
-      status: m.status,
-    })),
+    memberships,
+    organizations: memberships
+      .filter((m) => m.status === "active")
+      .map((m) => ({
+        id: m.organizationId,
+        name: user.organizations.find((om) => om.organizationId === m.organizationId)!
+          .organization.name,
+        slug: user.organizations.find((om) => om.organizationId === m.organizationId)!
+          .organization.slug,
+        plan: user.organizations.find((om) => om.organizationId === m.organizationId)!
+          .organization.plan,
+        role: m.role,
+        status: m.status,
+      })),
   };
 }
 
 /**
- * Returns the active organization id for the current request:
- *   - prefers an `organizationId` query param if provided
- *   - falls back to the user's first org (Acme Intelligence)
+ * Resolves the active organization for the request, VERIFYING that the
+ * current user is an ACTIVE member of that organization.
+ *
+ * Resolution order:
+ *   1. `organizationId` query param — IF the user is an active member.
+ *   2. The user's first active organization (fallback).
+ *
+ * If the user passes `?organizationId=<org_they_dont_belong_to>`, this
+ * returns a 403 Forbidden response instead of leaking data.
  */
-export async function getCurrentOrgId(req: NextRequest): Promise<string> {
+export async function getCurrentOrgId(
+  req: NextRequest
+): Promise<{ organizationId: string; error?: NextResponse }> {
+  const user = await getCurrentUser();
   const url = new URL(req.url);
   const explicit = url.searchParams.get("organizationId");
-  if (explicit) return explicit;
 
-  const user = await getCurrentUser();
-  const first = user.organizations[0];
-  if (!first) {
-    throw new Error("User does not belong to any organization");
+  if (explicit) {
+    const membership = user.memberships.find(
+      (m) => m.organizationId === explicit && m.status === "active"
+    );
+    if (!membership) {
+      return {
+        organizationId: "",
+        error: NextResponse.json(
+          { error: "You do not have access to this organization" },
+          { status: 403 }
+        ),
+      };
+    }
+    return { organizationId: explicit };
   }
-  return first.id;
+
+  const firstActive = user.organizations[0];
+  if (!firstActive) {
+    return {
+      organizationId: "",
+      error: NextResponse.json(
+        { error: "You are not an active member of any organization" },
+        { status: 403 }
+      ),
+    };
+  }
+  return { organizationId: firstActive.id };
 }
 
 export interface OrgContext {
   user: SessionUser;
   organizationId: string;
+  membership: OrgMembership;
 }
 
 /**
- * Returns the session user + active org id, throwing on failure.
- * Use inside a try/catch in route handlers; on error respond with 500.
+ * Returns the session user + active org + membership, VERIFYING that the
+ * user is an ACTIVE member. If the user passes `?organizationId=` for an
+ * org they don't belong to (or are removed/invited-only), this throws an
+ * `AuthError` that the route handler should catch and return as 403.
  */
-export async function requireOrgContext(req: NextRequest): Promise<OrgContext> {
+export async function requireOrgContext(
+  req: NextRequest
+): Promise<OrgContext> {
   const user = await getCurrentUser();
   const url = new URL(req.url);
   const explicit = url.searchParams.get("organizationId");
-  let organizationId: string | undefined;
+
+  let membership: OrgMembership | undefined;
+
   if (explicit) {
-    organizationId = explicit;
+    membership = user.memberships.find((m) => m.organizationId === explicit);
   } else {
-    organizationId = user.organizations[0]?.id;
+    membership = user.memberships.find((m) => m.status === "active");
   }
-  if (!organizationId) {
-    throw new Error("No active organization for current user");
+
+  if (!membership) {
+    throw new AuthError(
+      "You do not have access to this organization",
+      403
+    );
   }
-  return { user, organizationId };
+
+  if (membership.status !== "active") {
+    throw new AuthError(
+      `Your membership in this organization is ${membership.status}`,
+      403
+    );
+  }
+
+  return {
+    user,
+    organizationId: membership.organizationId,
+    membership,
+  };
+}
+
+/**
+ * Returns the session user + org context, VERIFYING that the user's role
+ * meets the minimum required level.
+ *
+ * Usage:
+ *   const ctx = await requireRole(req, "manager");
+ *   // ctx.user, ctx.organizationId, ctx.membership
+ */
+export async function requireRole(
+  req: NextRequest,
+  minRole: Role
+): Promise<OrgContext> {
+  const ctx = await requireOrgContext(req);
+  const userLevel = ROLE_LEVEL[ctx.membership.role] ?? 0;
+  const requiredLevel = ROLE_LEVEL[minRole];
+
+  if (userLevel < requiredLevel) {
+    throw new AuthError(
+      `This action requires ${minRole} role or higher. You are a ${ctx.membership.role}.`,
+      403
+    );
+  }
+
+  return ctx;
+}
+
+/**
+ * Returns true if the given role meets the minimum required level.
+ */
+export function hasRole(userRole: string, minRole: Role): boolean {
+  const userLevel = ROLE_LEVEL[userRole as Role] ?? 0;
+  const requiredLevel = ROLE_LEVEL[minRole];
+  return userLevel >= requiredLevel;
+}
+
+/**
+ * Error class for authorization failures. Route handlers should catch
+ * this and return the appropriate HTTP response.
+ */
+export class AuthError extends Error {
+  status: number;
+  constructor(message: string, status: number = 403) {
+    super(message);
+    this.name = "AuthError";
+    this.status = status;
+  }
+}
+
+/**
+ * Converts an AuthError (or any error) into a NextResponse. Route handlers
+ * should use this in their catch block:
+ *
+ *   } catch (err) {
+ *     if (err instanceof AuthError) {
+ *       return authErrorResponse(err);
+ *     }
+ *     return NextResponse.json({ error: "..." }, { status: 500 });
+ *   }
+ */
+export function authErrorResponse(err: AuthError): NextResponse {
+  return NextResponse.json(
+    { error: err.message },
+    { status: err.status }
+  );
 }

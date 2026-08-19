@@ -1,9 +1,11 @@
-// POST /api/ai-jobs/[id]/cancel — set status to failed, errorMessage=
-//   "Cancelled by user".
+// POST /api/ai-jobs/[id]/cancel — request cancellation of a job.
+//   Sets status to "cancelled" (distinct from "failed").
+//   If the job is already running, the runner will detect the cancelled
+//   state on its next progress check and stop processing.
 
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { requireOrgContext } from "@/lib/auth";
+import { requireOrgContext, AuthError, authErrorResponse } from "@/lib/auth";
 import { logAudit } from "@/lib/audit";
 import { serializeAiJob } from "@/lib/serialize";
 
@@ -21,14 +23,49 @@ export async function POST(
         { status: 404 }
       );
     }
+
+    // Can only cancel queued or running jobs
+    if (!["queued", "running"].includes(existing.status)) {
+      return NextResponse.json(
+        { error: `Cannot cancel a job that is already ${existing.status}` },
+        { status: 400 }
+      );
+    }
+
     const job = await db.aiJob.update({
       where: { id },
       data: {
-        status: "failed",
+        status: "cancelled",
         errorMessage: "Cancelled by user",
         finishedAt: new Date(),
       },
     });
+
+    // Also cancel any associated source run
+    if (existing.type === "GMAIL_SCAN") {
+      try {
+        const payload = JSON.parse(existing.payload || "{}");
+        if (payload.runId) {
+          await db.sourceRun.update({
+            where: { id: payload.runId },
+            data: {
+              status: "failed",
+              errorMessage: "Cancelled by user",
+              finishedAt: new Date(),
+            },
+          });
+          // Reset source runState
+          if (payload.sourceId) {
+            await db.source.update({
+              where: { id: payload.sourceId },
+              data: { runState: "idle" },
+            });
+          }
+        }
+      } catch {
+        // Payload parse error — ignore
+      }
+    }
 
     await logAudit({
       organizationId,
@@ -37,12 +74,13 @@ export async function POST(
       entity: "job",
       entityId: id,
       before: { status: existing.status },
-      after: { status: "failed", errorMessage: "Cancelled by user" },
+      after: { status: "cancelled", errorMessage: "Cancelled by user" },
       reason: "cancel",
     });
 
     return NextResponse.json(serializeAiJob(job));
   } catch (err) {
+    if (err instanceof AuthError) return authErrorResponse(err);
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Failed to cancel job" },
       { status: 500 }

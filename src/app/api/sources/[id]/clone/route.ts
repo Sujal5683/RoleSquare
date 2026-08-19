@@ -4,7 +4,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { requireOrgContext } from "@/lib/auth";
+import { requireOrgContext, AuthError, authErrorResponse } from "@/lib/auth";
 import { logAudit } from "@/lib/audit";
 import { serializeSource } from "@/lib/serialize";
 
@@ -77,6 +77,7 @@ export async function POST(
 
     return NextResponse.json(serializeSource(cloned));
   } catch (err) {
+    if (err instanceof AuthError) return authErrorResponse(err);
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Failed to clone source" },
       { status: 500 }

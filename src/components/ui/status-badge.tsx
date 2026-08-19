@@ -31,6 +31,7 @@ const statusVariant: Record<string, "default" | "secondary" | "destructive" | "o
   validating: "outline",
   updated: "outline",
   retry: "outline",
+  cancelled: "secondary",
   error: "destructive",
   failed: "destructive",
   rejected: "destructive",
@@ -156,6 +157,7 @@ export const JOB_STATUS_LABELS: Record<JobStatus, string> = {
   failed: "Failed",
   retry: "Retrying",
   dlq: "Dead-letter",
+  cancelled: "Cancelled",
 };
 
 export const CONNECTION_STATUS_LABELS: Record<ConnectionStatus, string> = {

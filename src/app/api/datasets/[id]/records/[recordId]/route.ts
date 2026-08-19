@@ -4,7 +4,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { requireOrgContext } from "@/lib/auth";
+import { requireOrgContext, AuthError, authErrorResponse } from "@/lib/auth";
 import { logAudit } from "@/lib/audit";
 import {
   attachFieldsToRecords,
@@ -53,6 +53,7 @@ export async function GET(
       )
     );
   } catch (err) {
+    if (err instanceof AuthError) return authErrorResponse(err);
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Failed to load record" },
       { status: 500 }
@@ -100,6 +101,7 @@ export async function PATCH(
 
     return NextResponse.json(serializeDatasetRecord(enriched));
   } catch (err) {
+    if (err instanceof AuthError) return authErrorResponse(err);
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Failed to update record" },
       { status: 500 }

@@ -43,7 +43,7 @@ export type JobType =
   | "AI_VALIDATION"
   | "EXPORT";
 
-export type JobStatus = "queued" | "running" | "success" | "failed" | "retry" | "dlq";
+export type JobStatus = "queued" | "running" | "success" | "failed" | "retry" | "dlq" | "cancelled";
 
 export type RecordStatus =
   | "valid"
@@ -165,6 +165,8 @@ export interface DatasetValueDTO {
   fieldName?: string;
   fieldType?: FieldType;
   value: unknown;
+  originalValue: unknown | null;
+  originalConfidence: number | null;
   confidence: number;
   evidence: string;
   sourceFile: string | null;
@@ -172,6 +174,8 @@ export interface DatasetValueDTO {
   modelUsed: string;
   promptVersion: string;
   extractedAt: string;
+  correctedAt: string | null;
+  correctedBy: string | null;
 }
 
 export interface DatasetRecordDTO {

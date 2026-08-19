@@ -4,7 +4,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { requireOrgContext } from "@/lib/auth";
+import { requireOrgContext, AuthError, authErrorResponse } from "@/lib/auth";
 import { logAudit } from "@/lib/audit";
 import { bumpUsageMetric } from "@/lib/usage";
 import { extractWithLLM } from "@/lib/extraction";
@@ -69,6 +69,7 @@ export async function POST(
 
     return NextResponse.json(result);
   } catch (err) {
+    if (err instanceof AuthError) return authErrorResponse(err);
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Failed to run test extraction" },
       { status: 500 }

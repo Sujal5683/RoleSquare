@@ -1,12 +1,17 @@
 // POST /api/sharing/requests/[id]/approve — set status=approved, decidedBy=
 //   current user, decidedAt=now. Also creates a SharingPermission so the
 //   share takes effect immediately.
+//   Requires: admin+ role.
 
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { requireOrgContext } from "@/lib/auth";
+import { requireOrgContext, AuthError, authErrorResponse } from "@/lib/auth";
 import { logAudit } from "@/lib/audit";
 import { serializeSharingRequest } from "@/lib/serialize";
+
+const ROLE_LEVEL: Record<string, number> = {
+  owner: 5, admin: 4, manager: 3, member: 2, viewer: 1,
+};
 
 export async function POST(
   req: NextRequest,
@@ -14,7 +19,16 @@ export async function POST(
 ) {
   try {
     const { id } = await params;
-    const { user, organizationId } = await requireOrgContext(req);
+    const { user, organizationId, membership } = await requireOrgContext(req);
+
+    // Role check: only admin+ can approve sharing requests
+    if ((ROLE_LEVEL[membership.role] ?? 0) < ROLE_LEVEL.admin) {
+      return NextResponse.json(
+        { error: `Approving sharing requests requires admin role or higher. You are a ${membership.role}.` },
+        { status: 403 }
+      );
+    }
+
     const existing = await db.sharingRequest.findUnique({
       where: { id },
     });
@@ -63,6 +77,7 @@ export async function POST(
 
     return NextResponse.json(serializeSharingRequest(updated));
   } catch (err) {
+    if (err instanceof AuthError) return authErrorResponse(err);
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Failed to approve request" },
       { status: 500 }

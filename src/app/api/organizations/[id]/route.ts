@@ -1,11 +1,36 @@
 // GET /api/organizations/[id] — organization detail.
+//   Requires: active member of the org (viewer+).
 // PATCH /api/organizations/[id] — update name / plan.
+//   Requires: admin+ role.
 
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { getCurrentUser } from "@/lib/auth";
+import { getCurrentUser, AuthError, authErrorResponse } from "@/lib/auth";
 import { logAudit } from "@/lib/audit";
 import { serializeOrganization } from "@/lib/serialize";
+
+const ROLE_LEVEL: Record<string, number> = {
+  owner: 5, admin: 4, manager: 3, member: 2, viewer: 1,
+};
+
+async function verifyOrgAccess(organizationId: string, minRole: string = "viewer") {
+  const user = await getCurrentUser();
+  const membership = user.memberships.find((m) => m.organizationId === organizationId);
+  if (!membership || membership.status !== "active") {
+    return { error: NextResponse.json({ error: "Organization not found" }, { status: 404 }), user: null, membership: null };
+  }
+  if ((ROLE_LEVEL[membership.role] ?? 0) < (ROLE_LEVEL[minRole] ?? 0)) {
+    return {
+      error: NextResponse.json(
+        { error: `This action requires ${minRole} role or higher. You are a ${membership.role}.` },
+        { status: 403 }
+      ),
+      user: null,
+      membership: null,
+    };
+  }
+  return { error: null, user, membership };
+}
 
 export async function GET(
   _req: NextRequest,
@@ -13,14 +38,9 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
-    const user = await getCurrentUser();
-    const isMember = user.organizations.some((o) => o.id === id);
-    if (!isMember) {
-      return NextResponse.json(
-        { error: "Organization not found" },
-        { status: 404 }
-      );
-    }
+    const access = await verifyOrgAccess(id, "viewer");
+    if (access.error) return access.error;
+
     const org = await db.organization.findUnique({
       where: { id },
       include: { _count: { select: { members: true } } },
@@ -35,6 +55,7 @@ export async function GET(
       serializeOrganization(org, org._count?.members ?? 0)
     );
   } catch (err) {
+    if (err instanceof AuthError) return authErrorResponse(err);
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Failed to load org" },
       { status: 500 }
@@ -48,14 +69,10 @@ export async function PATCH(
 ) {
   try {
     const { id } = await params;
-    const user = await getCurrentUser();
-    const isMember = user.organizations.some((o) => o.id === id);
-    if (!isMember) {
-      return NextResponse.json(
-        { error: "Organization not found" },
-        { status: 404 }
-      );
-    }
+    const access = await verifyOrgAccess(id, "admin");
+    if (access.error || !access.user) return access.error;
+    const { user } = access;
+
     const body = await req.json().catch(() => ({}));
     const data: { name?: string; plan?: string } = {};
     if (typeof body?.name === "string" && body.name.trim()) {
@@ -86,6 +103,7 @@ export async function PATCH(
       serializeOrganization(org, org._count?.members ?? 0)
     );
   } catch (err) {
+    if (err instanceof AuthError) return authErrorResponse(err);
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Failed to update org" },
       { status: 500 }

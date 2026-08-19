@@ -1,11 +1,14 @@
 // PATCH /api/datasets/[id]/records/[recordId]/values/[valueId] — update a
 //   value (human correction). Body: { value, confidence?, evidence? }.
-//   Records an audit log entry capturing before/after of the corrected
-//   value so the human-in-the-loop trail is preserved.
+//   Preserves the original AI-extracted value in `originalValue` on the
+//   first human correction. Subsequent corrections update `value` but
+//   preserve the original. Records an audit log entry capturing
+//   before/after of the corrected value so the human-in-the-loop trail
+//   is preserved.
 
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { requireOrgContext } from "@/lib/auth";
+import { requireOrgContext, AuthError, authErrorResponse } from "@/lib/auth";
 import { logAudit } from "@/lib/audit";
 import { attachFieldInfo, fieldsByIdMap, serializeDatasetValue } from "@/lib/serialize";
 
@@ -54,6 +57,14 @@ export async function PATCH(
     }
     const body = await req.json().catch(() => ({}));
     const data: any = {};
+
+    // On the FIRST human correction, preserve the original AI value.
+    // Subsequent corrections don't overwrite the original.
+    if (body?.value !== undefined && before.originalValue === null) {
+      data.originalValue = before.value;
+      data.originalConfidence = before.confidence;
+    }
+
     if (body?.value !== undefined) {
       data.value = JSON.stringify(body.value);
     }
@@ -65,6 +76,10 @@ export async function PATCH(
     }
     if (typeof body?.sourceFile === "string") data.sourceFile = body.sourceFile;
     if (typeof body?.pageNumber === "number") data.pageNumber = body.pageNumber;
+
+    // Mark as corrected
+    data.correctedAt = new Date();
+    data.correctedBy = user.id;
 
     const value = await db.datasetValue.update({
       where: { id: valueId },
@@ -91,12 +106,14 @@ export async function PATCH(
         value: body?.value,
         confidence: value.confidence,
         evidence: value.evidence,
+        originalPreserved: data.originalValue !== undefined,
       },
       reason: "human_correction",
     });
 
     return NextResponse.json(serializeDatasetValue(enriched));
   } catch (err) {
+    if (err instanceof AuthError) return authErrorResponse(err);
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Failed to update value" },
       { status: 500 }

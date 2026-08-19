@@ -9,10 +9,11 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { requireOrgContext } from "@/lib/auth";
+import { requireOrgContext, AuthError, authErrorResponse } from "@/lib/auth";
 import { logAudit } from "@/lib/audit";
 import { bumpUsageMetric } from "@/lib/usage";
 import { extractWithLLM, flagFieldsForReview } from "@/lib/extraction";
+import { dispatchWebhookEvent } from "@/lib/webhook-dispatcher";
 import type { ExtractionFieldResult } from "@/lib/types";
 
 export async function POST(req: NextRequest) {
@@ -92,6 +93,31 @@ export async function POST(req: NextRequest) {
       },
     });
 
+    // Dispatch webhook events for extraction completion and review needed
+    dispatchWebhookEvent({
+      event: "extraction.completed",
+      organizationId,
+      data: {
+        schemaId,
+        fieldsExtracted: validatedFields.length,
+        tokensUsed: result.tokensUsed,
+        overallConfidence: result.overallConfidence,
+        sourceFile,
+      },
+    });
+
+    if (fieldsNeedingReview > 0) {
+      dispatchWebhookEvent({
+        event: "review.needed",
+        organizationId,
+        data: {
+          schemaId,
+          fieldsNeedingReview,
+          reviewFlags: reviewFlags.filter((f) => f.needsReview),
+        },
+      });
+    }
+
     return NextResponse.json({
       ...result,
       fields: validatedFields,
@@ -99,6 +125,7 @@ export async function POST(req: NextRequest) {
       fieldsNeedingReview,
     });
   } catch (err) {
+    if (err instanceof AuthError) return authErrorResponse(err);
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Failed to run extraction" },
       { status: 500 }

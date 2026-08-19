@@ -4,9 +4,10 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { requireOrgContext } from "@/lib/auth";
+import { requireOrgContext, AuthError, authErrorResponse } from "@/lib/auth";
 import { logAudit } from "@/lib/audit";
 import { serializeSourceRun } from "@/lib/serialize";
+import { dispatchWebhookEvent } from "@/lib/webhook-dispatcher";
 
 export async function POST(
   req: NextRequest,
@@ -41,10 +42,9 @@ export async function POST(
           organizationId,
           userId: user.id,
           type: "GMAIL_SCAN",
-          status: "running",
+          status: "queued", // Job runner picks up "queued" jobs
           payload: JSON.stringify({ sourceId: id, runId: run.id, mode, triggeredBy: "scan" }),
           progress: 0,
-          startedAt: now,
         },
       });
       await tx.source.update({
@@ -63,10 +63,24 @@ export async function POST(
       after: { mode, runId: created.run.id, jobId: created.job.id },
     });
 
+    // Dispatch webhook event for scan start
+    dispatchWebhookEvent({
+      event: "source.run_started",
+      organizationId,
+      data: {
+        sourceId: id,
+        runId: created.run.id,
+        jobId: created.job.id,
+        mode,
+        triggeredBy: "scan",
+      },
+    });
+
     return NextResponse.json(serializeSourceRun(created.run), {
       status: 201,
     });
   } catch (err) {
+    if (err instanceof AuthError) return authErrorResponse(err);
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Failed to trigger scan" },
       { status: 500 }

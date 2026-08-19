@@ -1,10 +1,12 @@
 // GET /api/organizations/[id]/members — list members with user info.
+//   Requires: active member of the org (viewer+).
 // POST /api/organizations/[id]/members — invite member. Looks up user by
 //   email; creates an OrganizationMember row with status=invited.
+//   Requires: manager+ role.
 
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { getCurrentUser } from "@/lib/auth";
+import { getCurrentUser, requireRole, AuthError, authErrorResponse } from "@/lib/auth";
 import { logAudit } from "@/lib/audit";
 import { serializeMember } from "@/lib/serialize";
 
@@ -15,7 +17,8 @@ export async function GET(
   try {
     const { id } = await params;
     const user = await getCurrentUser();
-    if (!user.organizations.some((o) => o.id === id)) {
+    const membership = user.memberships.find((m) => m.organizationId === id);
+    if (!membership || membership.status !== "active") {
       return NextResponse.json(
         { error: "Organization not found" },
         { status: 404 }
@@ -28,6 +31,7 @@ export async function GET(
     });
     return NextResponse.json(members.map(serializeMember));
   } catch (err) {
+    if (err instanceof AuthError) return authErrorResponse(err);
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Failed to list members" },
       { status: 500 }
@@ -41,13 +45,27 @@ export async function POST(
 ) {
   try {
     const { id: organizationId } = await params;
+    // Override the org context to use the URL param org
     const user = await getCurrentUser();
-    if (!user.organizations.some((o) => o.id === organizationId)) {
+    const membership = user.memberships.find((m) => m.organizationId === organizationId);
+    if (!membership || membership.status !== "active") {
       return NextResponse.json(
         { error: "Organization not found" },
         { status: 404 }
       );
     }
+
+    // Role check: only manager+ can invite members
+    const ROLE_LEVEL: Record<string, number> = {
+      owner: 5, admin: 4, manager: 3, member: 2, viewer: 1,
+    };
+    if ((ROLE_LEVEL[membership.role] ?? 0) < ROLE_LEVEL.manager) {
+      return NextResponse.json(
+        { error: `Inviting members requires manager role or higher. You are a ${membership.role}.` },
+        { status: 403 }
+      );
+    }
+
     const body = await req.json().catch(() => ({}));
     const email = String(body?.email ?? "").trim().toLowerCase();
     const role = String(body?.role ?? "member");
@@ -98,6 +116,7 @@ export async function POST(
 
     return NextResponse.json(serializeMember(member), { status: 201 });
   } catch (err) {
+    if (err instanceof AuthError) return authErrorResponse(err);
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Failed to invite member" },
       { status: 500 }

@@ -2,7 +2,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { requireOrgContext } from "@/lib/auth";
+import { requireOrgContext, AuthError, authErrorResponse } from "@/lib/auth";
 import { serializeAiJob, serializeAiOutput } from "@/lib/serialize";
 
 export async function GET(
@@ -27,6 +27,7 @@ export async function GET(
       outputs: job.outputs.map(serializeAiOutput),
     });
   } catch (err) {
+    if (err instanceof AuthError) return authErrorResponse(err);
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Failed to load job" },
       { status: 500 }

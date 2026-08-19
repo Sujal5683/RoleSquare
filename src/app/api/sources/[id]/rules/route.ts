@@ -4,7 +4,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { requireOrgContext } from "@/lib/auth";
+import { requireOrgContext, AuthError, authErrorResponse } from "@/lib/auth";
 import { logAudit } from "@/lib/audit";
 import { serializeSourceRule } from "@/lib/serialize";
 
@@ -34,6 +34,7 @@ export async function GET(
     });
     return NextResponse.json(rules.map(serializeSourceRule));
   } catch (err) {
+    if (err instanceof AuthError) return authErrorResponse(err);
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Failed to list rules" },
       { status: 500 }
@@ -90,6 +91,7 @@ export async function PUT(
 
     return NextResponse.json(rules.map(serializeSourceRule));
   } catch (err) {
+    if (err instanceof AuthError) return authErrorResponse(err);
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Failed to replace rules" },
       { status: 500 }

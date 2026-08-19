@@ -211,6 +211,8 @@ export function serializeDatasetValue(v: any): DatasetValueDTO {
     fieldName: v.field?.name,
     fieldType: v.field?.type,
     value: parseJson(v.value, v.value),
+    originalValue: v.originalValue ? parseJson(v.originalValue, v.originalValue) : null,
+    originalConfidence: v.originalConfidence ?? null,
     confidence: v.confidence,
     evidence: v.evidence,
     sourceFile: v.sourceFile ?? null,
@@ -221,6 +223,11 @@ export function serializeDatasetValue(v: any): DatasetValueDTO {
       v.extractedAt instanceof Date
         ? v.extractedAt.toISOString()
         : v.extractedAt,
+    correctedAt:
+      v.correctedAt instanceof Date
+        ? v.correctedAt.toISOString()
+        : (v.correctedAt ?? null),
+    correctedBy: v.correctedBy ?? null,
   };
 }
 

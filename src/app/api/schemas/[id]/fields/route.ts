@@ -5,7 +5,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { requireOrgContext } from "@/lib/auth";
+import { requireOrgContext, AuthError, authErrorResponse } from "@/lib/auth";
 import { logAudit } from "@/lib/audit";
 import { serializeSchemaField } from "@/lib/serialize";
 
@@ -57,6 +57,9 @@ export async function POST(
         required: !!body?.required,
         options: body?.options ? JSON.stringify(body.options) : null,
         position,
+        confidenceThreshold: typeof body?.confidenceThreshold === "number"
+          ? Math.max(0, Math.min(1, body.confidenceThreshold))
+          : 0.7,
       },
     });
 
@@ -72,6 +75,7 @@ export async function POST(
 
     return NextResponse.json(serializeSchemaField(field), { status: 201 });
   } catch (err) {
+    if (err instanceof AuthError) return authErrorResponse(err);
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Failed to add field" },
       { status: 500 }
@@ -128,6 +132,7 @@ export async function PUT(
 
     return NextResponse.json(fields.map(serializeSchemaField));
   } catch (err) {
+    if (err instanceof AuthError) return authErrorResponse(err);
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Failed to reorder fields" },
       { status: 500 }

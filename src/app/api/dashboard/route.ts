@@ -11,7 +11,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { requireOrgContext } from "@/lib/auth";
+import { requireOrgContext, AuthError, authErrorResponse } from "@/lib/auth";
 import { currentMonthUsage } from "@/lib/usage";
 import {
   attachFieldsToRecords,
@@ -133,6 +133,7 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json(data);
   } catch (err) {
+    if (err instanceof AuthError) return authErrorResponse(err);
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Failed to load dashboard" },
       { status: 500 }

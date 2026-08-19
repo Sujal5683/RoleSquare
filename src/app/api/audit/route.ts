@@ -3,7 +3,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { requireOrgContext } from "@/lib/auth";
+import { requireOrgContext, AuthError, authErrorResponse } from "@/lib/auth";
 import { serializeAuditLog } from "@/lib/serialize";
 
 export async function GET(req: NextRequest) {
@@ -45,6 +45,7 @@ export async function GET(req: NextRequest) {
       pageSize,
     });
   } catch (err) {
+    if (err instanceof AuthError) return authErrorResponse(err);
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Failed to list audit logs" },
       { status: 500 }

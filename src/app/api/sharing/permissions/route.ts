@@ -6,7 +6,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { requireOrgContext } from "@/lib/auth";
+import { requireOrgContext, AuthError, authErrorResponse } from "@/lib/auth";
 import { logAudit } from "@/lib/audit";
 import { serializeSharingPermission } from "@/lib/serialize";
 
@@ -20,6 +20,7 @@ export async function GET(req: NextRequest) {
     });
     return NextResponse.json(perms.map(serializeSharingPermission));
   } catch (err) {
+    if (err instanceof AuthError) return authErrorResponse(err);
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Failed to list permissions" },
       { status: 500 }
@@ -71,6 +72,7 @@ export async function POST(req: NextRequest) {
       status: 201,
     });
   } catch (err) {
+    if (err instanceof AuthError) return authErrorResponse(err);
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Failed to create permission" },
       { status: 500 }
@@ -112,6 +114,7 @@ export async function DELETE(req: NextRequest) {
 
     return NextResponse.json({ ok: true });
   } catch (err) {
+    if (err instanceof AuthError) return authErrorResponse(err);
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Failed to revoke permission" },
       { status: 500 }

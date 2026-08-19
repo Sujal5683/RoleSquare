@@ -4,7 +4,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { requireOrgContext } from "@/lib/auth";
+import { requireOrgContext, AuthError, authErrorResponse } from "@/lib/auth";
 import { logAudit } from "@/lib/audit";
 import { offsetDate, serializeGoogleConnection } from "@/lib/serialize";
 
@@ -51,6 +51,7 @@ export async function PATCH(
 
     return NextResponse.json(serializeGoogleConnection(connection));
   } catch (err) {
+    if (err instanceof AuthError) return authErrorResponse(err);
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Failed to refresh connection" },
       { status: 500 }
@@ -90,6 +91,7 @@ export async function DELETE(
 
     return NextResponse.json(serializeGoogleConnection(connection));
   } catch (err) {
+    if (err instanceof AuthError) return authErrorResponse(err);
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Failed to revoke connection" },
       { status: 500 }
