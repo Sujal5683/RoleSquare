@@ -1,8 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { useAppStore, type SessionUser } from "@/lib/store";
 import { api } from "@/lib/api-client";
+import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -41,12 +43,26 @@ import {
   Zap,
   TrendingUp,
   Command as CommandIcon,
+  MailOpen,
   type LucideIcon,
 } from "lucide-react";
 import type { ViewId } from "@/lib/types";
 import { CommandPalette } from "@/components/command-palette";
 import { NotificationsDropdown } from "@/components/notifications-dropdown";
 import { KeyboardShortcutsDialog } from "@/components/keyboard-shortcuts-dialog";
+import { DashboardView } from "./views/dashboard-view";
+import { SourcesView } from "./views/sources-view";
+import { DatasetsView } from "./views/datasets-view";
+import { SchemaBuilderView } from "./views/schema-builder-view";
+import { AiStudioView } from "./views/ai-studio-view";
+import { MembersView } from "./views/members-view";
+import { SharingView } from "./views/sharing-view";
+import { AuditView } from "./views/audit-view";
+import { SettingsView } from "./views/settings-view";
+import { UsageView } from "./views/usage-view";
+import { OrganizationsView } from "./views/organizations-view";
+import { AssistantButton } from "./assistant/assistant-button";
+import { AssistantPanel } from "./assistant/assistant-panel";
 
 interface NavItem {
   id: ViewId;
@@ -65,6 +81,7 @@ const NAV_ITEMS: NavItem[] = [
   { id: "sharing", label: "Sharing Center", icon: Share2, group: "Governance" },
   { id: "organizations", label: "Organizations", icon: Building2, group: "Governance" },
   { id: "members", label: "Members", icon: Users, group: "Governance" },
+  { id: "invitations", label: "Invitations", icon: MailOpen, group: "Governance" },
   { id: "audit", label: "Audit Logs", icon: ShieldCheck, group: "Governance" },
   { id: "settings", label: "Settings", icon: Settings, group: "Account" },
 ];
@@ -77,8 +94,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const theme = useAppStore((s) => s.theme);
   const toggleTheme = useAppStore((s) => s.toggleTheme);
   const openSource = useAppStore((s) => s.openSource);
+  const setAssistantOpen = useAppStore((s) => s.setAssistantOpen);
+  const clearAssistantUnread = useAppStore((s) => s.clearAssistantUnread);
+
+  const router = useRouter();
+  const supabase = createClient();
 
   const [session, setSession] = useState<SessionUser | null>(null);
+  const [sessionLoading, setSessionLoading] = useState(true);
   const [orgs, setOrgs] = useState<
     { id: string; name: string; slug: string; plan: string; role: string }[]
   >([]);
@@ -112,8 +135,17 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         setOrgs(data.organizations);
         setActiveOrgId(data.organizations[0]?.id ?? null);
       })
-      .catch(() => {});
+      .catch(() => {
+        // api-client will handle 401→/login redirect automatically
+      })
+      .finally(() => setSessionLoading(false));
   }, []);
+
+  async function handleSignOut() {
+    await supabase.auth.signOut();
+    router.push("/login");
+    router.refresh();
+  }
 
   // Alt+T to toggle theme
   useEffect(() => {
@@ -122,14 +154,32 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         e.preventDefault();
         toggleTheme();
       }
+      // Alt+A to toggle AI Assistant
+      if (e.altKey && !e.metaKey && !e.ctrlKey && e.key.toLowerCase() === "a") {
+        e.preventDefault();
+        setAssistantOpen(true);
+        clearAssistantUnread();
+      }
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [toggleTheme]);
+  }, [toggleTheme, setAssistantOpen, clearAssistantUnread]);
 
   // Landing page is rendered without the shell
   if (view === "landing") {
     return <>{children}</>;
+  }
+
+  // Show a minimal loading skeleton while session is being fetched
+  if (sessionLoading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <div className="flex flex-col items-center gap-3">
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+          <p className="text-sm text-muted-foreground">Loading workspace…</p>
+        </div>
+      </div>
+    );
   }
 
   const groups = Array.from(new Set(NAV_ITEMS.map((i) => i.group)));
@@ -245,6 +295,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     <div className="flex min-h-screen flex-col">
       <CommandPalette />
       <KeyboardShortcutsDialog />
+      {/* AI Assistant — floating button + slide-in panel */}
+      <AssistantButton />
+      <AssistantPanel />
       {/* Top bar */}
       <header className="sticky top-0 z-40 flex h-14 items-center gap-3 border-b bg-background/95 px-4 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         {/* Mobile menu */}
@@ -358,8 +411,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 <ShieldCheck className="mr-2 h-4 w-4" /> Audit logs
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => setView("landing")} className="text-destructive">
-                <LogOut className="mr-2 h-4 w-4" /> Back to landing
+              <DropdownMenuItem
+                onClick={handleSignOut}
+                className="text-destructive focus:text-destructive"
+              >
+                <LogOut className="mr-2 h-4 w-4" /> Sign out
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>

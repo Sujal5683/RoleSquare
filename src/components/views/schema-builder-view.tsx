@@ -138,10 +138,13 @@ function buildPrompt(schema: SchemaDTO | null | undefined): string {
   return lines.join("\n");
 }
 
+import { useActiveOrg } from "@/hooks/use-active-org";
+
 // ── Component ────────────────────────────────────────────────────────────
 
 export function SchemaBuilderView() {
   const queryClient = useQueryClient();
+  const activeOrgId = useActiveOrg();
   const selectedSchemaId = useAppStore((s) => s.selectedSchemaId);
   const openSchema = useAppStore((s) => s.openSchema);
   const setView = useAppStore((s) => s.setView);
@@ -166,8 +169,9 @@ export function SchemaBuilderView() {
 
   // ── Queries ────────────────────────────────────────────────────────────
   const { data: schemas, isLoading: listLoading } = useQuery({
-    queryKey: ["schemas"],
+    queryKey: ["schemas", activeOrgId],
     queryFn: () => api.get<SchemaDTO[]>("/api/schemas"),
+    enabled: !!activeOrgId,
   });
 
   const { data: activeSchema, isLoading: schemaLoading } = useQuery({
@@ -404,17 +408,12 @@ export function SchemaBuilderView() {
                 variant="outline"
                 size="sm"
                 onClick={() => {
-                  const name = prompt(
+                  const name = window.prompt(
                     "Cloned schema name:",
                     `${activeSchema?.name ?? "Schema"} (copy)`
                   );
                   if (name && activeSchemaId) {
-                    fetch(`/api/schemas/${activeSchemaId}/clone`, {
-                      method: "POST",
-                      headers: { "Content-Type": "application/json" },
-                      body: JSON.stringify({ name }),
-                    })
-                      .then((r) => r.json())
+                    api.post<SchemaDTO>(`/api/schemas/${activeSchemaId}/clone`, { name })
                       .then((cloned) => {
                         toast.success("Schema cloned", {
                           description: `"${name}" created with ${cloned.fields?.length ?? 0} fields.`,

@@ -18,24 +18,29 @@
 import { db } from "@/lib/db";
 import { logAudit } from "@/lib/audit";
 import { bumpUsageMetric } from "@/lib/usage";
+import { getGmailClient, extractEmailBody, extractAttachments, extractDriveLinks, getHeader } from "@/lib/google-client";
+import { extractWithLLM } from "@/lib/extraction";
+import crypto from "crypto";
 
 const POLL_INTERVAL_MS = 5_000;
 const STALE_JOB_THRESHOLD_MS = 10 * 60 * 1000; // 10 minutes
 const MAX_ATTEMPTS = 5;
 
-let runnerStarted = false;
-let runnerPromise: Promise<void> | null = null;
+const globalForRunner = globalThis as unknown as {
+  runnerStarted: boolean;
+  runnerPromise: Promise<void> | null;
+};
 
 /**
  * Starts the job runner if it hasn't been started yet. Safe to call
  * multiple times — subsequent calls are no-ops.
  */
 export function ensureJobRunnerStarted() {
-  if (runnerStarted) return;
-  runnerStarted = true;
-  runnerPromise = runJobLoop().catch((err) => {
+  if (globalForRunner.runnerStarted) return;
+  globalForRunner.runnerStarted = true;
+  globalForRunner.runnerPromise = runJobLoop().catch((err) => {
     console.error("[job-runner] fatal error:", err);
-    runnerStarted = false;
+    globalForRunner.runnerStarted = false;
   });
 }
 
@@ -220,13 +225,12 @@ function isRetryableError(err: unknown): boolean {
 /**
  * GMAIL_SCAN job processor.
  *
- * In the real system this would call the Gmail API. In this simulated
- * environment, it:
- *   1. Updates the source run progress through stages.
- *   2. Marks the run as completed with simulated stats.
- *   3. Resets the source's runState to "idle".
- *
- * Idempotency: if the source run is already completed, this is a no-op.
+ * Calls the Gmail API to fetch real emails matching the source's filter rules.
+ * For each matched message:
+ *   1. Upserts an Email row (deduplicated by googleMessageId).
+ *   2. Discovers and stores EmailAttachment rows.
+ *   3. Discovers and stores EmailLink rows (Google Drive/Docs URLs).
+ * Updates the SourceRun stats with real counts.
  */
 async function processGmailScan(
   job: { id: string; organizationId: string; payload: string },
@@ -239,31 +243,166 @@ async function processGmailScan(
 
   // Check if the run is already completed (idempotency)
   const existingRun = await db.sourceRun.findUnique({ where: { id: runId } });
-  if (!existingRun) {
-    throw new Error(`Source run ${runId} not found`);
-  }
+  if (!existingRun) throw new Error(`Source run ${runId} not found`);
   if (existingRun.status === "success") {
     return { skipped: true, reason: "Run already completed" };
   }
 
-  // Simulate scan stages
-  await updateRunProgress(runId, 25, "scanning");
-  await sleep(500);
+  // Load the source with its rules and connection
+  const source = await db.source.findUnique({
+    where: { id: sourceId },
+    include: { rules: { orderBy: { position: "asc" } } },
+  });
+  if (!source) throw new Error(`Source ${sourceId} not found`);
 
-  await updateRunProgress(runId, 50, "parsing");
-  await sleep(500);
+  await updateRunProgress(runId, 10, "connecting");
 
-  await updateRunProgress(runId, 75, "extracting");
-  await sleep(500);
+  // Build Gmail search query from SourceRules
+  const queryParts: string[] = [];
+  for (const rule of source.rules) {
+    let value: unknown;
+    try { value = JSON.parse(rule.value); } catch { value = rule.value; }
+    switch (rule.filterType) {
+      case "sender":
+        queryParts.push(`from:${Array.isArray(value) ? value.join(" OR from:") : value}`);
+        break;
+      case "subject":
+        queryParts.push(rule.operator === "contains" ? `subject:${value}` : `-subject:${value}`);
+        break;
+      case "date":
+        if (rule.operator === "gt") queryParts.push(`after:${value}`);
+        if (rule.operator === "lt") queryParts.push(`before:${value}`);
+        break;
+      case "attachment":
+        if (value === true || value === "required") queryParts.push("has:attachment");
+        break;
+    }
+  }
+  const gmailQuery = queryParts.length > 0 ? queryParts.join(" ") : "";
 
-  // Simulate matched emails (in production, this would be real Gmail data)
-  const stats = {
-    emailsMatched: Math.floor(Math.random() * 15) + 5,
-    attachmentsFound: Math.floor(Math.random() * 8) + 2,
-    driveLinksDiscovered: Math.floor(Math.random() * 4),
-    recordsExtracted: 0,
-  };
-  stats.recordsExtracted = Math.floor(stats.emailsMatched * 0.85);
+  await updateRunProgress(runId, 20, "scanning");
+
+  // Fetch matching message IDs from Gmail
+  const gmail = await getGmailClient(source.googleConnectionId);
+  const listResp = await gmail.users.messages.list({
+    userId: "me",
+    q: gmailQuery || undefined,
+    maxResults: 100, // configurable in future
+  });
+  const messageRefs = listResp.data.messages ?? [];
+
+  await updateRunProgress(runId, 35, "fetching");
+
+  let emailsMatched = 0;
+  let attachmentsFound = 0;
+  let driveLinksDiscovered = 0;
+  const total = messageRefs.length;
+
+  // Fetch and parse each message
+  for (let i = 0; i < total; i++) {
+    const ref = messageRefs[i];
+    if (!ref.id) continue;
+
+    // Update progress incrementally
+    const pct = 35 + Math.floor(((i + 1) / Math.max(total, 1)) * 45);
+    if (i % 5 === 0) await updateRunProgress(runId, pct, "parsing");
+
+    // Fetch full message
+    const msgResp = await gmail.users.messages.get({
+      userId: "me",
+      id: ref.id,
+      format: "full",
+    });
+    const msg = msgResp.data;
+    const headers = msg.payload?.headers ?? [];
+
+    const fromAddress = getHeader(headers, "from");
+    const toAddress = getHeader(headers, "to");
+    const ccAddresses = getHeader(headers, "cc") || null;
+    const subject = getHeader(headers, "subject");
+    const dateStr = getHeader(headers, "date");
+    const receivedAt = dateStr ? new Date(dateStr) : new Date();
+    const snippet = msg.snippet ?? "";
+
+    const { text: bodyText, html: bodyHtml } = extractEmailBody(msg.payload);
+
+    // Dedup hash: sha256 of messageId
+    const dedupHash = crypto.createHash("sha256").update(ref.id).digest("hex");
+
+    // Upsert email (idempotent on googleMessageId)
+    const email = await db.email.upsert({
+      where: { sourceId_googleMessageId: { sourceId, googleMessageId: ref.id } },
+      create: {
+        sourceId,
+        googleMessageId: ref.id,
+        threadId: msg.threadId ?? null,
+        fromAddress,
+        toAddress,
+        ccAddresses,
+        subject,
+        snippet,
+        bodyText: bodyText || null,
+        bodyHtml: bodyHtml || null,
+        receivedAt,
+        dedupHash,
+        processingStatus: "matched",
+      },
+      update: {
+        fromAddress,
+        toAddress,
+        subject,
+        snippet,
+        bodyText: bodyText || null,
+        bodyHtml: bodyHtml || null,
+        receivedAt,
+        processingStatus: "matched",
+      },
+    });
+    emailsMatched++;
+
+    // Discover attachments
+    const attachments = extractAttachments(msg.payload);
+    for (const att of attachments) {
+      await db.emailAttachment.upsert({
+        where: { id: `${email.id}-${att.attachmentId}` },
+        create: {
+          id: `${email.id}-${att.attachmentId}`,
+          emailId: email.id,
+          filename: att.filename,
+          mimeType: att.mimeType,
+          size: att.size,
+          status: "discovered",
+        },
+        update: { filename: att.filename, mimeType: att.mimeType, size: att.size },
+      });
+      attachmentsFound++;
+    }
+
+    // Discover Drive links
+    const fullText = bodyText + " " + bodyHtml;
+    const driveLinks = extractDriveLinks(fullText);
+    for (const url of driveLinks) {
+      const resourceType = url.includes("docs.google.com/document") ? "docs"
+        : url.includes("docs.google.com/spreadsheets") ? "sheets"
+        : url.includes("docs.google.com/forms") ? "forms"
+        : url.includes("drive.google.com") ? "drive"
+        : "external";
+      // Check if link already stored
+      const existingLink = await db.emailLink.findFirst({
+        where: { emailId: email.id, url },
+      });
+      if (!existingLink) {
+        await db.emailLink.create({
+          data: { emailId: email.id, url, resourceType },
+        });
+        driveLinksDiscovered++;
+      }
+    }
+  }
+
+  await updateRunProgress(runId, 95, "finalizing");
+
+  const stats = { emailsMatched, attachmentsFound, driveLinksDiscovered, recordsExtracted: 0 };
 
   // Complete the run
   await db.sourceRun.update({
@@ -279,11 +418,11 @@ async function processGmailScan(
   // Reset source state
   await db.source.update({
     where: { id: sourceId },
-    data: { runState: "idle" },
+    data: { runState: "idle", lastRunAt: new Date() },
   });
 
   // Bump usage metrics
-  await bumpUsageMetric(job.organizationId, "emails_scanned", stats.emailsMatched);
+  await bumpUsageMetric(job.organizationId, "emails_scanned", emailsMatched);
 
   return { mode, stats };
 }
@@ -331,7 +470,7 @@ async function processExport(
 
   if (format === "json") {
     const data = dataset.records.map((r) => {
-      const byField = new Map(r.values.map((v) => [v.fieldId, v]));
+      const byField = new Map<string, any>(r.values.map((v: any) => [v.fieldId, v]));
       const obj: Record<string, unknown> = {
         recordId: r.id,
         status: r.status,
@@ -349,7 +488,7 @@ async function processExport(
   // CSV format
   const header = ["recordId", "status", "confidence", ...fields.map((f) => f.name)];
   const rows = dataset.records.map((r) => {
-    const byField = new Map(r.values.map((v) => [v.fieldId, v]));
+    const byField = new Map<string, any>(r.values.map((v: any) => [v.fieldId, v]));
     return [
       r.id,
       r.status,
@@ -380,15 +519,125 @@ async function processExport(
 /**
  * AI_EXTRACTION job processor.
  *
- * In the real system, this would run a full extraction pipeline. Since
- * the extraction endpoint already processes synchronously, this processor
- * is a placeholder that marks the job as complete.
+ * Runs the real LLM extraction pipeline:
+ *   1. Loads the source → schema → fields.
+ *   2. For each unprocessed email (processingStatus="matched"), calls extractWithLLM.
+ *   3. Persists DatasetRecord + DatasetValue rows with evidence, confidence, and model metadata.
+ *   4. Updates email processingStatus to "extracted".
+ *   5. Bumps ai_tokens usage metric.
  */
 async function processAiExtraction(
-  _job: { id: string; organizationId: string; payload: string },
-  _payload: Record<string, unknown>
+  job: { id: string; organizationId: string; payload: string },
+  payload: Record<string, unknown>
 ): Promise<Record<string, unknown>> {
-  // Extraction is handled synchronously by /api/extraction
-  // This processor exists for future async extraction workflows
-  return { note: "Extraction is processed synchronously by the API endpoint" };
+  const sourceId = payload.sourceId as string | undefined;
+  const datasetId = payload.datasetId as string | undefined;
+
+  if (!sourceId || !datasetId) {
+    return { note: "Missing sourceId or datasetId — skipping" };
+  }
+
+  // Load source → schema → fields
+  const source = await db.source.findUnique({
+    where: { id: sourceId },
+    include: {
+      schema: { include: { fields: { orderBy: { position: "asc" } } } },
+    },
+  });
+  if (!source?.schema?.fields?.length) {
+    return { note: "Source has no schema/fields configured" };
+  }
+
+  const schemaFields = source.schema.fields.map((f) => ({
+    name: f.name,
+    type: f.type,
+    description: f.description,
+    instructions: f.instructions,
+    required: f.required,
+    options: f.options ? JSON.parse(f.options) : undefined,
+    confidenceThreshold: f.confidenceThreshold,
+  }));
+
+  // Find unprocessed emails for this source
+  const emails = await db.email.findMany({
+    where: { sourceId, processingStatus: "matched" },
+    take: 50, // process in batches
+  });
+
+  let recordsExtracted = 0;
+  let totalTokens = 0;
+
+  for (const email of emails) {
+    const sourceText = [
+      `From: ${email.fromAddress}`,
+      `To: ${email.toAddress}`,
+      `Subject: ${email.subject}`,
+      `Date: ${email.receivedAt.toISOString()}`,
+      `---`,
+      email.bodyText || email.snippet,
+    ].join("\n");
+
+    let extractionResult;
+    try {
+      extractionResult = await extractWithLLM({
+        fields: schemaFields,
+        sourceText,
+        sourceFile: `gmail:${email.googleMessageId}`,
+      });
+    } catch (err) {
+      console.error(`[job-runner] AI extraction failed for email ${email.id}:`, err);
+      await db.email.update({ where: { id: email.id }, data: { processingStatus: "rejected" } });
+      continue;
+    }
+
+    // Persist DatasetRecord + DatasetValue rows
+    const record = await db.datasetRecord.create({
+      data: {
+        datasetId,
+        sourceEmailId: email.id,
+        status: "valid",
+        confidence: extractionResult.overallConfidence,
+      },
+    });
+
+    for (const fieldResult of extractionResult.fields) {
+      const schemaField = source.schema!.fields.find((f) => f.name === fieldResult.fieldName);
+      if (!schemaField) continue;
+
+      await db.datasetValue.create({
+        data: {
+          recordId: record.id,
+          fieldId: schemaField.id,
+          value: JSON.stringify(fieldResult.value ?? null),
+          confidence: fieldResult.confidence,
+          evidence: fieldResult.evidence || "",
+          sourceFile: fieldResult.sourceFile ?? `gmail:${email.googleMessageId}`,
+          modelUsed: extractionResult.modelUsed,
+          promptVersion: extractionResult.promptVersion,
+        },
+      });
+    }
+
+    // Update email processing status
+    await db.email.update({
+      where: { id: email.id },
+      data: { processingStatus: "extracted" },
+    });
+
+    recordsExtracted++;
+    totalTokens += extractionResult.tokensUsed;
+  }
+
+  // Update dataset record count
+  await db.dataset.update({
+    where: { id: datasetId },
+    data: { recordCount: { increment: recordsExtracted } },
+  });
+
+  // Bump AI token usage
+  if (totalTokens > 0) {
+    await bumpUsageMetric(job.organizationId, "ai_tokens", totalTokens);
+  }
+
+  return { recordsExtracted, totalTokens, emailsProcessed: emails.length };
 }

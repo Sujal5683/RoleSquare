@@ -15,8 +15,15 @@ if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = db;
 // Start the in-process job runner. This ensures queued/running jobs are
 // processed even in the Next.js dev server environment. The runner is
 // lazy — it only starts on first import and polls every 5 seconds.
-if (typeof window === "undefined") {
-  // Only run on the server side
+// We avoid starting it during `next build` to prevent DB connection errors.
+if (
+  typeof window === "undefined" &&
+  process.env.npm_lifecycle_event !== "build" &&
+  !process.env.NEXT_PHASE?.includes("build") &&
+  process.env.NODE_ENV !== "test" &&
+  process.env.NODE_ENV !== "development" // <-- Disable in local dev!
+) {
+  // Only run on the server side, but not during build
   import("./job-runner")
     .then(({ ensureJobRunnerStarted }) => {
       ensureJobRunnerStarted();

@@ -111,10 +111,13 @@ function formatDate(iso: string | null): string {
   }
 }
 
+import { useActiveOrg } from "@/hooks/use-active-org";
+
 // ── Component ────────────────────────────────────────────────────────────
 
 export function SourcesView() {
   const queryClient = useQueryClient();
+  const activeOrgId = useActiveOrg();
   const openSource = useAppStore((s) => s.openSource);
   const setView = useAppStore((s) => s.setView);
 
@@ -125,8 +128,9 @@ export function SourcesView() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   const { data: sources, isLoading, isError, refetch, isFetching } = useQuery({
-    queryKey: ["sources"],
+    queryKey: ["sources", activeOrgId],
     queryFn: () => api.get<SourceDTO[]>("/api/sources"),
+    enabled: !!activeOrgId,
   });
 
   // Runs query — only enabled when a source is opened in the dialog
@@ -330,7 +334,7 @@ export function SourcesView() {
               variant="outline"
               size="sm"
               onClick={() => refetch()}
-              disabled={isFetching}
+              disabled={!activeOrgId || isFetching}
             >
               <RefreshCw
                 className={`mr-2 h-3.5 w-3.5 ${isFetching ? "animate-spin" : ""}`}
@@ -718,12 +722,7 @@ export function SourcesView() {
                                   onClick={() => {
                                     const name = prompt("Clone source name:", `${s.name} (copy)`);
                                     if (name) {
-                                      fetch(`/api/sources/${s.id}/clone`, {
-                                        method: "POST",
-                                        headers: { "Content-Type": "application/json" },
-                                        body: JSON.stringify({ name }),
-                                      })
-                                        .then((r) => r.json())
+                                      api.post(`/api/sources/${s.id}/clone`, { name })
                                         .then(() => {
                                           toast.success("Source cloned", {
                                             description: `"${name}" created as paused. Review and activate.`,

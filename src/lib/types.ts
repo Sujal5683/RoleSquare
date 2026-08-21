@@ -15,7 +15,8 @@ export type ViewId =
   | "members"
   | "sharing"
   | "audit"
-  | "settings";
+  | "settings"
+  | "invitations";
 
 export type Role = "owner" | "admin" | "manager" | "member" | "viewer";
 export type Plan = "free" | "team" | "enterprise";
@@ -72,6 +73,7 @@ export interface OrganizationDTO {
   createdBy: string;
   createdAt: string;
   memberCount?: number;
+  userStatus?: string;
 }
 
 export interface MemberDTO {

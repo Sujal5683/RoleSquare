@@ -1,0 +1,1 @@
+const { PrismaClient } = require('@prisma/client'); const prisma = new PrismaClient(); prisma.user.findFirst().then(u => { console.log('Success:', !!u); prisma.$disconnect(); }).catch(e => { console.error('Error:', e.message); prisma.$disconnect(); });

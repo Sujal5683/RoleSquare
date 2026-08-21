@@ -120,12 +120,12 @@ async function sendToWebhook(
         action: "share",
         entity: "webhook",
         entityId: webhook.id,
-        after: {
+        after: JSON.stringify({
           event: evt.event,
           statusCode,
           success,
           elapsed,
-        },
+        }),
         reason: `Webhook delivery: ${evt.event}`,
       },
     })

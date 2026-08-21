@@ -12,16 +12,20 @@ import { serializeOrganization } from "@/lib/serialize";
 export async function GET() {
   try {
     const user = await getCurrentUser();
-    const orgIds = user.organizations.map((o) => o.id);
+    const orgIds = user.memberships.map((m) => m.organizationId);
     const orgs = await db.organization.findMany({
       where: { id: { in: orgIds } },
       include: { _count: { select: { members: true } } },
       orderBy: { createdAt: "asc" },
     });
     return NextResponse.json(
-      orgs.map((o) =>
-        serializeOrganization(o, o._count?.members ?? 0)
-      )
+      orgs.map((o) => {
+        const mem = user.memberships.find((m) => m.organizationId === o.id);
+        return {
+          ...serializeOrganization(o, o._count?.members ?? 0),
+          userStatus: mem?.status,
+        };
+      })
     );
   } catch (err) {
     return NextResponse.json(

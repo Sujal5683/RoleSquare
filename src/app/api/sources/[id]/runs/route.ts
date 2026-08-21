@@ -8,6 +8,7 @@ import { db } from "@/lib/db";
 import { requireOrgContext, AuthError, authErrorResponse } from "@/lib/auth";
 import { logAudit } from "@/lib/audit";
 import { serializeSourceRun } from "@/lib/serialize";
+import { ensureJobRunnerStarted } from "@/lib/job-runner";
 
 async function requireSource(id: string, organizationId: string) {
   const s = await db.source.findUnique({ where: { id } });
@@ -96,6 +97,10 @@ export async function POST(
       entityId: id,
       after: { mode, runId: created.run.id, jobId: created.job.id },
     });
+
+    // Wake the in-process job runner so the GMAIL_SCAN job is picked up
+    // immediately rather than waiting for the next API request to start it.
+    ensureJobRunnerStarted();
 
     return NextResponse.json(serializeSourceRun(created.run), {
       status: 201,

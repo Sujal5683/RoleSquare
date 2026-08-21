@@ -151,10 +151,13 @@ function summarizeRowFilter(filter: Record<string, unknown> | null): string {
     .join(", ") + (keys.length > 2 ? ` +${keys.length - 2}` : "");
 }
 
+import { useActiveOrg } from "@/hooks/use-active-org";
+
 // ── Main component ───────────────────────────────────────────────────────
 
 export function SharingView() {
   const queryClient = useQueryClient();
+  const activeOrgId = useActiveOrg();
   const [tab, setTab] = useState("incoming");
   const [createOpen, setCreateOpen] = useState(false);
   const [revokeTarget, setRevokeTarget] =
@@ -172,9 +175,10 @@ export function SharingView() {
     refetch: refetchRequests,
     isFetching: reqFetching,
   } = useQuery({
-    queryKey: ["sharing", "requests"],
+    queryKey: ["sharing", "requests", activeOrgId],
     queryFn: () =>
       api.get<SharingRequestDTO[]>("/api/sharing/requests"),
+    enabled: !!activeOrgId,
   });
 
   const {
@@ -184,15 +188,17 @@ export function SharingView() {
     refetch: refetchPermissions,
     isFetching: permFetching,
   } = useQuery({
-    queryKey: ["sharing", "permissions"],
+    queryKey: ["sharing", "permissions", activeOrgId],
     queryFn: () =>
       api.get<SharingPermissionDTO[]>("/api/sharing/permissions"),
+    enabled: !!activeOrgId,
   });
 
   // Datasets list — used in the new-share dialog dropdown
   const { data: datasets } = useQuery({
-    queryKey: ["datasets"],
+    queryKey: ["datasets", activeOrgId],
     queryFn: () => api.get<DatasetDTO[]>("/api/datasets"),
+    enabled: !!activeOrgId,
   });
 
   // ── Mutations ──────────────────────────────────────────────────────────
@@ -225,23 +231,8 @@ export function SharingView() {
   });
 
   const revokeMutation = useMutation({
-    // DELETE /api/sharing/permissions expects a JSON body { id } — our api
-    // client doesn't expose delete-with-body, so we call fetch directly.
     mutationFn: (id: string) =>
-      fetch("/api/sharing/permissions", {
-        method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id }),
-      }).then(async (res) => {
-        const data = await res.json().catch(() => null);
-        if (!res.ok) {
-          throw new Error(
-            (data && (data.error as string)) ||
-              `Failed to revoke (${res.status})`
-          );
-        }
-        return data;
-      }),
+      api.delete<void>("/api/sharing/permissions", { id }),
     onSuccess: () => {
       toast.success("Share revoked");
       queryClient.invalidateQueries({ queryKey: ["sharing"] });
@@ -296,14 +287,14 @@ export function SharingView() {
                 refetchRequests();
                 refetchPermissions();
               }}
-              disabled={reqFetching || permFetching}
+              disabled={!activeOrgId || reqFetching || permFetching}
             >
               <RefreshCw
                 className={`mr-2 h-3.5 w-3.5 ${reqFetching || permFetching ? "animate-spin" : ""}`}
               />
               Refresh
             </Button>
-            <Button size="sm" onClick={() => setCreateOpen(true)}>
+            <Button size="sm" onClick={() => setCreateOpen(true)} disabled={!activeOrgId}>
               <Plus className="mr-2 h-3.5 w-3.5" />
               New share request
             </Button>

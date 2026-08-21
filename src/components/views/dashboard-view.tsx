@@ -36,21 +36,32 @@ import {
 } from "lucide-react";
 
 export function DashboardView() {
+  const selectedOrgId = useAppStore((s) => s.selectedOrganizationId);
   const setView = useAppStore((s) => s.setView);
   const openDataset = useAppStore((s) => s.openDataset);
   const openSource = useAppStore((s) => s.openSource);
   const openSchema = useAppStore((s) => s.openSchema);
   const recentItems = useAppStore((s) => s.recentItems);
 
+  const { data: session } = useQuery({
+    queryKey: ["session"],
+    queryFn: () => api.get<{ organizations: Array<{ id: string }> }>("/api/session"),
+  });
+
+  const isValidSelectedOrg = session?.organizations?.some(o => o.id === selectedOrgId);
+  const activeOrgId = (selectedOrgId && isValidSelectedOrg) ? selectedOrgId : session?.organizations?.[0]?.id ?? null;
+
   const { data, isLoading, refetch, isFetching } = useQuery({
-    queryKey: ["dashboard"],
-    queryFn: () => api.get<DashboardData>("/api/dashboard"),
+    queryKey: ["dashboard", activeOrgId],
+    queryFn: () => api.get<DashboardData>(`/api/dashboard?organizationId=${activeOrgId}`),
+    enabled: !!activeOrgId,
   });
 
   // Activity feed — recent audit events
   const { data: activityData } = useQuery({
-    queryKey: ["dashboard-activity"],
-    queryFn: () => api.get<{ data: AuditLogDTO[] }>("/api/audit?limit=8"),
+    queryKey: ["dashboard-activity", activeOrgId],
+    queryFn: () => api.get<{ data: AuditLogDTO[] }>(`/api/audit?limit=8&organizationId=${activeOrgId}`),
+    enabled: !!activeOrgId,
     staleTime: 30_000,
   });
 
@@ -140,7 +151,7 @@ export function DashboardView() {
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2">
                             <p className="text-sm font-medium truncate">
-                              {run.sourceName ?? run.sourceId.slice(0, 8)}
+                              {(run as unknown as { sourceName?: string }).sourceName ?? run.sourceId.slice(0, 8)}
                             </p>
                             <StatusBadge status={run.status} />
                           </div>

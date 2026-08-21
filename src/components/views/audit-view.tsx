@@ -152,9 +152,12 @@ const ACTION_STYLE: Record<string, string> = {
   export: "bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300",
 };
 
+import { useActiveOrg } from "@/hooks/use-active-org";
+
 // ── Main component ───────────────────────────────────────────────────────
 
 export function AuditView() {
+  const activeOrgId = useActiveOrg();
   const [entity, setEntity] = useState("all");
   const [action, setAction] = useState("all");
   const [fromDate, setFromDate] = useState("");
@@ -180,11 +183,12 @@ export function AuditView() {
     refetch,
     isFetching,
   } = useQuery({
-    queryKey: ["audit", entity, action],
+    queryKey: ["audit", entity, action, activeOrgId],
     queryFn: () =>
       api.get<{ data: AuditLogDTO[]; total: number; page: number; pageSize: number }>(
         `/api/audit?${queryParams}`
       ),
+    enabled: !!activeOrgId,
   });
 
   // Client-side filtering by date range and search term
@@ -266,7 +270,7 @@ export function AuditView() {
               variant="outline"
               size="sm"
               onClick={() => refetch()}
-              disabled={isFetching}
+              disabled={!activeOrgId || isFetching}
             >
               <RefreshCw
                 className={`mr-2 h-3.5 w-3.5 ${isFetching ? "animate-spin" : ""}`}

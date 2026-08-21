@@ -88,10 +88,13 @@ function formatDate(iso: string | null | undefined): string {
   }
 }
 
+import { useActiveOrg } from "@/hooks/use-active-org";
+
 // ── Component ────────────────────────────────────────────────────────────
 
 export function DatasetsView() {
   const queryClient = useQueryClient();
+  const activeOrgId = useActiveOrg();
   const openDataset = useAppStore((s) => s.openDataset);
   const setView = useAppStore((s) => s.setView);
 
@@ -107,13 +110,15 @@ export function DatasetsView() {
     refetch,
     isFetching,
   } = useQuery({
-    queryKey: ["datasets"],
+    queryKey: ["datasets", activeOrgId],
     queryFn: () => api.get<DatasetDTO[]>("/api/datasets"),
+    enabled: !!activeOrgId,
   });
 
   const { data: schemas } = useQuery({
-    queryKey: ["schemas"],
+    queryKey: ["schemas", activeOrgId],
     queryFn: () => api.get<SchemaDTO[]>("/api/schemas"),
+    enabled: !!activeOrgId,
   });
 
   // ── Mutations ──────────────────────────────────────────────────────────
@@ -189,14 +194,14 @@ export function DatasetsView() {
               variant="outline"
               size="sm"
               onClick={() => refetch()}
-              disabled={isFetching}
+              disabled={!activeOrgId || isFetching}
             >
               <RefreshCw
                 className={`mr-2 h-3.5 w-3.5 ${isFetching ? "animate-spin" : ""}`}
               />
               Refresh
             </Button>
-            <Button size="sm" onClick={() => setCreateOpen(true)}>
+            <Button size="sm" onClick={() => setCreateOpen(true)} disabled={!activeOrgId}>
               <Plus className="mr-2 h-3.5 w-3.5" />
               New dataset
             </Button>
@@ -243,7 +248,7 @@ export function DatasetsView() {
               : "Create your first dataset to start collecting structured, evidence-backed records from your sources."
           }
           action={
-            <Button size="sm" onClick={() => setCreateOpen(true)}>
+            <Button size="sm" onClick={() => setCreateOpen(true)} disabled={!activeOrgId}>
               <Plus className="mr-2 h-3.5 w-3.5" />
               New dataset
             </Button>

@@ -50,10 +50,10 @@ export function LandingView() {
             <a href="#pricing" className="text-muted-foreground hover:text-foreground">Pricing</a>
           </nav>
           <div className="flex items-center gap-2">
-            <Button variant="ghost" size="sm" onClick={() => setView("dashboard")}>
+            <Button variant="ghost" size="sm" onClick={() => window.location.href = "/login"}>
               Sign in
             </Button>
-            <Button size="sm" onClick={() => setView("dashboard")}>
+            <Button size="sm" onClick={() => window.location.href = "/login"}>
               Get started
               <ArrowRight className="ml-1.5 h-3.5 w-3.5" />
             </Button>

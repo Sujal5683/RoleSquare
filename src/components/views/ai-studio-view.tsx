@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { formatDistanceToNow, format, parseISO } from "date-fns";
 import { toast } from "sonner";
@@ -183,11 +183,8 @@ const AGENTS: AgentDef[] = [
   },
 ];
 
-const MODEL_CHAIN = [
-  { name: "Gemini 1.5 Pro", role: "Primary", status: "active" },
-  { name: "Claude 3.5 Sonnet", role: "Fallback 1", status: "idle" },
-  { name: "GPT-4o", role: "Fallback 2", status: "idle" },
-];
+// MODEL_CHAIN is now driven by /api/ai/model-status — see ModelCostTab.
+// This constant is intentionally removed; do not add hardcoded model lists here.
 
 const COST_PER_1K = 0.001;
 
@@ -1203,6 +1200,21 @@ function AgentLogsDialog({
 
 // ── Model & Cost tab ─────────────────────────────────────────────────────
 
+interface ModelStatusResponse {
+  models: {
+    modelId: string;
+    displayName: string;
+    role: string;
+    status: "active" | "rate_limited";
+    cooldownUntil: string | null;
+    cooldownRemainingSeconds: number;
+    rateLimitHits: number;
+    successCount: number;
+    lastUsedAt: string | null;
+  }[];
+  updatedAt: string;
+}
+
 function ModelCostTab() {
   const { data: usage, isLoading: usageLoading } = useQuery({
     queryKey: ["usage"],
@@ -1216,6 +1228,31 @@ function ModelCostTab() {
         "/api/ai-jobs?pageSize=200"
       ),
   });
+
+  // Live model chain status — poll every 10s so cooldown countdowns stay fresh
+  const [modelStatus, setModelStatus] = useState<ModelStatusResponse | null>(null);
+  const [modelStatusLoading, setModelStatusLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function fetchStatus() {
+      try {
+        setModelStatusLoading(true);
+        const data = await api.get<ModelStatusResponse>("/api/ai/model-status");
+        if (!cancelled) setModelStatus(data);
+      } catch {
+        // ignore — server may not be ready yet
+      } finally {
+        if (!cancelled) setModelStatusLoading(false);
+      }
+    }
+    fetchStatus();
+    const interval = setInterval(fetchStatus, 10_000);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, []);
 
   const aiTokens = useMemo(() => {
     const m = (usage ?? []).find((u) => u.metricType === "ai_tokens");
@@ -1266,65 +1303,87 @@ function ModelCostTab() {
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
-        {/* Model card */}
+        {/* Live model chain card */}
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="flex items-center gap-2 text-base">
               <Cpu className="h-4 w-4" />
-              Primary model
+              Gemini Model Chain
+              {modelStatusLoading && (
+                <RefreshCw className="ml-1 h-3 w-3 animate-spin text-muted-foreground" />
+              )}
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex items-start justify-between gap-3 rounded-lg border bg-muted/30 p-4">
-              <div>
-                <p className="text-base font-semibold">Gemini 1.5 Pro</p>
-                <p className="text-xs text-muted-foreground">
-                  Multimodal · 1M context · via z-ai-web-dev-sdk
+          <CardContent className="space-y-3">
+            {modelStatusLoading ? (
+              <LoadingState rows={5} />
+            ) : !modelStatus || modelStatus.models.length === 0 ? (
+              <EmptyState
+                icon={<Cpu className="h-5 w-5" />}
+                title="No model status available"
+                description="Model status is only available when the server is running."
+              />
+            ) : (
+              <>
+                <div className="space-y-2">
+                  {modelStatus.models.map((m, i) => (
+                    <div
+                      key={m.modelId}
+                      className={`flex items-center gap-3 rounded-lg border p-3 transition-colors ${
+                        m.status === "active"
+                          ? "border-emerald-200 bg-emerald-50/50 dark:border-emerald-900 dark:bg-emerald-950/30"
+                          : "border-amber-200 bg-amber-50/50 dark:border-amber-900 dark:bg-amber-950/30"
+                      }`}
+                    >
+                      <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary tabular-nums">
+                        {i + 1}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold truncate">{m.displayName}</p>
+                        <p className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                          {m.role} · <span className="font-mono">{m.modelId}</span>
+                        </p>
+                        {m.status === "rate_limited" && m.cooldownRemainingSeconds > 0 && (
+                          <p className="text-[10px] text-amber-600 dark:text-amber-400 mt-0.5">
+                            cooldown: {m.cooldownRemainingSeconds}s remaining
+                          </p>
+                        )}
+                      </div>
+                      <div className="flex flex-col items-end gap-1">
+                        {m.status === "active" ? (
+                          <Badge className="bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 text-[10px]">
+                            <CheckCircle2 className="mr-1 h-2.5 w-2.5" />
+                            Active
+                          </Badge>
+                        ) : (
+                          <Badge className="bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300 text-[10px]">
+                            <Clock className="mr-1 h-2.5 w-2.5" />
+                            Rate limited
+                          </Badge>
+                        )}
+                        {m.successCount > 0 && (
+                          <span className="text-[9px] text-muted-foreground tabular-nums">
+                            {m.successCount} calls
+                          </span>
+                        )}
+                        {m.rateLimitHits > 0 && (
+                          <span className="text-[9px] text-amber-600 dark:text-amber-400 tabular-nums">
+                            {m.rateLimitHits} 429s
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <p className="text-[10px] text-muted-foreground">
+                  Live fallback — when a model returns 429, the next in chain is
+                  used automatically. Status resets after cooldown.
+                  {modelStatus.updatedAt && (
+                    <> Updated {relativeTime(modelStatus.updatedAt)}.</>
+                  )}
                 </p>
-              </div>
-              <Badge className="bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
-                <CheckCircle2 className="mr-1 h-3 w-3" />
-                Active
-              </Badge>
-            </div>
-
-            {/* Fallback chain */}
-            <div>
-              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                Fallback chain
-              </p>
-              <div className="space-y-2">
-                {MODEL_CHAIN.map((m, i) => (
-                  <div key={m.name} className="flex items-center gap-3">
-                    <div className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary tabular-nums">
-                      {i + 1}
-                    </div>
-                    <div className="flex-1">
-                      <p className="text-sm font-medium">{m.name}</p>
-                      <p className="text-[10px] uppercase tracking-wide text-muted-foreground">
-                        {m.role}
-                      </p>
-                    </div>
-                    {m.status === "active" ? (
-                      <Badge className="bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
-                        Active
-                      </Badge>
-                    ) : (
-                      <Badge variant="outline" className="text-muted-foreground">
-                        Standby
-                      </Badge>
-                    )}
-                    {i < MODEL_CHAIN.length - 1 && (
-                      <ArrowRight className="h-3.5 w-3.5 text-muted-foreground" />
-                    )}
-                  </div>
-                ))}
-              </div>
-              <p className="mt-3 text-xs text-muted-foreground">
-                Fallbacks are not actively wired — visualised for architecture
-                planning only.
-              </p>
-            </div>
+              </>
+            )}
           </CardContent>
         </Card>
 

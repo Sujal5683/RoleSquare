@@ -14,10 +14,14 @@ import { logAudit } from "@/lib/audit";
 import { bumpUsageMetric } from "@/lib/usage";
 import { extractWithLLM, flagFieldsForReview } from "@/lib/extraction";
 import { dispatchWebhookEvent } from "@/lib/webhook-dispatcher";
+import { ensureJobRunnerStarted } from "@/lib/job-runner";
 import type { ExtractionFieldResult } from "@/lib/types";
 
 export async function POST(req: NextRequest) {
   try {
+    // Ensure the in-process job runner is alive so any queued AI jobs are
+    // processed alongside this synchronous extraction call.
+    ensureJobRunnerStarted();
     const { user, organizationId } = await requireOrgContext(req);
     const body = await req.json().catch(() => ({}));
     const schemaId = String(body?.schemaId ?? "").trim();
@@ -55,7 +59,7 @@ export async function POST(req: NextRequest) {
         description: f.description,
         instructions: f.instructions,
         required: f.required,
-        options: f.options ? JSON.parse(f.options) : null,
+        options: f.options ? (JSON.parse(f.options) as string[]) : null,
         confidenceThreshold: f.confidenceThreshold,
       })),
       sourceText,
@@ -71,7 +75,15 @@ export async function POST(req: NextRequest) {
     );
 
     // Flag fields that fall below their per-field confidence threshold.
-    const reviewFlags = flagFieldsForReview(validatedFields, schema.fields);
+    const reviewFlags = flagFieldsForReview(validatedFields, schema.fields.map((f) => ({
+      name: f.name,
+      type: f.type,
+      description: f.description,
+      instructions: f.instructions,
+      required: f.required,
+      options: f.options ? (JSON.parse(f.options) as string[]) : undefined,
+      confidenceThreshold: f.confidenceThreshold,
+    })));
     const fieldsNeedingReview = reviewFlags.filter((f) => f.needsReview).length;
 
     if (result.tokensUsed > 0) {

@@ -252,21 +252,21 @@ export function SourceBuilderView() {
     },
   });
 
-  const connectAccountMutation = useMutation({
-    mutationFn: (googleEmail: string) =>
-      api.post<GoogleConnectionDTO>("/api/google-connections", { googleEmail }),
-    onSuccess: (conn) => {
-      toast.success("Google account connected", {
-        description: conn.googleEmail,
-      });
-      queryClient.invalidateQueries({ queryKey: ["google-connections"] });
-      setForm((f) => ({ ...f, googleConnectionId: conn.id }));
-    },
-    onError: (err: unknown) => {
-      const msg = err instanceof Error ? err.message : "Failed to connect";
-      toast.error("Connection failed", { description: msg });
-    },
-  });
+  const [connectingAccount, setConnectingAccount] = useState(false);
+
+  async function handleConnectAccount() {
+    setConnectingAccount(true);
+    try {
+      const result = await api.post<{ authorizeUrl: string }>("/api/google-connections");
+      if (result.authorizeUrl) {
+        window.location.href = result.authorizeUrl;
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Failed to start authorization";
+      toast.error("Authorization failed", { description: msg });
+      setConnectingAccount(false);
+    }
+  }
 
   const replaceRulesMutation = useMutation({
     mutationFn: ({ id, rules }: { id: string; rules: unknown[] }) =>
@@ -520,21 +520,19 @@ export function SourceBuilderView() {
                     <EmptyState
                       icon={<Mail className="h-5 w-5" />}
                       title="No Google accounts connected"
-                      description="Connect a Google account to start ingesting Workspace content. We'll simulate the OAuth flow for this demo."
+                      description="Connect a Google account to start ingesting Workspace content via Google OAuth."
                       action={
                         <Button
                           size="sm"
-                          onClick={() =>
-                            connectAccountMutation.mutate("new@acme.io")
-                          }
-                          disabled={connectAccountMutation.isPending}
+                          onClick={handleConnectAccount}
+                          disabled={connectingAccount}
                         >
-                          {connectAccountMutation.isPending ? (
+                          {connectingAccount ? (
                             <RefreshCw className="mr-2 h-3.5 w-3.5 animate-spin" />
                           ) : (
                             <Plus className="mr-2 h-3.5 w-3.5" />
                           )}
-                          Connect account
+                          Connect with Google
                         </Button>
                       }
                     />
@@ -613,10 +611,8 @@ export function SourceBuilderView() {
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() =>
-                          connectAccountMutation.mutate("new@acme.io")
-                        }
-                        disabled={connectAccountMutation.isPending}
+                        onClick={handleConnectAccount}
+                        disabled={connectingAccount}
                       >
                         <Plus className="mr-2 h-3.5 w-3.5" />
                         Connect another account

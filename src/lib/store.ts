@@ -52,6 +52,13 @@ interface AppState {
   toggleTheme: () => void;
   setTheme: (t: "light" | "dark") => void;
 
+  // AI Assistant panel
+  assistantOpen: boolean;
+  setAssistantOpen: (open: boolean) => void;
+  assistantUnread: number;
+  bumpAssistantUnread: () => void;
+  clearAssistantUnread: () => void;
+
   // Recently viewed items (persisted across sessions)
   recentItems: RecentItem[];
   addRecent: (item: Omit<RecentItem, "timestamp">) => void;
@@ -133,6 +140,13 @@ export const useAppStore = create<AppState>()(
       toggleTheme: () =>
         set({ theme: get().theme === "light" ? "dark" : "light" }),
       setTheme: (t) => set({ theme: t }),
+
+      assistantOpen: false,
+      setAssistantOpen: (open) => set({ assistantOpen: open }),
+      assistantUnread: 0,
+      bumpAssistantUnread: () =>
+        set((s) => ({ assistantUnread: s.assistantUnread + 1 })),
+      clearAssistantUnread: () => set({ assistantUnread: 0 }),
 
       recentItems: [],
       addRecent: (item) =>

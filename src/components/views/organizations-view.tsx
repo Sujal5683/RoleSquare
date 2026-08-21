@@ -170,6 +170,21 @@ export function OrganizationsView() {
     },
   });
 
+  // ── Invite mutation ────────────────────────────────────────────────────
+  const inviteMutation = useMutation({
+    mutationFn: ({ id, status }: { id: string; status: "active" | "rejected" }) =>
+      api.patch(`/api/organizations/${id}/members/me`, { status }),
+    onSuccess: () => {
+      toast.success("Invitation updated");
+      queryClient.invalidateQueries({ queryKey: ["organizations"] });
+      queryClient.invalidateQueries({ queryKey: ["session"] });
+    },
+    onError: (err: unknown) => {
+      const msg = err instanceof Error ? err.message : "Failed to update invitation";
+      toast.error("Error", { description: msg });
+    },
+  });
+
   // ── Derived ────────────────────────────────────────────────────────────
   const filtered = useMemo(() => {
     if (!orgs) return [];
@@ -290,39 +305,46 @@ export function OrganizationsView() {
                         <code className="text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
                           {org.slug}
                         </code>
+                        {org.userStatus === "invited" && (
+                          <span className="text-xs font-medium text-amber-600 bg-amber-100 dark:text-amber-400 dark:bg-amber-900/30 px-1.5 py-0.5 rounded">
+                            Pending Invite
+                          </span>
+                        )}
                       </div>
                     </div>
                   </div>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 shrink-0"
-                        aria-label="Organization actions"
-                      >
-                        <MoreHorizontal className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="w-44">
-                      <DropdownMenuItem onClick={() => setEditTarget(org)}>
-                        <Pencil className="mr-2 h-4 w-4" />
-                        Edit
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => handleOpen(org)}>
-                        <Users className="mr-2 h-4 w-4" />
-                        Members
-                      </DropdownMenuItem>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem
-                        className="text-destructive focus:text-destructive"
-                        onClick={() => setDeleteTarget(org)}
-                      >
-                        <Trash2 className="mr-2 h-4 w-4" />
-                        Delete
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
+                  {org.userStatus !== "invited" && (
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 shrink-0"
+                          aria-label="Organization actions"
+                        >
+                          <MoreHorizontal className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="w-44">
+                        <DropdownMenuItem onClick={() => setEditTarget(org)}>
+                          <Pencil className="mr-2 h-4 w-4" />
+                          Edit
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handleOpen(org)}>
+                          <Users className="mr-2 h-4 w-4" />
+                          Members
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          className="text-destructive focus:text-destructive"
+                          onClick={() => setDeleteTarget(org)}
+                        >
+                          <Trash2 className="mr-2 h-4 w-4" />
+                          Delete
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  )}
                 </div>
 
                 {/* Member avatars */}
@@ -373,15 +395,35 @@ export function OrganizationsView() {
                 </div>
 
                 {/* Footer */}
-                <div className="mt-auto flex items-center justify-end border-t pt-3">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleOpen(org)}
-                  >
-                    Open
-                    <ChevronRight className="ml-1.5 h-3.5 w-3.5" />
-                  </Button>
+                <div className="mt-auto flex items-center justify-end gap-2 border-t pt-3">
+                  {org.userStatus === "invited" ? (
+                    <>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={inviteMutation.isPending}
+                        onClick={() => inviteMutation.mutate({ id: org.id, status: "rejected" })}
+                      >
+                        Decline
+                      </Button>
+                      <Button
+                        size="sm"
+                        disabled={inviteMutation.isPending}
+                        onClick={() => inviteMutation.mutate({ id: org.id, status: "active" })}
+                      >
+                        Accept
+                      </Button>
+                    </>
+                  ) : (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleOpen(org)}
+                    >
+                      Open
+                      <ChevronRight className="ml-1.5 h-3.5 w-3.5" />
+                    </Button>
+                  )}
                 </div>
               </Card>
             );

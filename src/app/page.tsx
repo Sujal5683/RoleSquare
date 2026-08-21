@@ -16,6 +16,7 @@ import { MembersView } from "@/components/views/members-view";
 import { SharingView } from "@/components/views/sharing-view";
 import { AuditView } from "@/components/views/audit-view";
 import { SettingsView } from "@/components/views/settings-view";
+import { InvitationsView } from "@/components/views/invitations-view";
 
 export default function Home() {
   const view = useAppStore((s) => s.view);
@@ -33,6 +34,7 @@ export default function Home() {
       {view === "usage" && <UsageView />}
       {view === "organizations" && <OrganizationsView />}
       {view === "members" && <MembersView />}
+      {view === "invitations" && <InvitationsView />}
       {view === "sharing" && <SharingView />}
       {view === "audit" && <AuditView />}
       {view === "settings" && <SettingsView />}

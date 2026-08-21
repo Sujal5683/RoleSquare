@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import { useActiveOrg } from "@/hooks/use-active-org";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { formatDistanceToNow } from "date-fns";
 import { toast } from "sonner";
@@ -339,6 +340,8 @@ function ConnectedAccountsSection() {
   const [disconnectTarget, setDisconnectTarget] =
     useState<GoogleConnectionDTO | null>(null);
 
+  const activeOrgId = useActiveOrg();
+
   const {
     data: connections,
     isLoading,
@@ -346,9 +349,10 @@ function ConnectedAccountsSection() {
     refetch,
     isFetching,
   } = useQuery({
-    queryKey: ["google-connections"],
+    queryKey: ["google-connections", activeOrgId],
     queryFn: () =>
       api.get<GoogleConnectionDTO[]>("/api/google-connections"),
+    enabled: !!activeOrgId,
   });
 
   const refreshMutation = useMutation({
@@ -401,7 +405,7 @@ function ConnectedAccountsSection() {
               variant="outline"
               size="sm"
               onClick={() => refetch()}
-              disabled={isFetching}
+              disabled={!activeOrgId || isFetching}
             >
               <RefreshCw
                 className={`mr-2 h-3.5 w-3.5 ${isFetching ? "animate-spin" : ""}`}
@@ -563,39 +567,23 @@ function ConnectAccountDialog({
   open: boolean;
   onClose: () => void;
 }) {
-  const queryClient = useQueryClient();
-  const [email, setEmail] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  const connectMutation = useMutation({
-    mutationFn: (payload: { googleEmail: string }) =>
-      api.post<GoogleConnectionDTO>("/api/google-connections", payload),
-    onSuccess: (c) => {
-      toast.success("Account connected", {
-        description: `${c.googleEmail} is now active.`,
-      });
-      queryClient.invalidateQueries({ queryKey: ["google-connections"] });
-      queryClient.invalidateQueries({ queryKey: ["dashboard"] });
-      setEmail("");
-      onClose();
-    },
-    onError: (err: unknown) => {
-      const msg = err instanceof Error ? err.message : "Failed to connect";
-      toast.error("Connect failed", { description: msg });
-    },
-  });
-
-  const handleSubmit = () => {
-    const trimmed = email.trim().toLowerCase();
-    if (!trimmed) {
-      toast.error("Email is required");
-      return;
+  async function handleAuthorize() {
+    setLoading(true);
+    try {
+      // Get the OAuth URL from the server (it embeds user+org context in state)
+      const result = await api.post<{ authorizeUrl: string }>("/api/google-connections");
+      if (result.authorizeUrl) {
+        // Navigate the browser to Google's consent screen
+        window.location.href = result.authorizeUrl;
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Failed to start authorization";
+      toast.error("Authorization failed", { description: msg });
+      setLoading(false);
     }
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) {
-      toast.error("Please enter a valid Google email address");
-      return;
-    }
-    connectMutation.mutate({ googleEmail: trimmed });
-  };
+  }
 
   return (
     <Dialog
@@ -606,49 +594,37 @@ function ConnectAccountDialog({
     >
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Connect Google account</DialogTitle>
+          <DialogTitle>Connect Google Account</DialogTitle>
           <DialogDescription>
-            Enter the Google email address you want to use as an ingestion
-            source. We&apos;ll simulate the OAuth flow and create an active
-            connection.
+            You&apos;ll be redirected to Google to authorize access to your Gmail and
+            Drive. We request read-only permissions only.
           </DialogDescription>
         </DialogHeader>
-        <div className="space-y-4 py-2">
-          <div className="space-y-1.5">
-            <Label htmlFor="conn-email">
-              Google email <span className="text-destructive">*</span>
-            </Label>
-            <Input
-              id="conn-email"
-              type="email"
-              placeholder="you@gmail.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              autoFocus
-              onKeyDown={(e) => {
-                if (e.key === "Enter") handleSubmit();
-              }}
-            />
+        <div className="space-y-3 py-2">
+          <div className="rounded-lg border bg-muted/40 p-3 space-y-1.5">
+            <p className="text-xs font-semibold text-foreground">Permissions requested:</p>
+            <ul className="text-xs text-muted-foreground space-y-1">
+              <li>✓ <strong>Gmail</strong> — read emails (read-only)</li>
+              <li>✓ <strong>Drive</strong> — list &amp; read files (read-only)</li>
+              <li>✓ <strong>Profile</strong> — your Google email address</li>
+            </ul>
           </div>
+          <p className="text-xs text-muted-foreground">
+            You can revoke access at any time from your Google Account settings or
+            from this page.
+          </p>
         </div>
         <DialogFooter>
-          <Button
-            variant="outline"
-            onClick={onClose}
-            disabled={connectMutation.isPending}
-          >
+          <Button variant="outline" onClick={onClose} disabled={loading}>
             Cancel
           </Button>
-          <Button
-            onClick={handleSubmit}
-            disabled={!email.trim() || connectMutation.isPending}
-          >
-            {connectMutation.isPending ? (
+          <Button onClick={handleAuthorize} disabled={loading}>
+            {loading ? (
               <RefreshCw className="mr-2 h-3.5 w-3.5 animate-spin" />
             ) : (
               <Plug className="mr-2 h-3.5 w-3.5" />
             )}
-            Connect
+            Authorize with Google
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -999,6 +975,8 @@ const USAGE_METRIC_META: Record<
 
 function BillingSection() {
   const { data: session } = useSession();
+  const activeOrgId = useActiveOrg();
+
   const {
     data: usage,
     isLoading,
@@ -1006,8 +984,9 @@ function BillingSection() {
     refetch,
     isFetching,
   } = useQuery({
-    queryKey: ["usage"],
+    queryKey: ["usage", activeOrgId],
     queryFn: () => api.get<UsageMetricDTO[]>("/api/usage"),
+    enabled: !!activeOrgId,
   });
 
   const activeOrg = session?.organizations?.[0];
@@ -1079,7 +1058,7 @@ function BillingSection() {
               variant="outline"
               size="sm"
               onClick={() => refetch()}
-              disabled={isFetching}
+              disabled={!activeOrgId || isFetching}
             >
               <RefreshCw
                 className={`mr-2 h-3.5 w-3.5 ${isFetching ? "animate-spin" : ""}`}
@@ -1282,10 +1261,12 @@ interface IntegrationDef {
 
 function IntegrationsSection() {
   // Use google-connections to infer which Google integrations are active
+  const activeOrgId = useActiveOrg();
   const { data: connections } = useQuery({
-    queryKey: ["google-connections"],
+    queryKey: ["google-connections", activeOrgId],
     queryFn: () =>
       api.get<GoogleConnectionDTO[]>("/api/google-connections"),
+    enabled: !!activeOrgId,
   });
 
   // Determine which Google services are reachable from any connection's scopes
@@ -1483,19 +1464,17 @@ function WebhooksSection() {
   const [testingId, setTestingId] = useState<string | null>(null);
   const [testResult, setTestResult] = useState<Record<string, { success: boolean; statusCode: number; elapsed: number; responseBody: string }>>({});
 
+  const activeOrgId = useActiveOrg();
   const { data: webhooks = [], isLoading: loading } = useQuery({
-    queryKey: ["webhooks"],
+    queryKey: ["webhooks", activeOrgId],
     queryFn: () =>
-      fetch("/api/webhooks").then((r) => r.json()) as Promise<WebhookDTO[]>,
+      api.get<WebhookDTO[]>("/api/webhooks"),
+    enabled: !!activeOrgId,
   });
 
   const createMutation = useMutation({
     mutationFn: (vars: { url: string; secret: string | null; events: string[] }) =>
-      fetch("/api/webhooks", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(vars),
-      }).then((r) => r.json()),
+      api.post<WebhookDTO>("/api/webhooks", vars),
     onSuccess: () => {
       toast.success("Webhook created");
       queryClient.invalidateQueries({ queryKey: ["webhooks"] });
@@ -1508,7 +1487,7 @@ function WebhooksSection() {
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) =>
-      fetch(`/api/webhooks/${id}`, { method: "DELETE" }).then((r) => r.json()),
+      api.delete<WebhookDTO>(`/api/webhooks/${id}`),
     onSuccess: () => {
       toast.success("Webhook deleted");
       queryClient.invalidateQueries({ queryKey: ["webhooks"] });
@@ -1518,7 +1497,7 @@ function WebhooksSection() {
 
   const testMutation = useMutation({
     mutationFn: (id: string) =>
-      fetch(`/api/webhooks/${id}/test`, { method: "POST" }).then((r) => r.json()),
+      api.post<{ success: boolean; statusCode: number; elapsed: number; responseBody: string }>(`/api/webhooks/${id}/test`),
     onMutate: (id) => setTestingId(id),
     onSuccess: (result, id) => {
       setTestResult((prev) => ({ ...prev, [id]: result }));
@@ -1596,7 +1575,7 @@ function WebhooksSection() {
           />
         ) : (
           <div className="space-y-3">
-            {webhooks.map((w) => {
+            {Array.isArray(webhooks) && webhooks.map((w) => {
               const result = testResult[w.id];
               return (
                 <div key={w.id} className="rounded-lg border p-4">

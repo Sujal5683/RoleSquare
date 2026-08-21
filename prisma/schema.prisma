@@ -7,8 +7,9 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -86,6 +87,9 @@ model GoogleConnection {
   googleEmail    String
   scopes         String   @default("gmail.readonly,drive.metadata.readonly")
   status         String   @default("active") // active | expired | revoked | degraded
+  accessToken    String?  // AES-256-GCM encrypted short-lived access token
+  refreshToken   String?  // AES-256-GCM encrypted long-lived refresh token
+  tokenExpiresAt DateTime? // when the access token expires
   watchExpiresAt DateTime?
   lastSyncAt     DateTime?
   createdAt      DateTime @default(now())

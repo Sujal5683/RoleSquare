@@ -204,9 +204,10 @@ export function MembersView() {
       }>("/api/session"),
   });
 
-  // Resolve the active org id: prefer store, fall back to session's first org
+  // Resolve the active org id: prefer store (if valid), fall back to session's first org
+  const isValidSelectedOrg = session?.organizations?.some(o => o.id === selectedOrgId);
   const activeOrgId =
-    selectedOrgId ?? session?.organizations?.[0]?.id ?? null;
+    (selectedOrgId && isValidSelectedOrg) ? selectedOrgId : session?.organizations?.[0]?.id ?? null;
 
   const {
     data: members,

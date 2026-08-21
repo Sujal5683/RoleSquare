@@ -157,7 +157,7 @@ export async function POST(
           },
           include: { values: true },
         });
-        records.push(record);
+        records.push(record as unknown as typeof records[0]);
       }
 
       // Update dataset record count

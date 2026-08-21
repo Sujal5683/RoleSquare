@@ -15,8 +15,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-
-const SESSION_EMAIL = "alice@acme.io";
+import { createClient } from "@/lib/supabase/server";
 
 export type Role = "owner" | "admin" | "manager" | "member" | "viewer";
 
@@ -62,15 +61,14 @@ export interface SessionUser {
  * `organizations` convenience array.
  */
 export async function getCurrentUser(): Promise<SessionUser> {
-  const user = await db.user.findFirst({
-    where: { email: SESSION_EMAIL },
-    include: {
-      organizations: { include: { organization: true } },
-    },
-  });
-  if (!user) {
-    throw new Error("Session user not found — did the seed run?");
+  const supabase = await createClient();
+  const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
+
+  if (authError || !authUser?.email) {
+    throw new AuthError("Unauthorized", 401);
   }
+
+  const user = await getOrCreateUser(authUser.email, authUser.user_metadata);
 
   const memberships: OrgMembership[] = user.organizations.map((m) => ({
     id: m.id,
@@ -104,6 +102,76 @@ export async function getCurrentUser(): Promise<SessionUser> {
 }
 
 /**
+ * Finds the User row for a given email. If it doesn't exist (first login),
+ * auto-creates:
+ *   1. A User row linked to the Supabase Auth identity.
+ *   2. A default Organization (slug derived from email domain).
+ *   3. An OrganizationMember row with role="owner".
+ *
+ * This makes signup completely self-service — no manual DB seeding needed.
+ */
+async function getOrCreateUser(
+  email: string,
+  metadata: Record<string, unknown> = {}
+) {
+  const existing = await db.user.findFirst({
+    where: { email },
+    include: { organizations: { include: { organization: true } } },
+  });
+  if (existing) return existing;
+
+  // --- First login: provision user + org ---
+  const name = (metadata.full_name as string) || (metadata.name as string) || email.split("@")[0];
+  const avatarUrl = (metadata.avatar_url as string) || null;
+
+  // Derive org slug from the email domain (or username if personal)
+  const [localPart, domain] = email.split("@");
+  const orgName = domain && !["gmail.com", "outlook.com", "yahoo.com", "hotmail.com"].includes(domain)
+    ? domain.split(".")[0].charAt(0).toUpperCase() + domain.split(".")[0].slice(1)
+    : `${localPart}'s Workspace`;
+  const baseSlug = orgName.toLowerCase().replace(/[^a-z0-9]/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "");
+
+  // Ensure slug uniqueness
+  let slug = baseSlug;
+  let attempt = 0;
+  while (await db.organization.findUnique({ where: { slug } })) {
+    attempt++;
+    slug = `${baseSlug}-${attempt}`;
+  }
+
+  // Transactionally create user + org + member
+  const userId = (await import("crypto")).randomUUID();
+  const orgId = (await import("crypto")).randomUUID();
+  const memberId = (await import("crypto")).randomUUID();
+
+  const newUser = await db.$transaction(async (tx) => {
+    const user = await tx.user.create({
+      data: { id: userId, email, name, avatarUrl, role: "user" },
+    });
+    const org = await tx.organization.create({
+      data: { id: orgId, name: orgName, slug, createdBy: userId },
+    });
+    await tx.organizationMember.create({
+      data: {
+        id: memberId,
+        organizationId: org.id,
+        userId: user.id,
+        role: "owner",
+        status: "active",
+      },
+    });
+    return user;
+  });
+
+  // Reload with full relations
+  return db.user.findFirstOrThrow({
+    where: { id: newUser.id },
+    include: { organizations: { include: { organization: true } } },
+  });
+}
+
+
+/**
  * Resolves the active organization for the request, VERIFYING that the
  * current user is an ACTIVE member of that organization.
  *
@@ -119,22 +187,16 @@ export async function getCurrentOrgId(
 ): Promise<{ organizationId: string; error?: NextResponse }> {
   const user = await getCurrentUser();
   const url = new URL(req.url);
-  const explicit = url.searchParams.get("organizationId");
+  const explicit = url.searchParams.get("organizationId") || req.headers.get("x-organization-id");
 
   if (explicit) {
     const membership = user.memberships.find(
       (m) => m.organizationId === explicit && m.status === "active"
     );
-    if (!membership) {
-      return {
-        organizationId: "",
-        error: NextResponse.json(
-          { error: "You do not have access to this organization" },
-          { status: 403 }
-        ),
-      };
+    if (membership) {
+      return { organizationId: explicit };
     }
-    return { organizationId: explicit };
+    // If explicit is invalid/stale, we just fall through to the fallback below.
   }
 
   const firstActive = user.organizations[0];
@@ -159,34 +221,29 @@ export interface OrgContext {
 /**
  * Returns the session user + active org + membership, VERIFYING that the
  * user is an ACTIVE member. If the user passes `?organizationId=` for an
- * org they don't belong to (or are removed/invited-only), this throws an
- * `AuthError` that the route handler should catch and return as 403.
+ * org they don't belong to (or are removed/invited-only), this automatically
+ * falls back to their first active organization. If they have none, it throws 403.
  */
 export async function requireOrgContext(
   req: NextRequest
 ): Promise<OrgContext> {
   const user = await getCurrentUser();
   const url = new URL(req.url);
-  const explicit = url.searchParams.get("organizationId");
+  const explicit = url.searchParams.get("organizationId") || req.headers.get("x-organization-id");
 
   let membership: OrgMembership | undefined;
 
   if (explicit) {
-    membership = user.memberships.find((m) => m.organizationId === explicit);
-  } else {
+    membership = user.memberships.find((m) => m.organizationId === explicit && m.status === "active");
+  }
+  
+  if (!membership) {
     membership = user.memberships.find((m) => m.status === "active");
   }
 
   if (!membership) {
     throw new AuthError(
       "You do not have access to this organization",
-      403
-    );
-  }
-
-  if (membership.status !== "active") {
-    throw new AuthError(
-      `Your membership in this organization is ${membership.status}`,
       403
     );
   }
