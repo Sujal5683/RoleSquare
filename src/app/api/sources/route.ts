@@ -91,6 +91,9 @@ export async function POST(req: NextRequest) {
       return created;
     });
 
+    const { ensureDefaultDataset } = await import("@/lib/dataset-provisioner");
+    await ensureDefaultDataset(source.id);
+
     const full = await db.source.findUnique({
       where: { id: source.id },
       include: {

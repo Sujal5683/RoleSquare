@@ -234,8 +234,8 @@ export function DashboardView() {
                   <EmptyState title="No jobs" description="No AI jobs have run yet." />
                 ) : (
                   <div className="space-y-3">
-                    {data.queueHealth.map((q) => (
-                      <div key={q.type} className="flex items-center gap-3">
+                    {data.queueHealth.map((q, i) => (
+                      <div key={`${q.type}-${q.status}-${i}`} className="flex items-center gap-3">
                         <div className="w-40 shrink-0">
                           <JobTypeBadge type={q.type as any} />
                         </div>

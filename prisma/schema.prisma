@@ -271,6 +271,9 @@ model Schema {
   description String?
   version     Int      @default(1)
   promptTemplate String?
+  isDefault   Boolean  @default(false) // true = system-provisioned default email schema
+  datasetType String   @default("custom") // default | custom
+  tags        String[] @default([])
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -312,6 +315,8 @@ model Dataset {
   name           String
   description    String?
   recordCount    Int      @default(0)
+  isDefault      Boolean  @default(false) // true = system-provisioned default dataset
+  datasetType    String   @default("custom") // default | custom
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
@@ -374,7 +379,7 @@ model AiJob {
   id             String   @id @default(cuid())
   organizationId String
   userId         String?
-  type           String   // GMAIL_SCAN | EMAIL_PARSE | ATTACHMENT_PROCESS | DRIVE_DISCOVERY | DOCUMENT_PARSE | AI_EXTRACTION | AI_VALIDATION | EXPORT
+  type           String   // GMAIL_SCAN | DETERMINISTIC_SYNC | EMAIL_PARSE | ATTACHMENT_PROCESS | DRIVE_DISCOVERY | DOCUMENT_PARSE | AI_EXTRACTION | AI_VALIDATION | EXPORT
   status         String   @default("queued") // queued | running | success | failed | retry | dlq
   payload        String   @default("{}") // JSON
   attempts       Int      @default(0)

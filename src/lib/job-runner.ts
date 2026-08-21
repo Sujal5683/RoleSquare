@@ -19,6 +19,8 @@ import { db } from "@/lib/db";
 import { logAudit } from "@/lib/audit";
 import { bumpUsageMetric } from "@/lib/usage";
 import { getGmailClient, extractEmailBody, extractAttachments, extractDriveLinks, getHeader } from "@/lib/google-client";
+import { parseEmailFields } from "@/lib/email-parser";
+import { ensureDefaultDataset, writeDefaultDatasetRecord } from "@/lib/dataset-provisioner";
 import { extractWithLLM } from "@/lib/extraction";
 import crypto from "crypto";
 
@@ -144,6 +146,9 @@ async function processJob(job: {
     switch (job.type) {
       case "GMAIL_SCAN":
         result = await processGmailScan(job, payload);
+        break;
+      case "DETERMINISTIC_SYNC":
+        result = await processDeterministicSync(job, payload);
         break;
       case "EXPORT":
         result = await processExport(job, payload);
@@ -424,6 +429,20 @@ async function processGmailScan(
   // Bump usage metrics
   await bumpUsageMetric(job.organizationId, "emails_scanned", emailsMatched);
 
+  // Always queue a DETERMINISTIC_SYNC job to populate the Default Dataset.
+  // This runs even if emailsMatched is 0 (clears stale state safely).
+  if (emailsMatched > 0) {
+    await db.aiJob.create({
+      data: {
+        organizationId: job.organizationId,
+        type: "DETERMINISTIC_SYNC",
+        status: "queued",
+        payload: JSON.stringify({ sourceId }),
+        progress: 0,
+      },
+    });
+  }
+
   return { mode, stats };
 }
 
@@ -433,6 +452,140 @@ async function updateRunProgress(runId: string, progress: number, _stage: string
     data: { progress },
   });
 }
+
+/**
+ * DETERMINISTIC_SYNC job processor.
+ *
+ * Reads all Email rows with processingStatus="matched" for a source and
+ * writes deterministic DatasetRecord + DatasetValue rows into the Default Dataset.
+ * Zero AI tokens consumed.
+ */
+async function processDeterministicSync(
+  job: { id: string; organizationId: string },
+  payload: Record<string, unknown>
+): Promise<Record<string, unknown>> {
+  const sourceId = payload.sourceId as string | undefined;
+  if (!sourceId) return { note: "Missing sourceId" };
+
+  // Ensure default dataset exists (idempotent)
+  const datasetId = await ensureDefaultDataset(sourceId);
+
+  // Load the source's schema id
+  const source = await db.source.findUnique({
+    where: { id: sourceId },
+    select: { schemaId: true },
+  });
+  if (!source?.schemaId) return { note: "Source has no schemaId after provisioning — unexpected" };
+
+  // Process unsynced emails in batches of 50
+  const emails = await db.email.findMany({
+    where: { sourceId, processingStatus: "matched" },
+    take: 50,
+    orderBy: { receivedAt: "asc" },
+  });
+
+  let recordsSynced = 0;
+
+  for (const email of emails) {
+    // Re-fetch full Gmail message to get body/attachments for parsing
+    // Note: we rely on bodyText stored during GMAIL_SCAN
+    const parsedFields = {
+      Date: email.receivedAt.toISOString(),
+      Sender: email.fromAddress,
+      To: email.toAddress,
+      CC: email.ccAddresses ?? "",
+      Subject: email.subject,
+      Body: email.bodyText ?? email.snippet ?? "",
+      Signature: "", // Will be extracted below from bodyText
+      "Attachments Summary": "",
+      "Drive Links": "",
+      "Form Links": "",
+      "Other Links": "",
+    };
+
+    // Re-run deterministic parsing on stored bodyText
+    if (email.bodyText) {
+      const { default: SIG_PATTERNS } = await import("@/lib/email-parser").then((m) => ({ default: null, ...m }));
+      // Use parseEmailFields signature extraction via a lightweight re-parse
+      const fullText = email.bodyText;
+      const sigDelimiters = [
+        /^--\s*$/m, /^_{3,}/m, /^-{3,}/m,
+        /^(regards|sincerely|cheers|best|thanks?)[,.]?\s*$/im,
+        /^sent from my (iphone|ipad|android|samsung|gmail)/im,
+      ];
+      let mainBody = fullText.trim();
+      let signature = "";
+      for (const p of sigDelimiters) {
+        const match = fullText.match(p);
+        if (match && match.index !== undefined) {
+          mainBody = fullText.slice(0, match.index).trim();
+          signature = fullText.slice(match.index).trim();
+          break;
+        }
+      }
+      parsedFields.Body = mainBody;
+      parsedFields.Signature = signature;
+
+      // Links from bodyText
+      const allUrls = [...new Set((fullText.match(/https?:\/\/[^\s"'<>)]+/g) ?? []))];
+      const driveLinks: string[] = [];
+      const formLinks: string[] = [];
+      const otherLinks: string[] = [];
+      for (const url of allUrls) {
+        if (url.includes("docs.google.com/forms") || url.includes("forms.gle")) {
+          formLinks.push(url);
+        } else if (url.includes("docs.google.com") || url.includes("drive.google.com") || url.includes("sheets.google.com")) {
+          driveLinks.push(url);
+        } else {
+          otherLinks.push(url);
+        }
+      }
+      parsedFields["Drive Links"] = driveLinks.join(", ");
+      parsedFields["Form Links"] = formLinks.join(", ");
+      parsedFields["Other Links"] = otherLinks.join(", ");
+    }
+
+    // Load email's attachments for summary
+    const attachments = await db.emailAttachment.findMany({
+      where: { emailId: email.id },
+      select: { filename: true, mimeType: true, size: true },
+    });
+    if (attachments.length > 0) {
+      const details = attachments.map((a) => {
+        const ext = a.filename.split(".").pop()?.toLowerCase() ?? "file";
+        const sizeKb = (a.size / 1024).toFixed(0);
+        return `${a.filename} (${ext}, ${sizeKb}KB)`;
+      }).join("; ");
+      parsedFields["Attachments Summary"] = `${attachments.length} attachment(s): ${details}`;
+    }
+
+    await writeDefaultDatasetRecord(email.id, datasetId, parsedFields, source.schemaId);
+
+    // Mark email as extracted
+    await db.email.update({
+      where: { id: email.id },
+      data: { processingStatus: "extracted" },
+    });
+
+    recordsSynced++;
+  }
+
+  // If full batch, queue another DETERMINISTIC_SYNC
+  if (emails.length === 50) {
+    await db.aiJob.create({
+      data: {
+        organizationId: job.organizationId,
+        type: "DETERMINISTIC_SYNC",
+        status: "queued",
+        payload: JSON.stringify({ sourceId }),
+        progress: 0,
+      },
+    });
+  }
+
+  return { recordsSynced, emailsProcessed: emails.length };
+}
+
 
 /**
  * EXPORT job processor.
@@ -519,17 +672,28 @@ async function processExport(
 /**
  * AI_EXTRACTION job processor.
  *
- * Runs the real LLM extraction pipeline:
- *   1. Loads the source → schema → fields.
- *   2. For each unprocessed email (processingStatus="matched"), calls extractWithLLM.
- *   3. Persists DatasetRecord + DatasetValue rows with evidence, confidence, and model metadata.
- *   4. Updates email processingStatus to "extracted".
- *   5. Bumps ai_tokens usage metric.
+ * Supports two modes:
+ *
+ * Mode A — Legacy (sourceId-based): reads Email rows, runs LLM on raw email content.
+ *   Payload: { sourceId, datasetId }
+ *
+ * Mode B — Two-Step Pipeline (recommended): reads DatasetRecord rows from the
+ *   Default Dataset and runs LLM on deterministic text to populate Custom Dataset.
+ *   Payload: { sourceDatasetId, targetDatasetId, targetSchemaId }
  */
 async function processAiExtraction(
   job: { id: string; organizationId: string; payload: string },
   payload: Record<string, unknown>
 ): Promise<Record<string, unknown>> {
+  // Mode B — forward to two-step pipeline
+  const sourceDatasetId = payload.sourceDatasetId as string | undefined;
+  const targetDatasetId = payload.targetDatasetId as string | undefined;
+  const targetSchemaId  = payload.targetSchemaId  as string | undefined;
+  if (sourceDatasetId && targetDatasetId && targetSchemaId) {
+    return processTwoStepExtraction(job, { sourceDatasetId, targetDatasetId, targetSchemaId });
+  }
+
+  // Mode A — Legacy
   const sourceId = payload.sourceId as string | undefined;
   const datasetId = payload.datasetId as string | undefined;
 
@@ -639,5 +803,145 @@ async function processAiExtraction(
     await bumpUsageMetric(job.organizationId, "ai_tokens", totalTokens);
   }
 
+  // If we processed a full batch of 50, there might be more emails waiting.
+  // Queue another job to continue extraction.
+  if (emails.length === 50) {
+    await db.aiJob.create({
+      data: {
+        organizationId: job.organizationId,
+        type: "AI_EXTRACTION",
+        status: "queued",
+        payload: JSON.stringify({ sourceId, datasetId }),
+        progress: 0,
+      },
+    });
+  }
+
   return { recordsExtracted, totalTokens, emailsProcessed: emails.length };
+}
+
+/**
+ * Two-step extraction: reads text from Default Dataset records, runs LLM
+ * on deterministic content to populate a Custom Dataset.
+ */
+async function processTwoStepExtraction(
+  job: { id: string; organizationId: string },
+  { sourceDatasetId, targetDatasetId, targetSchemaId }: {
+    sourceDatasetId: string;
+    targetDatasetId: string;
+    targetSchemaId: string;
+  }
+): Promise<Record<string, unknown>> {
+  const schemaFields = await db.schemaField.findMany({
+    where: { schemaId: targetSchemaId },
+    orderBy: { position: "asc" },
+    select: { id: true, name: true, type: true, description: true, instructions: true, required: true, options: true, confidenceThreshold: true },
+  });
+  if (!schemaFields.length) return { note: "Target schema has no fields" };
+
+  const fieldInputs = schemaFields.map((f) => ({
+    name: f.name,
+    type: f.type,
+    description: f.description,
+    instructions: f.instructions,
+    required: f.required,
+    options: f.options ? JSON.parse(f.options) : undefined,
+    confidenceThreshold: f.confidenceThreshold,
+  }));
+
+  const doneEmails = await db.datasetRecord.findMany({
+    where: { datasetId: targetDatasetId, sourceEmailId: { not: null } },
+    select: { sourceEmailId: true },
+  });
+  const doneEmailIds = new Set(doneEmails.map((r) => r.sourceEmailId as string));
+
+  const sourceRecords = await db.datasetRecord.findMany({
+    where: { datasetId: sourceDatasetId },
+    include: { values: true },
+    take: 50,
+    orderBy: { createdAt: "asc" },
+  });
+  const unprocessed = sourceRecords.filter(
+    (r) => !r.sourceEmailId || !doneEmailIds.has(r.sourceEmailId)
+  );
+
+  let recordsExtracted = 0;
+  let totalTokens = 0;
+
+  for (const sourceRecord of unprocessed) {
+    const fieldIds = sourceRecord.values.map((v) => v.fieldId);
+    const defaultFields = await db.schemaField.findMany({
+      where: { id: { in: fieldIds } },
+      select: { id: true, name: true },
+    });
+    const nameById = new Map(defaultFields.map((f) => [f.id, f.name]));
+
+    const textLines = sourceRecord.values
+      .map((v) => {
+        let val: unknown;
+        try { val = JSON.parse(v.value); } catch { val = v.value; }
+        return val ? `${nameById.get(v.fieldId) ?? v.fieldId}: ${val}` : null;
+      })
+      .filter(Boolean);
+
+    const sourceText = (textLines as string[]).join("\n");
+
+    let extractionResult;
+    try {
+      extractionResult = await extractWithLLM({
+        fields: fieldInputs,
+        sourceText,
+        sourceFile: `dataset:${sourceDatasetId}:record:${sourceRecord.id}`,
+      });
+    } catch (err) {
+      console.error(`[job-runner] Two-step extraction failed for record ${sourceRecord.id}:`, err);
+      continue;
+    }
+
+    const record = await db.datasetRecord.create({
+      data: {
+        datasetId: targetDatasetId,
+        sourceEmailId: sourceRecord.sourceEmailId,
+        status: extractionResult.overallConfidence >= 0.7 ? "valid" : "needs_review",
+        confidence: extractionResult.overallConfidence,
+      },
+    });
+
+    for (const fieldResult of extractionResult.fields) {
+      const sf = schemaFields.find((f) => f.name === fieldResult.fieldName);
+      if (!sf) continue;
+      await db.datasetValue.create({
+        data: {
+          recordId: record.id,
+          fieldId: sf.id,
+          value: JSON.stringify(fieldResult.value ?? null),
+          confidence: fieldResult.confidence,
+          evidence: fieldResult.evidence || "",
+          sourceFile: fieldResult.sourceFile,
+          modelUsed: extractionResult.modelUsed,
+          promptVersion: extractionResult.promptVersion,
+        },
+      });
+    }
+
+    recordsExtracted++;
+    totalTokens += extractionResult.tokensUsed;
+  }
+
+  await db.dataset.update({ where: { id: targetDatasetId }, data: { recordCount: { increment: recordsExtracted } } });
+  if (totalTokens > 0) await bumpUsageMetric(job.organizationId, "ai_tokens", totalTokens);
+
+  if (unprocessed.length === 50) {
+    await db.aiJob.create({
+      data: {
+        organizationId: job.organizationId,
+        type: "AI_EXTRACTION",
+        status: "queued",
+        payload: JSON.stringify({ sourceDatasetId, targetDatasetId, targetSchemaId }),
+        progress: 0,
+      },
+    });
+  }
+
+  return { recordsExtracted, totalTokens, sourceRecordsProcessed: unprocessed.length };
 }

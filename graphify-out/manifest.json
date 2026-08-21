@@ -305,13 +305,13 @@
     "semantic_hash": ""
   },
   "src/app/api/sources/[id]/scan/route.ts": {
-    "mtime": 1787340285.026167,
-    "ast_hash": "70d9074316382320a01b3de2afb142d4",
+    "mtime": 1787346859.9117422,
+    "ast_hash": "09afff4added34a31ae588d5d367f6de",
     "semantic_hash": ""
   },
   "src/app/api/sources/route.ts": {
-    "mtime": 1787098295.0,
-    "ast_hash": "69f6ee11f97596cdd45073c605622936",
+    "mtime": 1787347206.2022693,
+    "ast_hash": "83ffb7a265b660f2754f02e24e2f8053",
     "semantic_hash": ""
   },
   "src/app/api/usage/route.ts": {
@@ -635,13 +635,13 @@
     "semantic_hash": ""
   },
   "src/components/views/dashboard-view.tsx": {
-    "mtime": 1787235594.3423557,
-    "ast_hash": "a21597da64b3a0dd016feb95dd9263b0",
+    "mtime": 1787344815.2787492,
+    "ast_hash": "608be092f999fc0dcd29f374d4652d5f",
     "semantic_hash": ""
   },
   "src/components/views/dataset-detail-view.tsx": {
-    "mtime": 1787113412.0,
-    "ast_hash": "218a706c44c5650fed92ec30044b03b7",
+    "mtime": 1787347051.4972994,
+    "ast_hash": "8398b718149046f4970a3720979d10f5",
     "semantic_hash": ""
   },
   "src/components/views/datasets-view.tsx": {
@@ -690,8 +690,8 @@
     "semantic_hash": ""
   },
   "src/components/views/sources-view.tsx": {
-    "mtime": 1787236340.7368336,
-    "ast_hash": "3b6b3d56bd9d51707608b3e4b8dc73fc",
+    "mtime": 1787347588.5247192,
+    "ast_hash": "17f5f1dbeae60822e7dedcf2527c0a09",
     "semantic_hash": ""
   },
   "src/components/views/usage-view.tsx": {
@@ -730,8 +730,8 @@
     "semantic_hash": ""
   },
   "src/lib/db.ts": {
-    "mtime": 1787319012.85659,
-    "ast_hash": "c8e91b6766a4b2cc974ead2fb67659dd",
+    "mtime": 1787346919.1268108,
+    "ast_hash": "1cfc576c730f5c74787cac2810065817",
     "semantic_hash": ""
   },
   "src/lib/extraction.ts": {
@@ -750,8 +750,8 @@
     "semantic_hash": ""
   },
   "src/lib/job-runner.ts": {
-    "mtime": 1787234713.8972335,
-    "ast_hash": "5034726226ec4807946bb4cbb841b91f",
+    "mtime": 1787346881.919682,
+    "ast_hash": "633abbc6b97fb4568772ed06b8ee3bbc",
     "semantic_hash": ""
   },
   "src/lib/serialize.ts": {
@@ -997,6 +997,31 @@
   "README.md": {
     "mtime": 1787342395.3277702,
     "ast_hash": "bfc528bb25d07c4640e1ba48db81cda5",
+    "semantic_hash": ""
+  },
+  "src/app/api/sources/[id]/default-dataset/route.ts": {
+    "mtime": 1787347218.6580386,
+    "ast_hash": "a10a6e7cf5a90335de1a6abc76cdf933",
+    "semantic_hash": ""
+  },
+  "src/app/api/sources/[id]/extract/route.ts": {
+    "mtime": 1787346902.7822068,
+    "ast_hash": "a3773a94bed07dab858b3b51008d7c42",
+    "semantic_hash": ""
+  },
+  "src/lib/dataset-provisioner.ts": {
+    "mtime": 1787346653.6697593,
+    "ast_hash": "d61b018288dd9020d51b6e748638037a",
+    "semantic_hash": ""
+  },
+  "src/lib/default-schema.ts": {
+    "mtime": 1787346601.4948049,
+    "ast_hash": "7d3e8b53af2b00303bfd932cefc79b8c",
+    "semantic_hash": ""
+  },
+  "src/lib/email-parser.ts": {
+    "mtime": 1787346627.9621334,
+    "ast_hash": "6d92a01999675fbe9f49b16a5383bf18",
     "semantic_hash": ""
   }
 }

@@ -24,6 +24,8 @@ export async function POST(
         { status: 404 }
       );
     }
+    // Note: Dataset is no longer required — ensureDefaultDataset is called
+    // automatically during DETERMINISTIC_SYNC after the scan completes.
     const body = await req.json().catch(() => ({}));
     const mode = body?.mode === "historical" ? "historical" : "incremental";
 

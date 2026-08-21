@@ -20,8 +20,7 @@ if (
   typeof window === "undefined" &&
   process.env.npm_lifecycle_event !== "build" &&
   !process.env.NEXT_PHASE?.includes("build") &&
-  process.env.NODE_ENV !== "test" &&
-  process.env.NODE_ENV !== "development" // <-- Disable in local dev!
+  process.env.NODE_ENV !== "test"
 ) {
   // Only run on the server side, but not during build
   import("./job-runner")

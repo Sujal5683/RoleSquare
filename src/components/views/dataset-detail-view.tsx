@@ -98,7 +98,11 @@ import {
   Hash,
   Bookmark,
   Upload,
+  Sparkles,
+  Zap,
 } from "lucide-react";
+import type { SchemaDTO } from "@/lib/types";
+
 
 // ── Helpers ──────────────────────────────────────────────────────────────
 
@@ -228,6 +232,10 @@ export function DatasetDetailView() {
   const [importDialog, setImportDialog] = useState(false);
   const [importData, setImportData] = useState("");
   const [importFormat, setImportFormat] = useState<"csv" | "json">("csv");
+  const [extractDialog, setExtractDialog] = useState(false);
+  const [extractSchemaId, setExtractSchemaId] = useState("");
+  const [extractDatasetName, setExtractDatasetName] = useState("");
+
 
   // Persist saved views to localStorage whenever they change
   const persistSavedViews = (views: typeof savedViews) => {
@@ -336,6 +344,37 @@ export function DatasetDetailView() {
       toast.error("Export failed", { description: msg });
     },
   });
+
+  // ── Schemas for AI extraction dialog ─────────────────────────────────
+  const { data: schemas } = useQuery({
+    queryKey: ["schemas"],
+    queryFn: () => api.get<SchemaDTO[]>("/api/schemas"),
+    enabled: !!dataset?.isDefault,
+  });
+
+  // ── AI Extraction (Default Dataset → Custom Dataset) ─────────────────
+  const extractMutation = useMutation({
+    mutationFn: (vars: { schemaId: string; datasetName: string }) =>
+      api.post<{ jobId: string; targetDatasetId: string }>(
+        `/api/sources/${dataset?.sourceId}/extract`,
+        { schemaId: vars.schemaId, datasetName: vars.datasetName }
+      ),
+    onSuccess: (res) => {
+      toast.success("AI extraction queued", {
+        description: `Job ${res.jobId.slice(0, 8)} created. Records will appear in the new dataset shortly.`,
+      });
+      queryClient.invalidateQueries({ queryKey: ["datasets"] });
+      queryClient.invalidateQueries({ queryKey: ["ai-jobs"] });
+      setExtractDialog(false);
+      setExtractSchemaId("");
+      setExtractDatasetName("");
+    },
+    onError: (err: unknown) => {
+      const msg = err instanceof Error ? err.message : "Extraction failed";
+      toast.error("Extraction failed", { description: msg });
+    },
+  });
+
 
   // ── Import mutation (CSV/JSON) ───────────────────────────────────────
   const importMutation = useMutation({
@@ -602,6 +641,20 @@ export function DatasetDetailView() {
                 <Upload className="mr-1.5 h-3.5 w-3.5" />
                 Import
               </Button>
+
+              {/* AI Extract button — only shown for Default Datasets */}
+              {dataset?.isDefault && (
+                <Button
+                  size="sm"
+                  className="gap-1.5 bg-gradient-to-r from-violet-600 to-indigo-600 text-white hover:from-violet-700 hover:to-indigo-700 shadow-sm"
+                  onClick={() => setExtractDialog(true)}
+                  title="Run AI extraction from this Default Dataset into a new Custom Dataset"
+                >
+                  <Zap className="h-3.5 w-3.5" />
+                  Extract Custom Fields (AI)
+                </Button>
+              )}
+
               <Popover>
               <PopoverTrigger asChild>
                 <Button variant="outline" size="sm" className="shrink-0">
@@ -989,9 +1042,35 @@ export function DatasetDetailView() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* AI Extraction Dialog */}
+      {dataset?.isDefault && (
+        <AiExtractDialog
+          open={extractDialog}
+          datasetName={dataset?.name ?? ""}
+          schemas={schemas ?? []}
+          schemaId={extractSchemaId}
+          onSchemaChange={setExtractSchemaId}
+          newDatasetName={extractDatasetName}
+          onDatasetNameChange={setExtractDatasetName}
+          onConfirm={() => {
+            if (!extractSchemaId) {
+              toast.error("Select a schema first");
+              return;
+            }
+            extractMutation.mutate({
+              schemaId: extractSchemaId,
+              datasetName: extractDatasetName.trim() || undefined as unknown as string,
+            });
+          }}
+          loading={extractMutation.isPending}
+          onClose={() => setExtractDialog(false)}
+        />
+      )}
     </div>
   );
 }
+
 
 // ── Top bar ──────────────────────────────────────────────────────────────
 

@@ -125,6 +125,7 @@ export function SourcesView() {
   const [statusFilter, setStatusFilter] = useState<"all" | SourceStatus>("all");
   const [runsDialogSource, setRunsDialogSource] = useState<SourceDTO | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<SourceDTO | null>(null);
+
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   const { data: sources, isLoading, isError, refetch, isFetching } = useQuery({
@@ -479,9 +480,10 @@ export function SourcesView() {
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() =>
-                        bulkScanMutation.mutate(Array.from(selectedIds))
-                      }
+                      onClick={() => {
+                        if (selectedIds.size === 0) return;
+                        bulkScanMutation.mutate(Array.from(selectedIds));
+                      }}
                       disabled={bulkScanMutation.isPending}
                     >
                       <Play className="mr-1.5 h-3 w-3" />
@@ -653,9 +655,7 @@ export function SourcesView() {
                             <Button
                               variant="outline"
                               size="sm"
-                              onClick={() =>
-                                scanMutation.mutate(s.id)
-                              }
+                              onClick={() => scanMutation.mutate(s.id)}
                               disabled={isBusy || scanMutation.isPending}
                               title="Trigger incremental scan"
                             >
@@ -878,6 +878,8 @@ export function SourcesView() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+
     </div>
   );
 }
