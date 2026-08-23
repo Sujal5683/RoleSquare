@@ -1,82 +1,82 @@
-# Graph Report - CDS IIT JMU  (2026-08-22)
+# Graph Report - CDS IIT JMU  (2026-08-23)
 
 ## Corpus Check
-- 193 files · ~176,651 words
+- 197 files · ~177,486 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 1538 nodes · 3775 edges · 164 communities (86 shown, 78 thin omitted)
-- Extraction: 99% EXTRACTED · 1% INFERRED · 0% AMBIGUOUS · INFERRED: 27 edges (avg confidence: 0.76)
+- 1560 nodes · 3847 edges · 169 communities (90 shown, 79 thin omitted)
+- Extraction: 99% EXTRACTED · 1% INFERRED · 0% AMBIGUOUS · INFERRED: 27 edges (avg confidence: 0.85)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `1372b088`
+- Built from commit: `a62cba7d`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
 ## Community Hubs (Navigation)
 - cn
-- dataset-detail-view.tsx
+- lib/types.ts
 - sidebar.tsx
-- members-view.tsx
-- sharing-view.tsx
+- menubar.tsx
+- ai-studio-view.tsx
 - job-runner.ts
 - auth.ts
 - use-toast.ts
-- authErrorResponse
+- AuthError
 - Workspace Intelligence Platform — Complete SaaS Ar.md
 - devDependencies
 - compilerOptions
-- dashboard-view.tsx
-- ai-studio-view.tsx
-- db.ts
-- serialize.ts
-- page.tsx
-- schema-builder-view.tsx
-- settings-view.tsx
-- logAudit
-- react
 - source-builder-view.tsx
+- context-menu.tsx
+- extraction/route.ts
+- dashboard/route.ts
+- app-shell.tsx
+- members-view.tsx
+- settings-view.tsx
+- authErrorResponse
+- chart.tsx
+- google-client.ts
 - Functional Scope
 - components.json
-- audit-view.tsx
+- assistant-panel.tsx
 - Workspace Intelligence Platform
-- dependencies
+- cmdk
 - 15-Prompt Build Sequence
 - Workspace Intelligence Platform — Worklog
-- route.ts
+- serialize.ts
 - command-palette.tsx
 - carousel.tsx
 - Core Tables
-- route.ts
-- audit.ts
-- pagination.tsx
+- README.md
+- db.ts
+- google-auth.ts
 - UI/UX Specifications
-- AuthError
+- chat/route.ts
 - form.tsx
 - API Architecture
 - Work Log
-- drawer.tsx
+- gemini.ts
 - Completed Modifications
-- navigation-menu.tsx
-- formatValueCompact
+- drawer.tsx
+- dataset-detail-view.tsx
 - Completed Modifications
 - Cron Review Phase 2 — Global Search + Bulk Actions + Saved Views
 - Cron Review Phase 3 — Usage Dashboard + Clone + Import + Animations
 - Phase 1-9 Audit + Hardening
-- server.ts
+- websocket/server.ts
 - Cron Review Phase 4 — Activity Feed + Confidence Thresholds + Webhooks
-- breadcrumb.tsx
+- Supabase Schema Blueprint
 - Workspace Intelligence Platform — Complete SaaS Architecture \& Build Blueprint
 - toggle-group.tsx
 - dev.sh
 - Task 12-14 — Frontend View Builder (Orgs / Members / Sharing / Audit / Settings)
 - Task 8-10 — Frontend View Builder (Sources / Source Builder / Schema Builder)
-- page.tsx
-- formatDateTime
-- Project Status (Initial)
+- export/route.ts
+- relativeTime
+- dropdown-menu.tsx
 - Cron Review Phase — QA + Feature Additions
-- accordion.tsx
+- AGENTS.md
 - alert.tsx
 - middleware.ts
 - Personas
@@ -86,11 +86,11 @@
 - Security Architecture
 - Product Requirements Document
 - Production Roadmap
-- python-runtime-build.sh
+- .zscripts/python-runtime-build.sh
 - eslint.config.mjs
 - createClient
 - hover-card.tsx
-- database-runtime-build.sh
+- tests/database-runtime-build.sh
 - Coding Standards
 - AI Architecture
 - Backend Architecture
@@ -101,16 +101,17 @@
 - Workspace Intelligence Platform
 - mini-services-start.sh
 - test-db.js
-- Queue Architecture
+- date-fns
 - build.sh
 - mini-services-build.sh
 - mini-services-install.sh
-- start.sh
+- navigation-menu.tsx
 - class-variance-authority
 - clsx
-- @dnd-kit/core
+- Task 12-14 — Frontend View Builder (Organizations / Members / Sharing / Audit / Settings)
+- dependencies
 - @dnd-kit/sortable
-- @dnd-kit/utilities
+- test-query.ts
 - framer-motion
 - googleapis
 - @hookform/resolvers
@@ -119,11 +120,11 @@
 - next
 - next-auth
 - next.config.ts
-- next-intl
+- embla-carousel-react
 - next-themes
 - pg
 - prisma
-- @prisma/client
+- @google/generative-ai
 - @radix-ui/react-accordion
 - @radix-ui/react-alert-dialog
 - @radix-ui/react-aspect-ratio
@@ -140,7 +141,7 @@
 - @radix-ui/react-popover
 - @radix-ui/react-progress
 - @radix-ui/react-radio-group
-- @radix-ui/react-scroll-area
+- input-otp
 - @radix-ui/react-separator
 - @radix-ui/react-slot
 - @radix-ui/react-switch
@@ -156,77 +157,80 @@
 - @reactuses/core
 - recharts
 - sharp
-- sonner
+- @radix-ui/react-select
 - @supabase/ssr
-- tailwind-merge
+- @radix-ui/react-slider
 - tailwindcss-animate
 - @tanstack/react-query
 - @tanstack/react-table
 - uuid
-- vaul
+- react
 - z-ai-web-dev-sdk
 - zod
 - zustand
 - postcss.config.mjs
-- test-db.js
+- scratch/test-db.js
 - tailwind.config.ts
-- python-runtime-build.sh
+- tests/python-runtime-build.sh
 - python-runtime-container.sh
 - AI Development Prompt Pack
-- database-runtime-build.sh
+- .zscripts/database-runtime-build.sh
+- react-day-picker
+- react-markdown
+- @supabase/supabase-js
 
 ## God Nodes (most connected - your core abstractions)
-1. `cn()` - 241 edges
+1. `cn()` - 247 edges
 2. `authErrorResponse()` - 119 edges
 3. `requireOrgContext()` - 108 edges
 4. `logAudit()` - 86 edges
-5. `AuthError` - 49 edges
-6. `useAppStore` - 41 edges
-7. `Workspace Intelligence Platform` - 32 edges
-8. `Button()` - 26 edges
-9. `getCurrentUser()` - 21 edges
-10. `Functional Scope` - 20 edges
+5. `db` - 59 edges
+6. `AuthError` - 49 edges
+7. `useAppStore` - 42 edges
+8. `Workspace Intelligence Platform` - 32 edges
+9. `Button()` - 26 edges
+10. `getCurrentUser()` - 21 edges
 
 ## Surprising Connections (you probably didn't know these)
-- `CalendarDayButton()` --references--> `react`  [EXTRACTED]
-  src/components/ui/calendar.tsx → package.json
-- `Carousel()` --references--> `react`  [EXTRACTED]
-  src/components/ui/carousel.tsx → package.json
-- `useCarousel()` --references--> `react`  [EXTRACTED]
-  src/components/ui/carousel.tsx → package.json
-- `FormItem()` --references--> `react`  [EXTRACTED]
-  src/components/ui/form.tsx → package.json
-- `useFormField()` --references--> `react`  [EXTRACTED]
-  src/components/ui/form.tsx → package.json
+- `main()` --calls--> `extractWithLLM()`  [EXTRACTED]
+  test-extract.ts → src/lib/extraction.ts
+- `run()` --calls--> `callGeminiWithFallback()`  [EXTRACTED]
+  test-gemini.mjs → src/lib/gemini.ts
+- `run()` --calls--> `callGeminiWithFallback()`  [EXTRACTED]
+  test-gemini.ts → src/lib/gemini.ts
+- `main()` --calls--> `getGmailClient()`  [EXTRACTED]
+  test-google-hang.ts → src/lib/google-client.ts
+- `GET()` --indirect_call--> `serializeGoogleConnection()`  [INFERRED]
+  src/app/api/dashboard/route.ts → src/lib/serialize.ts
 
 ## Import Cycles
 - None detected.
 
-## Communities (164 total, 78 thin omitted)
+## Communities (169 total, 79 thin omitted)
 
 ### Community 0 - "cn"
 Cohesion: 0.06
-Nodes (41): AccordionContent(), AccordionItem(), AccordionTrigger(), AlertDialogOverlay(), BreadcrumbEllipsis(), BreadcrumbItem(), BreadcrumbLink(), BreadcrumbList() (+33 more)
+Nodes (36): AccordionContent(), AccordionItem(), AccordionTrigger(), AlertDialogOverlay(), BreadcrumbEllipsis(), BreadcrumbItem(), BreadcrumbLink(), BreadcrumbList() (+28 more)
 
-### Community 1 - "dataset-detail-view.tsx"
-Cohesion: 0.06
-Nodes (35): CONNECTION_STATUS_LABELS, FieldTypeBadge(), fieldTypeColor, JOB_STATUS_LABELS, jobTypeColor, PlanBadge(), RECORD_STATUS_LABELS, RoleBadge() (+27 more)
+### Community 1 - "lib/types.ts"
+Cohesion: 0.07
+Nodes (34): CONNECTION_STATUS_LABELS, FieldTypeBadge(), fieldTypeColor, JOB_STATUS_LABELS, jobTypeColor, RECORD_STATUS_LABELS, RoleBadge(), RUN_STATE_LABELS (+26 more)
 
 ### Community 2 - "sidebar.tsx"
 Cohesion: 0.06
-Nodes (38): Sheet(), SheetContent(), SheetDescription(), SheetFooter(), SheetHeader(), SheetOverlay(), SheetTitle(), SheetTrigger() (+30 more)
+Nodes (41): Sheet(), SheetContent(), SheetDescription(), SheetFooter(), SheetHeader(), SheetOverlay(), SheetTitle(), SheetTrigger() (+33 more)
 
-### Community 3 - "members-view.tsx"
+### Community 3 - "menubar.tsx"
 Cohesion: 0.12
 Nodes (11): Menubar(), MenubarCheckboxItem(), MenubarContent(), MenubarItem(), MenubarLabel(), MenubarRadioItem(), MenubarSeparator(), MenubarShortcut() (+3 more)
 
-### Community 4 - "sharing-view.tsx"
-Cohesion: 0.13
-Nodes (24): Badge(), badgeVariants, Card(), Table(), TableBody(), TableCell(), TableHead(), TableHeader() (+16 more)
+### Community 4 - "ai-studio-view.tsx"
+Cohesion: 0.12
+Nodes (25): Badge(), badgeVariants, CardContent(), Table(), TableBody(), TableCell(), TableHead(), TableHeader() (+17 more)
 
 ### Community 5 - "job-runner.ts"
-Cohesion: 0.08
-Nodes (46): GET(), GET(), ensureDefaultDataset(), writeDefaultDatasetRecord(), DEFAULT_FIELDS, ensureDefaultSchema(), buildAttachmentSummary(), categoriseLinks() (+38 more)
+Cohesion: 0.20
+Nodes (16): ensureDefaultDataset(), writeDefaultDatasetRecord(), extractWithLLM(), globalForRunner, isRetryableError(), pickNextJob(), processAiExtraction(), processDeterministicSync() (+8 more)
 
 ### Community 6 - "auth.ts"
 Cohesion: 0.10
@@ -236,9 +240,9 @@ Nodes (29): PATCH(), POST(), ROLE_LEVEL, verifyOrgAccess(), DELETE(), PATCH(), R
 Cohesion: 0.08
 Nodes (31): geistMono, geistSans, metadata, getQueryClient(), makeQueryClient(), Providers(), Toaster(), Toast (+23 more)
 
-### Community 8 - "authErrorResponse"
-Cohesion: 0.14
-Nodes (27): DELETE(), GET(), requireDataset(), DELETE(), PATCH(), requireConnection(), GET(), POST() (+19 more)
+### Community 8 - "AuthError"
+Cohesion: 0.27
+Nodes (9): GET(), DELETE(), PATCH(), requireConnection(), GET(), POST(), AuthError, buildGoogleOAuthUrl() (+1 more)
 
 ### Community 9 - "Workspace Intelligence Platform — Complete SaaS Ar.md"
 Cohesion: 0.06
@@ -249,48 +253,48 @@ Cohesion: 0.06
 Nodes (31): bun-types, eslint, eslint-config-next, devDependencies, bun-types, eslint, eslint-config-next, tailwindcss (+23 more)
 
 ### Community 11 - "compilerOptions"
-Cohesion: 0.06
-Nodes (30): dom, dom.iterable, esnext, .next/dev/types/**/*.ts, next-env.d.ts, .next/types/**/*.ts, node_modules, ./src/* (+22 more)
+Cohesion: 0.07
+Nodes (28): dom, dom.iterable, esnext, .next/dev/types/**/*.ts, next-env.d.ts, .next/types/**/*.ts, node_modules, **/*.ts (+20 more)
 
-### Community 12 - "dashboard-view.tsx"
-Cohesion: 0.10
-Nodes (31): Message, User, Button(), CardContent(), CardDescription(), CardHeader(), CardTitle(), EmptyState() (+23 more)
+### Community 12 - "source-builder-view.tsx"
+Cohesion: 0.08
+Nodes (30): Message, User, Card(), CardDescription(), CardHeader(), CardTitle(), Input(), Label() (+22 more)
 
-### Community 13 - "ai-studio-view.tsx"
+### Community 13 - "context-menu.tsx"
 Cohesion: 0.12
 Nodes (9): ContextMenuCheckboxItem(), ContextMenuContent(), ContextMenuItem(), ContextMenuLabel(), ContextMenuRadioItem(), ContextMenuSeparator(), ContextMenuShortcut(), ContextMenuSubContent() (+1 more)
 
-### Community 14 - "db.ts"
-Cohesion: 0.13
-Nodes (22): csvEscape(), POST(), POST(), GET(), POST(), POST(), GET(), POST() (+14 more)
+### Community 14 - "extraction/route.ts"
+Cohesion: 0.22
+Nodes (14): POST(), POST(), ROLE_LEVEL, GET(), POST(), requireSource(), POST(), flagFieldsForReview() (+6 more)
 
-### Community 15 - "serialize.ts"
+### Community 15 - "dashboard/route.ts"
 Cohesion: 0.28
 Nodes (15): GET(), GET(), loadSchemaFields(), PATCH(), requireRecord(), GET(), POST(), requireDataset() (+7 more)
 
-### Community 16 - "page.tsx"
-Cohesion: 0.07
-Nodes (40): Home(), NAV_ITEMS, NavItem, AssistantButton(), Avatar(), AvatarFallback(), AvatarImage(), AiStudioView() (+32 more)
+### Community 16 - "app-shell.tsx"
+Cohesion: 0.05
+Nodes (58): LoginPageContent(), Mode, Home(), AppShell(), NAV_ITEMS, NavItem, AssistantButton(), KeyboardShortcutsDialog() (+50 more)
 
-### Community 17 - "schema-builder-view.tsx"
-Cohesion: 0.12
-Nodes (38): AlertDialog(), AlertDialogAction(), AlertDialogCancel(), AlertDialogContent(), AlertDialogDescription(), AlertDialogFooter(), AlertDialogHeader(), AlertDialogTitle() (+30 more)
+### Community 17 - "members-view.tsx"
+Cohesion: 0.11
+Nodes (39): AlertDialog(), AlertDialogAction(), AlertDialogCancel(), AlertDialogContent(), AlertDialogDescription(), AlertDialogFooter(), AlertDialogHeader(), AlertDialogTitle() (+31 more)
 
 ### Community 18 - "settings-view.tsx"
-Cohesion: 0.12
-Nodes (20): Switch(), OutgoingInvites(), BillingSection(), ConnectedAccountsSection(), initials(), IntegrationDef, IntegrationsSection(), NOTIFICATION_PREFS (+12 more)
-
-### Community 19 - "logAudit"
-Cohesion: 0.17
-Nodes (19): POST(), POST(), DELETE(), PATCH(), requireField(), POST(), PUT(), requireSchema() (+11 more)
-
-### Community 20 - "react"
 Cohesion: 0.11
-Nodes (18): react, react, ChartConfig, ChartContainer(), ChartContext, ChartContextProps, ChartLegendContent(), ChartTooltipContent() (+10 more)
+Nodes (20): Switch(), OutgoingInvites(), BillingSection(), ConnectAccountDialog(), ConnectedAccountsSection(), initials(), IntegrationDef, IntegrationsSection() (+12 more)
 
-### Community 21 - "source-builder-view.tsx"
-Cohesion: 0.11
-Nodes (20): KeyboardShortcutsDialog(), Shortcut, SHORTCUTS, Separator(), Textarea(), EMPTY_FORM, FILTER_TYPES, makeLocalId() (+12 more)
+### Community 19 - "authErrorResponse"
+Cohesion: 0.13
+Nodes (43): POST(), DELETE(), GET(), requireDataset(), POST(), DELETE(), PATCH(), requireField() (+35 more)
+
+### Community 20 - "chart.tsx"
+Cohesion: 0.25
+Nodes (9): ChartConfig, ChartContainer(), ChartContext, ChartContextProps, ChartLegendContent(), ChartTooltipContent(), getPayloadConfigFromPayload(), THEMES (+1 more)
+
+### Community 21 - "google-client.ts"
+Cohesion: 0.21
+Nodes (15): buildAttachmentSummary(), categoriseLinks(), ParsedEmailFields, parseEmailFields(), SIG_PATTERNS, splitSignature(), decodeBase64Url(), extractAttachments() (+7 more)
 
 ### Community 22 - "Functional Scope"
 Cohesion: 0.10
@@ -300,17 +304,13 @@ Nodes (20): AI Agents, AI Extraction System, AI Output Contract, AI Resource Bun
 Cohesion: 0.11
 Nodes (17): aliases, components, hooks, lib, ui, utils, iconLibrary, rsc (+9 more)
 
-### Community 24 - "audit-view.tsx"
-Cohesion: 0.14
+### Community 24 - "assistant-panel.tsx"
+Cohesion: 0.12
 Nodes (15): AssistantPanel(), formatTime(), MessageBubble(), Message, QuickChip, extractChips(), generateId(), STARTER_PROMPTS (+7 more)
 
 ### Community 25 - "Workspace Intelligence Platform"
 Cohesion: 0.10
 Nodes (21): Architectural Principles, BullMQ Queues, CI/CD, Complete Product Requirements and Production Architecture Document, DevOps Architecture, Final Architecture Recommendations, Folder Structure, High-Level Architecture (+13 more)
-
-### Community 26 - "dependencies"
-Cohesion: 0.12
-Nodes (17): cmdk, embla-carousel-react, input-otp, dependencies, cmdk, embla-carousel-react, input-otp, @radix-ui/react-select (+9 more)
 
 ### Community 27 - "15-Prompt Build Sequence"
 Cohesion: 0.12
@@ -318,43 +318,43 @@ Nodes (16): 15-Prompt Build Sequence, Prompt 10 — Implement Organization, Shar
 
 ### Community 28 - "Workspace Intelligence Platform — Worklog"
 Cohesion: 0.12
-Nodes (15): Files Created, Key Decisions, Stage Summary, Stage Summary, Stage Summary, Task 12-14 — Frontend View Builder (Organizations / Members / Sharing / Audit / Settings), Task 4 — Backend API Routes, Task 8-10 — Sources, Source Builder & Schema Builder Views (+7 more)
+Nodes (16): Architectural Boundaries (Preserved from Plan), Core Entities (from plan, adapted to Prisma), Environment Adaptation, Evidence Rule (Hard Requirement), Pages / Views (all on `/` via Zustand switcher), Project Status (Initial), Stage Summary, Stage Summary (+8 more)
 
-### Community 29 - "route.ts"
-Cohesion: 0.20
-Nodes (16): GET(), loadFieldForValue(), PATCH(), requireValue(), GET(), PUT(), requireSource(), GET() (+8 more)
+### Community 29 - "serialize.ts"
+Cohesion: 0.15
+Nodes (20): POST(), POST(), GET(), GET(), GET(), loadFieldForValue(), PATCH(), requireValue() (+12 more)
 
 ### Community 30 - "command-palette.tsx"
-Cohesion: 0.21
-Nodes (14): CommandAction, CommandPalette(), SearchResults, timeAgo(), Command(), CommandDialog(), CommandEmpty(), CommandGroup() (+6 more)
+Cohesion: 0.12
+Nodes (23): CommandAction, CommandPalette(), SearchResults, timeAgo(), Shortcut, SHORTCUTS, Command(), CommandDialog() (+15 more)
 
 ### Community 31 - "carousel.tsx"
-Cohesion: 0.20
+Cohesion: 0.19
 Nodes (13): Carousel(), CarouselApi, CarouselContent(), CarouselContext, CarouselContextProps, CarouselItem(), CarouselNext(), CarouselOptions (+5 more)
 
 ### Community 32 - "Core Tables"
 Cohesion: 0.14
 Nodes (14): AI Extraction and Validation, Core Tables, Database Architecture, Datasets, Design Principles, Documents and Indexing, Drive and Linked Resources, Gmail and Email (+6 more)
 
-### Community 33 - "route.ts"
+### Community 33 - "README.md"
 Cohesion: 0.25
 Nodes (7): Description, Example, Install:, Name, nextjs_tailwind_shadcn_ts, Synopsis, Test:
 
-### Community 34 - "audit.ts"
-Cohesion: 0.33
-Nodes (8): POST(), DELETE(), GET(), loadSourceInOrg(), PATCH(), GET(), POST(), serializeSource()
+### Community 34 - "db.ts"
+Cohesion: 0.17
+Nodes (11): GET(), GET(), POST(), GET(), JOB_TYPE_COLORS, ensureOrgDefaultDataset(), db, globalForPrisma (+3 more)
 
-### Community 35 - "pagination.tsx"
-Cohesion: 0.19
-Nodes (10): buttonVariants, Calendar(), CalendarDayButton(), Pagination(), PaginationContent(), PaginationEllipsis(), PaginationLink(), PaginationLinkProps (+2 more)
+### Community 35 - "google-auth.ts"
+Cohesion: 0.25
+Nodes (13): GET(), decodeOAuthState(), decryptToken(), encryptToken(), exchangeCodeForTokens(), getEncryptionKey(), OAUTH_SCOPES, OAuthState (+5 more)
 
 ### Community 36 - "UI/UX Specifications"
 Cohesion: 0.15
 Nodes (13): AI Studio, Dashboard, Dataset Detail, Dataset Explorer, Landing Page, Layout System, Organizations and Members, Schema Builder (+5 more)
 
-### Community 37 - "AuthError"
-Cohesion: 0.29
-Nodes (7): POST(), POST(), GET(), GET(), AuthError, serializeAiJob(), serializeAiOutput()
+### Community 37 - "chat/route.ts"
+Cohesion: 0.19
+Nodes (11): AppContext, buildSystemPrompt(), ChatMessage, executeTool(), parseToolCall(), POST(), ExtractOptions, FieldReviewFlag (+3 more)
 
 ### Community 38 - "form.tsx"
 Cohesion: 0.23
@@ -368,21 +368,21 @@ Nodes (12): AI and Job APIs, API Architecture, API Design Principles, Authentica
 Cohesion: 0.18
 Nodes (10): 1. Read context, 2. Shared backend helpers (`src/lib/`), 3. API routes (`src/app/api/`), 4. Lint + typecheck, 5. Live verification against dev server, 6. Type-system notes / gotchas, Stage Summary, Task (+2 more)
 
-### Community 41 - "drawer.tsx"
-Cohesion: 0.10
-Nodes (29): @google/generative-ai, @google/generative-ai, GET(), AppContext, buildSystemPrompt(), ChatMessage, executeTool(), parseToolCall() (+21 more)
+### Community 41 - "gemini.ts"
+Cohesion: 0.17
+Nodes (16): GET(), callGeminiWithFallback(), GeminiCallOptions, GeminiMessage, GeminiResult, getModelChainStatus(), getState(), isBlocked() (+8 more)
 
 ### Community 42 - "Completed Modifications"
 Cohesion: 0.18
 Nodes (11): 1. Confidence Threshold Slider in Schema Builder — NEW, 2. Original AI Value Display in Evidence Drawer — NEW, 3. Health Endpoint — NEW, 4. Webhook Event Wiring — ENHANCED, 5. Review Flags in AI Studio Test Sandbox — NEW, Completed Modifications, Cron Review Phase — Confidence Threshold UI + Evidence Display + Health + Webhooks, Current Project Status Assessment (+3 more)
 
-### Community 43 - "navigation-menu.tsx"
+### Community 43 - "drawer.tsx"
 Cohesion: 0.18
 Nodes (6): DrawerContent(), DrawerDescription(), DrawerFooter(), DrawerHeader(), DrawerOverlay(), DrawerTitle()
 
-### Community 44 - "formatValueCompact"
-Cohesion: 0.13
-Nodes (22): Notification, NotificationsDropdown(), timeAgo(), Checkbox(), Popover(), PopoverContent(), PopoverTrigger(), StatusBadge() (+14 more)
+### Community 44 - "dataset-detail-view.tsx"
+Cohesion: 0.11
+Nodes (23): Notification, NotificationsDropdown(), timeAgo(), Checkbox(), Popover(), PopoverContent(), PopoverTrigger(), Slider() (+15 more)
 
 ### Community 45 - "Completed Modifications"
 Cohesion: 0.20
@@ -400,7 +400,7 @@ Nodes (10): 1. Usage & Billing Dashboard — NEW VIEW, 2. Clone Actions — NEW,
 Cohesion: 0.20
 Nodes (10): Phase 1-9 Audit + Hardening, Phase 1 — Repository Audit (Complete), Phase 3 — Authorization + Tenant Isolation (Complete), Phase 5 — Job System + State Machine (Complete), Phase 6 — Webhook Event Dispatcher (Complete), Phase 7 — Schema Field Confidence Threshold (Complete), Phase 8 — Evidence Preservation (Complete), Recommended Next Steps (Priority Order) (+2 more)
 
-### Community 49 - "server.ts"
+### Community 49 - "websocket/server.ts"
 Cohesion: 0.28
 Nodes (8): createSystemMessage(), createUserMessage(), generateMessageId(), httpServer, io, Message, User, users
 
@@ -408,7 +408,7 @@ Nodes (8): createSystemMessage(), createUserMessage(), generateMessageId(), http
 Cohesion: 0.22
 Nodes (9): 1. Activity Feed on Dashboard — NEW, 2. Per-Field Confidence Thresholds — NEW, 3. Webhook Configuration — NEW, Completed Modifications, Cron Review Phase 4 — Activity Feed + Confidence Thresholds + Webhooks, Current Project Status Assessment, Recommended Next Steps (Priority Order), Unresolved Issues / Risks (+1 more)
 
-### Community 51 - "breadcrumb.tsx"
+### Community 51 - "Supabase Schema Blueprint"
 Cohesion: 0.67
 Nodes (3): Example Column Design, Foundational Tables, Supabase Schema Blueprint
 
@@ -432,17 +432,17 @@ Nodes (5): Files Created, Key Decisions, Summary, Task 12-14 — Frontend View B
 Cohesion: 0.33
 Nodes (5): Files Created, Key Decisions, Task 8-10 — Frontend View Builder (Sources / Source Builder / Schema Builder), Verification, What Other Agents Should Know
 
-### Community 57 - "page.tsx"
-Cohesion: 0.38
-Nodes (4): LoginPageContent(), Mode, AppShell(), createClient()
+### Community 57 - "export/route.ts"
+Cohesion: 0.27
+Nodes (9): csvEscape(), POST(), GET(), POST(), GET(), serializeUsageMetric(), bumpUsageMetric(), currentMonthUsage() (+1 more)
 
-### Community 58 - "formatDateTime"
-Cohesion: 0.43
+### Community 58 - "relativeTime"
+Cohesion: 0.36
 Nodes (7): AgentLogsDialog(), AgentLogsTab(), ExtractionRunsTab(), formatDateTime(), JobDetailDialog(), ModelCostTab(), relativeTime()
 
-### Community 59 - "Project Status (Initial)"
-Cohesion: 0.33
-Nodes (6): Architectural Boundaries (Preserved from Plan), Core Entities (from plan, adapted to Prisma), Environment Adaptation, Evidence Rule (Hard Requirement), Pages / Views (all on `/` via Zustand switcher), Project Status (Initial)
+### Community 59 - "dropdown-menu.tsx"
+Cohesion: 0.18
+Nodes (6): DropdownMenuCheckboxItem(), DropdownMenuLabel(), DropdownMenuRadioItem(), DropdownMenuShortcut(), DropdownMenuSubContent(), DropdownMenuSubTrigger()
 
 ### Community 60 - "Cron Review Phase — QA + Feature Additions"
 Cohesion: 0.33
@@ -453,7 +453,7 @@ Cohesion: 0.50
 Nodes (4): Alert(), AlertDescription(), AlertTitle(), alertVariants
 
 ### Community 63 - "middleware.ts"
-Cohesion: 0.60
+Cohesion: 0.50
 Nodes (4): config, isPublicPath(), middleware(), PUBLIC_PATHS
 
 ### Community 64 - "Personas"
@@ -484,7 +484,7 @@ Nodes (5): Problem Statement, Product Requirements Document, Solution Statement,
 Cohesion: 0.40
 Nodes (5): Production Roadmap, Stage 1, Stage 2, Stage 3, Stage 4
 
-### Community 71 - "python-runtime-build.sh"
+### Community 71 - ".zscripts/python-runtime-build.sh"
 Cohesion: 0.80
 Nodes (4): has_python_sources(), install_pyproject(), install_requirements(), python-runtime-build.sh script
 
@@ -492,7 +492,7 @@ Nodes (4): has_python_sources(), install_pyproject(), install_requirements(), py
 Cohesion: 0.50
 Nodes (3): __dirname, eslintConfig, __filename
 
-### Community 76 - "database-runtime-build.sh"
+### Community 76 - "tests/database-runtime-build.sh"
 Cohesion: 0.50
 Nodes (3): DB_PUSH_CALLS, PATH, database-runtime-build.sh script
 
@@ -528,25 +528,41 @@ Nodes (4): Feature: Drive Discovery, Feature: Evidence Viewer, Feature: Gmail So
 Cohesion: 0.50
 Nodes (4): File Map, Platform Decision Summary, Requirements Index, Workspace Intelligence Platform
 
+### Community 85 - "mini-services-start.sh"
+Cohesion: 0.33
+Nodes (3): main(), mini-services-start.sh script, start.sh script
+
+### Community 92 - "navigation-menu.tsx"
+Cohesion: 0.22
+Nodes (9): NavigationMenu(), NavigationMenuContent(), NavigationMenuIndicator(), NavigationMenuItem(), NavigationMenuLink(), NavigationMenuList(), NavigationMenuTrigger(), navigationMenuTriggerStyle (+1 more)
+
+### Community 95 - "Task 12-14 — Frontend View Builder (Organizations / Members / Sharing / Audit / Settings)"
+Cohesion: 0.40
+Nodes (5): Files Created, Key Decisions, Task 12-14 — Frontend View Builder (Organizations / Members / Sharing / Audit / Settings), Verification, What Other Agents Should Know
+
+### Community 96 - "dependencies"
+Cohesion: 0.12
+Nodes (17): @dnd-kit/core, @dnd-kit/utilities, next-intl, dependencies, @dnd-kit/core, @dnd-kit/utilities, next-intl, @prisma/client (+9 more)
+
 ## Knowledge Gaps
-- **540 isolated node(s):** `build.sh script`, `NEXT_TELEMETRY_DISABLED`, `database-runtime-build.sh script`, `start.sh script`, `$schema` (+535 more)
+- **547 isolated node(s):** `build.sh script`, `NEXT_TELEMETRY_DISABLED`, `database-runtime-build.sh script`, `$schema`, `style` (+542 more)
   These have ≤1 connection - possible missing edges or undocumented components.
-- **78 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **79 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `cn()` connect `cn` to `dataset-detail-view.tsx`, `sidebar.tsx`, `members-view.tsx`, `sharing-view.tsx`, `use-toast.ts`, `dashboard-view.tsx`, `ai-studio-view.tsx`, `page.tsx`, `schema-builder-view.tsx`, `settings-view.tsx`, `react`, `source-builder-view.tsx`, `audit-view.tsx`, `command-palette.tsx`, `carousel.tsx`, `pagination.tsx`, `form.tsx`, `navigation-menu.tsx`, `formatValueCompact`, `toggle-group.tsx`, `page.tsx`, `alert.tsx`, `hover-card.tsx`?**
-  _High betweenness centrality (0.155) - this node is a cross-community bridge._
-- **Why does `dependencies` connect `dependencies` to `@radix-ui/react-scroll-area`, `@radix-ui/react-separator`, `@radix-ui/react-slot`, `@radix-ui/react-switch`, `@radix-ui/react-tabs`, `@radix-ui/react-toast`, `@radix-ui/react-toggle`, `@radix-ui/react-toggle-group`, `@radix-ui/react-tooltip`, `react-dom`, `devDependencies`, `react-hook-form`, `react-resizable-panels`, `react-syntax-highlighter`, `@reactuses/core`, `recharts`, `sharp`, `sonner`, `@supabase/ssr`, `tailwind-merge`, `react`, `tailwindcss-animate`, `@tanstack/react-query`, `@tanstack/react-table`, `uuid`, `vaul`, `z-ai-web-dev-sdk`, `zod`, `zustand`, `drawer.tsx`, `Queue Architecture`, `class-variance-authority`, `clsx`, `@dnd-kit/core`, `@dnd-kit/sortable`, `@dnd-kit/utilities`, `framer-motion`, `googleapis`, `@hookform/resolvers`, `lucide-react`, `@mdxeditor/editor`, `next`, `next-auth`, `next-intl`, `next-themes`, `pg`, `prisma`, `@prisma/client`, `@radix-ui/react-accordion`, `@radix-ui/react-alert-dialog`, `@radix-ui/react-aspect-ratio`, `@radix-ui/react-avatar`, `@radix-ui/react-checkbox`, `@radix-ui/react-collapsible`, `@radix-ui/react-context-menu`, `@radix-ui/react-dialog`, `@radix-ui/react-dropdown-menu`, `@radix-ui/react-hover-card`, `@radix-ui/react-label`, `@radix-ui/react-menubar`, `@radix-ui/react-navigation-menu`, `@radix-ui/react-popover`, `@radix-ui/react-progress`, `@radix-ui/react-radio-group`?**
-  _High betweenness centrality (0.144) - this node is a cross-community bridge._
-- **Why does `react` connect `react` to `sidebar.tsx`, `pagination.tsx`, `form.tsx`, `use-toast.ts`, `toggle-group.tsx`, `dependencies`, `carousel.tsx`?**
-  _High betweenness centrality (0.095) - this node is a cross-community bridge._
+- **Why does `cn()` connect `cn` to `lib/types.ts`, `sidebar.tsx`, `menubar.tsx`, `ai-studio-view.tsx`, `use-toast.ts`, `source-builder-view.tsx`, `context-menu.tsx`, `app-shell.tsx`, `members-view.tsx`, `settings-view.tsx`, `chart.tsx`, `assistant-panel.tsx`, `command-palette.tsx`, `carousel.tsx`, `form.tsx`, `drawer.tsx`, `dataset-detail-view.tsx`, `toggle-group.tsx`, `dropdown-menu.tsx`, `alert.tsx`, `hover-card.tsx`, `navigation-menu.tsx`?**
+  _High betweenness centrality (0.122) - this node is a cross-community bridge._
+- **Why does `Workspace Intelligence Platform` connect `Workspace Intelligence Platform` to `Workspace Intelligence Platform — Complete SaaS Ar.md`, `Functional Scope`, `Core Tables`, `UI/UX Specifications`, `API Architecture`, `Supabase Schema Blueprint`, `Personas`, `Wireframe Specifications`, `Development Roadmap`, `Frontend Architecture`, `Security Architecture`, `Product Requirements Document`, `Production Roadmap`, `Coding Standards`, `AI Architecture`, `Backend Architecture`, `User Flows`, `Deployment Architecture`, `RLS Architecture`, `Feature Specifications`?**
+  _High betweenness centrality (0.022) - this node is a cross-community bridge._
+- **Why does `authErrorResponse()` connect `authErrorResponse` to `db.ts`, `chat/route.ts`, `auth.ts`, `AuthError`, `extraction/route.ts`, `dashboard/route.ts`, `export/route.ts`, `serialize.ts`?**
+  _High betweenness centrality (0.015) - this node is a cross-community bridge._
 - **What connects `build.sh script`, `NEXT_TELEMETRY_DISABLED`, `database-runtime-build.sh script` to the rest of the system?**
-  _540 weakly-connected nodes found - possible documentation gaps or missing edges._
+  _547 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `cn` be split into smaller, more focused modules?**
-  _Cohesion score 0.05656565656565657 - nodes in this community are weakly interconnected._
-- **Should `dataset-detail-view.tsx` be split into smaller, more focused modules?**
-  _Cohesion score 0.06456456456456457 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.06294326241134751 - nodes in this community are weakly interconnected._
+- **Should `lib/types.ts` be split into smaller, more focused modules?**
+  _Cohesion score 0.06666666666666667 - nodes in this community are weakly interconnected._
 - **Should `sidebar.tsx` be split into smaller, more focused modules?**
-  _Cohesion score 0.0613107822410148 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.05673758865248227 - nodes in this community are weakly interconnected._

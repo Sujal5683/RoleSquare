@@ -61,6 +61,8 @@ export async function extractWithLLM(
 
   let raw = "";
   let tokensUsed = 0;
+  let promptTokens = 0;
+  let completionTokens = 0;
   let modelUsed = "unknown";
 
   try {
@@ -74,6 +76,8 @@ export async function extractWithLLM(
     );
     raw = result.text;
     tokensUsed = result.tokensUsed;
+    promptTokens = result.promptTokens;
+    completionTokens = result.completionTokens;
     modelUsed = result.modelUsed;
   } catch (err) {
     // All models exhausted — return an empty result so callers can still respond.
@@ -83,6 +87,8 @@ export async function extractWithLLM(
       modelUsed: "none",
       promptVersion: PROMPT_VERSION,
       tokensUsed: 0,
+      promptTokens: 0,
+      completionTokens: 0,
       overallConfidence: 0,
     };
   }
@@ -127,6 +133,8 @@ export async function extractWithLLM(
     modelUsed,
     promptVersion: PROMPT_VERSION,
     tokensUsed,
+    promptTokens,
+    completionTokens,
     overallConfidence,
   };
 }

@@ -86,7 +86,7 @@ export function UsageView() {
 
   if (isLoading) {
     return (
-      <div className="space-y-6">
+      <div className="space-y-4">
         <PageHeader title="Usage & Billing" description="Token consumption, costs, and quota trends." icon={<TrendingUp className="h-5 w-5" />} />
         <LoadingState rows={4} />
       </div>
@@ -95,7 +95,7 @@ export function UsageView() {
 
   if (!data) {
     return (
-      <div className="space-y-6">
+      <div className="space-y-4">
         <PageHeader title="Usage & Billing" description="Token consumption, costs, and quota trends." icon={<TrendingUp className="h-5 w-5" />} />
         <EmptyState title="No data" description="Usage data could not be loaded." />
       </div>
@@ -107,7 +107,7 @@ export function UsageView() {
   const fmtMoney = (n: number) => `$${n.toFixed(2)}`;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <PageHeader
         title="Usage & Billing"
         description="Track AI token consumption, extraction costs, and quota utilization across your organization."
@@ -279,7 +279,7 @@ export function UsageView() {
       </Card>
 
       {/* Job type distribution + Job status distribution */}
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="grid gap-4 lg:grid-cols-2">
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-base flex items-center gap-2">
@@ -383,7 +383,7 @@ export function UsageView() {
       </div>
 
       {/* Model usage table + Cost breakdown */}
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="grid gap-4 lg:grid-cols-2">
         {/* Model usage */}
         <Card>
           <CardHeader className="pb-3">
@@ -395,7 +395,7 @@ export function UsageView() {
           <CardContent className="p-0">
             <div className="divide-y">
               {data.modelUsage.length === 0 ? (
-                <div className="p-6">
+                <div className="p-4">
                   <EmptyState
                     icon={<Brain className="h-5 w-5" />}
                     title="No AI calls yet"
@@ -411,7 +411,8 @@ export function UsageView() {
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium font-mono truncate">{m.model}</p>
                       <p className="text-xs text-muted-foreground">
-                        {m.calls} calls · {fmt(m.tokens)} tokens
+                        {m.calls} calls ·{" "}
+                        <span title="Total tokens">{fmt(m.tokens)} tokens</span>
                       </p>
                     </div>
                     <div className="text-right">

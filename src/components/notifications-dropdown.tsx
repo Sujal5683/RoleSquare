@@ -199,7 +199,7 @@ export function NotificationsDropdown() {
         <ScrollArea className="max-h-[400px]">
           <div className="divide-y">
             {visibleNotifications.length === 0 ? (
-              <div className="flex flex-col items-center py-8 text-center">
+              <div className="flex flex-col items-center py-5 text-center">
                 <CheckCircle2 className="mb-2 h-8 w-8 text-emerald-600" />
                 <p className="text-sm font-medium">All caught up</p>
                 <p className="text-xs text-muted-foreground">

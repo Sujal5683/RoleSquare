@@ -1,5 +1,5 @@
-// GET /api/datasets?organizationId=... — list datasets for org (include
-//   schema, recordCount).
+// GET /api/datasets?organizationId=... — list datasets for org + shared datasets.
+//   Returns owned datasets AND datasets shared into the org/user via DatasetAccess.
 // POST /api/datasets — create a dataset.
 //   Body: { name, description?, schemaId? }
 
@@ -8,11 +8,20 @@ import { db } from "@/lib/db";
 import { requireOrgContext, AuthError, authErrorResponse } from "@/lib/auth";
 import { logAudit } from "@/lib/audit";
 import { serializeDataset } from "@/lib/serialize";
+import { getAccessibleDatasetIds } from "@/lib/dataset-access";
 
 export async function GET(req: NextRequest) {
   try {
-    const { organizationId } = await requireOrgContext(req);
-    const datasets = await db.dataset.findMany({
+    const { user, organizationId } = await requireOrgContext(req);
+
+    // Get owned + shared dataset IDs
+    const { ownedIds, sharedAccesses } = await getAccessibleDatasetIds(
+      user.id,
+      organizationId
+    );
+
+    // Fetch owned datasets
+    const ownedDatasets = await db.dataset.findMany({
       where: { organizationId },
       include: {
         schema: { include: { fields: true } },
@@ -20,7 +29,43 @@ export async function GET(req: NextRequest) {
       },
       orderBy: { createdAt: "desc" },
     });
-    return NextResponse.json(datasets.map(serializeDataset));
+
+    // Fetch shared datasets (only if there are any)
+    const sharedDatasets =
+      sharedAccesses.length > 0
+        ? await db.dataset.findMany({
+            where: {
+              id: { in: sharedAccesses.map((a) => a.datasetId) },
+            },
+            include: {
+              schema: { include: { fields: true } },
+              sources: { select: { id: true } },
+              organization: { select: { id: true, name: true } },
+            },
+            orderBy: { createdAt: "desc" },
+          })
+        : [];
+
+    // Build response — owned first, then shared
+    const result = [
+      ...ownedDatasets.map((d) => ({
+        ...serializeDataset(d),
+        accessLevel: "owner" as const,
+        isShared: false,
+      })),
+      ...sharedDatasets.map((d) => {
+        const access = sharedAccesses.find((a) => a.datasetId === d.id);
+        return {
+          ...serializeDataset(d),
+          accessLevel: (access?.level ?? "read") as "read" | "comment" | "edit",
+          isShared: true,
+          ownerOrgId: d.organizationId,
+          ownerOrgName: (d as any).organization?.name ?? undefined,
+        };
+      }),
+    ];
+
+    return NextResponse.json(result);
   } catch (err) {
     if (err instanceof AuthError) return authErrorResponse(err);
     return NextResponse.json(
@@ -29,6 +74,8 @@ export async function GET(req: NextRequest) {
     );
   }
 }
+
+
 
 export async function POST(req: NextRequest) {
   try {

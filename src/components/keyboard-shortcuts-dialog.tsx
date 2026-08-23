@@ -106,7 +106,7 @@ export function KeyboardShortcutsDialog() {
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-6 py-2">
+        <div className="space-y-4 py-2">
           {SHORTCUTS.map((section) => (
             <div key={section.group}>
               <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">

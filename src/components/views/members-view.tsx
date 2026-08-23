@@ -10,6 +10,7 @@ import type {
   MemberDTO,
   Role,
   UserDTO,
+  InvitationDTO,
 } from "@/lib/types";
 import {
   PageHeader,
@@ -273,7 +274,7 @@ export function MembersView() {
   const [removeTarget, setRemoveTarget] = useState<MemberDTO | null>(null);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <PageHeader
         title="Members"
         description={
@@ -362,14 +363,14 @@ export function MembersView() {
                   Open organizations
                 </Button>
               }
-              className="mx-6 mb-6"
+              className="mx-4 mb-4"
             />
           ) : isLoading ? (
-            <div className="px-6 pb-6">
+            <div className="px-4 pb-6">
               <LoadingState rows={4} />
             </div>
           ) : isError ? (
-            <div className="px-6 pb-6">
+            <div className="px-4 pb-6">
               <ErrorState
                 message="Failed to load members"
                 onRetry={() => refetch()}
@@ -386,7 +387,7 @@ export function MembersView() {
                   Invite member
                 </Button>
               }
-              className="mx-6 mb-6"
+              className="mx-4 mb-4"
             />
           ) : (
             <div className="max-h-[28rem] overflow-y-auto">
@@ -507,6 +508,9 @@ export function MembersView() {
         </CardContent>
       </Card>
 
+      {/* Pending Invitations */}
+      <PendingInvitationsCard orgId={activeOrgId} onInvite={() => setInviteOpen(true)} />
+
       {/* Invite dialog */}
       <InviteMemberDialog
         orgId={activeOrgId}
@@ -555,7 +559,144 @@ export function MembersView() {
   );
 }
 
-// ── Permission matrix card ───────────────────────────────────────────────
+// ── Pending Invitations card ─────────────────────────────────────────────
+
+function PendingInvitationsCard({
+  orgId,
+  onInvite,
+}: {
+  orgId: string | null;
+  onInvite: () => void;
+}) {
+  const queryClient = useQueryClient();
+
+  const { data: invitations, isLoading } = useQuery({
+    queryKey: ["invitations", "outgoing", orgId],
+    queryFn: () =>
+      api.get<InvitationDTO[]>(`/api/organizations/${orgId}/invitations`),
+    enabled: !!orgId,
+  });
+
+  const resendMutation = useMutation({
+    mutationFn: ({ email, role }: { email: string; role: string }) =>
+      api.post(`/api/organizations/${orgId}/invitations`, { email, role }),
+    onSuccess: () => {
+      toast.success("Invitation resent");
+      queryClient.invalidateQueries({ queryKey: ["invitations", "outgoing", orgId] });
+    },
+    onError: (err: unknown) => {
+      toast.error("Failed to resend", { description: err instanceof Error ? err.message : undefined });
+    },
+  });
+
+  const cancelMutation = useMutation({
+    mutationFn: (token: string) =>
+      api.post("/api/invitations/decline", { token }),
+    onSuccess: () => {
+      toast.success("Invitation cancelled");
+      queryClient.invalidateQueries({ queryKey: ["invitations", "outgoing", orgId] });
+    },
+    onError: (err: unknown) => {
+      toast.error("Failed to cancel", { description: err instanceof Error ? err.message : undefined });
+    },
+  });
+
+  const pending = (invitations ?? []).filter((i) => i.status === "pending");
+
+  if (!orgId || (!isLoading && pending.length === 0)) return null;
+
+  return (
+    <Card>
+      <CardHeader className="pb-2">
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-base flex items-center gap-2">
+            Pending Invitations
+            {pending.length > 0 && (
+              <span className="inline-flex items-center justify-center rounded-full bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 text-xs font-semibold px-2 py-0.5">
+                {pending.length}
+              </span>
+            )}
+          </CardTitle>
+          <Button variant="outline" size="sm" onClick={onInvite}>
+            <UserPlus className="mr-2 h-3.5 w-3.5" />
+            Invite
+          </Button>
+        </div>
+        <CardDescription>
+          These people have been invited but haven&apos;t accepted yet. They won&apos;t see any data until they accept.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="p-0">
+        {isLoading ? (
+          <div className="px-4 pb-4"><LoadingState rows={2} /></div>
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Email</TableHead>
+                <TableHead>Role</TableHead>
+                <TableHead>Invited</TableHead>
+                <TableHead>Expires</TableHead>
+                <TableHead className="w-12"></TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {pending.map((inv) => (
+                <TableRow key={inv.id}>
+                  <TableCell>
+                    <div className="flex items-center gap-2">
+                      <div className="flex h-7 w-7 items-center justify-center rounded bg-muted text-muted-foreground text-xs font-medium">
+                        {inv.email[0]?.toUpperCase()}
+                      </div>
+                      <span className="text-sm">{inv.email}</span>
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <RoleBadge role={inv.role as Role} />
+                  </TableCell>
+                  <TableCell className="text-sm text-muted-foreground">
+                    {relativeTime(inv.createdAt)}
+                  </TableCell>
+                  <TableCell className="text-sm text-muted-foreground">
+                    {relativeTime(inv.expiresAt)}
+                  </TableCell>
+                  <TableCell>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-8 w-8">
+                          <MoreHorizontal className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem
+                          onClick={() => resendMutation.mutate({ email: inv.email, role: inv.role })}
+                          disabled={resendMutation.isPending}
+                        >
+                          <RefreshCw className="mr-2 h-4 w-4" />
+                          Resend invite
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          className="text-destructive focus:text-destructive"
+                          onClick={() => cancelMutation.mutate(inv.token)}
+                          disabled={cancelMutation.isPending}
+                        >
+                          <X className="mr-2 h-4 w-4" />
+                          Cancel invite
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+// ── Permission matrix card ─────────────────────────────────────────────────
 
 function PermissionMatrixCard() {
   return (

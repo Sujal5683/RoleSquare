@@ -32,7 +32,7 @@ export function LandingView() {
     <div className="flex min-h-screen flex-col bg-background">
       {/* Nav */}
       <header className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="mx-auto flex h-14 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
+        <div className="mx-auto flex h-14 max-w-7xl items-center justify-between px-4 sm:px-4 lg:px-5">
           <div className="flex items-center gap-2">
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
               <Zap className="h-4 w-4" />
@@ -42,7 +42,7 @@ export function LandingView() {
               <span className="text-[10px] text-muted-foreground">Intelligence Platform</span>
             </div>
           </div>
-          <nav className="hidden md:flex items-center gap-6 text-sm">
+          <nav className="hidden md:flex items-center gap-4 text-sm">
             <a href="#capabilities" className="text-muted-foreground hover:text-foreground">Capabilities</a>
             <a href="#use-cases" className="text-muted-foreground hover:text-foreground">Use cases</a>
             <a href="#security" className="text-muted-foreground hover:text-foreground">Security</a>
@@ -75,7 +75,7 @@ export function LandingView() {
         {/* Glow orbs */}
         <div className="absolute top-0 left-1/4 h-72 w-72 rounded-full bg-violet-500/10 blur-3xl pulse-glow" />
         <div className="absolute bottom-0 right-1/4 h-96 w-96 rounded-full bg-fuchsia-500/10 blur-3xl" />
-        <div className="relative mx-auto max-w-7xl px-4 py-20 sm:px-6 lg:px-8 lg:py-28">
+        <div className="relative mx-auto max-w-7xl px-4 py-20 sm:px-4 lg:px-5 lg:py-28">
           <div className="mx-auto max-w-3xl text-center slide-up">
             <Badge variant="outline" className="mb-5 gap-1.5 pulse-glow">
               <Sparkles className="h-3 w-3" /> AI-native · Evidence-backed · Multi-tenant
@@ -86,7 +86,7 @@ export function LandingView() {
                 structured, queryable datasets
               </span>
             </h1>
-            <p className="mt-6 text-lg leading-8 text-muted-foreground">
+            <p className="mt-4 text-lg leading-8 text-muted-foreground">
               A backend-first, AI-native SaaS that converts emails, attachments, Drive
               resources, Docs, Sheets, and Forms into governed, evidence-backed records —
               through an asynchronous extraction pipeline with full auditability.
@@ -140,7 +140,7 @@ export function LandingView() {
 
       {/* Capabilities */}
       <section id="capabilities" className="border-b py-20">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-7xl px-4 sm:px-4 lg:px-5">
           <div className="mx-auto max-w-2xl text-center">
             <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">
               One composable pipeline, every output
@@ -152,13 +152,13 @@ export function LandingView() {
             </p>
           </div>
 
-          <div className="mt-14 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="mt-14 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {CAPABILITIES.map((cap) => {
               const Icon = cap.icon;
               return (
                 <div
                   key={cap.title}
-                  className="group rounded-xl border bg-card p-6 shadow-sm transition-all hover:shadow-md hover:-translate-y-0.5 hover-lift"
+                  className="group rounded-xl border bg-card p-4 shadow-sm transition-all hover:shadow-md hover:-translate-y-0.5 hover-lift"
                 >
                   <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-lg bg-primary/10 text-primary group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
                     <Icon className="h-5 w-5" />
@@ -176,7 +176,7 @@ export function LandingView() {
 
       {/* Use cases */}
       <section id="use-cases" className="border-b bg-muted/30 py-20">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-7xl px-4 sm:px-4 lg:px-5">
           <div className="mx-auto max-w-2xl text-center">
             <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">
               Built for operational intelligence
@@ -186,11 +186,11 @@ export function LandingView() {
               scales from one inbox to millions of messages.
             </p>
           </div>
-          <div className="mt-14 grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+          <div className="mt-14 grid gap-4 md:grid-cols-2 lg:grid-cols-4">
             {USE_CASES.map((uc) => {
               const Icon = uc.icon;
               return (
-                <div key={uc.title} className="rounded-xl border bg-background p-6">
+                <div key={uc.title} className="rounded-xl border bg-background p-4">
                   <Icon className="h-6 w-6 text-primary" />
                   <h3 className="mt-3 text-sm font-semibold">{uc.title}</h3>
                   <p className="mt-1 text-xs text-muted-foreground">{uc.description}</p>
@@ -203,7 +203,7 @@ export function LandingView() {
 
       {/* Security */}
       <section id="security" className="border-b py-20">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-7xl px-4 sm:px-4 lg:px-5">
           <div className="grid gap-12 lg:grid-cols-2 lg:items-center">
             <div>
               <Badge variant="outline" className="mb-4 gap-1.5">
@@ -218,7 +218,7 @@ export function LandingView() {
                 at the database layer, with role-aware access for owners, admins, managers,
                 members, and viewers.
               </p>
-              <ul className="mt-6 space-y-3">
+              <ul className="mt-4 space-y-3">
                 {SECURITY_POINTS.map((pt) => (
                   <li key={pt} className="flex items-start gap-2.5 text-sm">
                     <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />
@@ -227,7 +227,7 @@ export function LandingView() {
                 ))}
               </ul>
             </div>
-            <div className="rounded-2xl border bg-card p-6 shadow-sm">
+            <div className="rounded-2xl border bg-card p-4 shadow-sm">
               <div className="space-y-4">
                 <div className="flex items-center justify-between border-b pb-3">
                   <div className="flex items-center gap-2">
@@ -262,7 +262,7 @@ export function LandingView() {
 
       {/* Integrations */}
       <section id="integrations" className="border-b py-20">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-7xl px-4 sm:px-4 lg:px-5">
           <div className="mx-auto max-w-2xl text-center">
             <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">
               Native Google Workspace integration
@@ -296,7 +296,7 @@ export function LandingView() {
 
       {/* Pricing */}
       <section id="pricing" className="border-b py-20">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-7xl px-4 sm:px-4 lg:px-5">
           <div className="mx-auto max-w-2xl text-center">
             <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">Pricing</h2>
             <p className="mt-4 text-muted-foreground">
@@ -304,11 +304,11 @@ export function LandingView() {
               collaboration across organizations.
             </p>
           </div>
-          <div className="mt-12 grid gap-6 lg:grid-cols-3">
+          <div className="mt-12 grid gap-4 lg:grid-cols-3">
             {PRICING.map((tier) => (
               <div
                 key={tier.name}
-                className={`rounded-2xl border p-6 ${
+                className={`rounded-2xl border p-4 ${
                   tier.featured ? "border-primary bg-primary/5 shadow-md" : "bg-card"
                 }`}
               >
@@ -323,7 +323,7 @@ export function LandingView() {
                     <span className="text-sm text-muted-foreground">/mo</span>
                   )}
                 </div>
-                <ul className="mt-6 space-y-2.5 text-sm">
+                <ul className="mt-4 space-y-2.5 text-sm">
                   {tier.features.map((f) => (
                     <li key={f} className="flex items-start gap-2">
                       <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />
@@ -332,7 +332,7 @@ export function LandingView() {
                   ))}
                 </ul>
                 <Button
-                  className="mt-6 w-full"
+                  className="mt-4 w-full"
                   variant={tier.featured ? "default" : "outline"}
                   onClick={() => setView("dashboard")}
                 >
@@ -346,7 +346,7 @@ export function LandingView() {
 
       {/* CTA */}
       <section className="py-20">
-        <div className="mx-auto max-w-4xl px-4 sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-4xl px-4 sm:px-4 lg:px-5">
           <div className="rounded-2xl bg-primary p-10 text-center text-primary-foreground shadow-lg">
             <h2 className="text-3xl font-bold tracking-tight">
               Operationalize your inbox today
@@ -358,7 +358,7 @@ export function LandingView() {
             <Button
               size="lg"
               variant="secondary"
-              className="mt-6"
+              className="mt-4"
               onClick={() => setView("dashboard")}
             >
               Open demo workspace
@@ -369,8 +369,8 @@ export function LandingView() {
       </section>
 
       {/* Footer */}
-      <footer className="border-t bg-background py-10 mt-auto">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+      <footer className="border-t bg-background py-6 mt-auto">
+        <div className="mx-auto max-w-7xl px-4 sm:px-4 lg:px-5">
           <div className="flex flex-col items-center justify-between gap-4 sm:flex-row">
             <div className="flex items-center gap-2">
               <div className="flex h-6 w-6 items-center justify-center rounded bg-primary text-primary-foreground">

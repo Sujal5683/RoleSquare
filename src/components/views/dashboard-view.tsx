@@ -66,7 +66,7 @@ export function DashboardView() {
   });
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <PageHeader
         title="Dashboard"
         description="Real-time view of your ingestion pipeline, AI extraction activity, and review queue."
@@ -127,7 +127,7 @@ export function DashboardView() {
           </div>
 
           {/* Recent runs + Review queue */}
-          <div className="grid gap-6 lg:grid-cols-3">
+          <div className="grid gap-4 lg:grid-cols-3">
             {/* Recent runs */}
             <Card className="lg:col-span-2">
               <CardHeader className="flex flex-row items-center justify-between pb-3">
@@ -139,12 +139,12 @@ export function DashboardView() {
               <CardContent className="p-0">
                 <div className="divide-y">
                   {data.recentRuns.length === 0 ? (
-                    <div className="p-6">
+                    <div className="p-4">
                       <EmptyState title="No runs yet" description="Trigger a scan from the Sources page." />
                     </div>
                   ) : (
                     data.recentRuns.slice(0, 6).map((run) => (
-                      <div key={run.id} className="flex items-center gap-3 px-6 py-3 hover:bg-muted/40">
+                      <div key={run.id} className="flex items-center gap-3 px-4 py-3 hover:bg-muted/40">
                         <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-primary">
                           <Inbox className="h-4 w-4" />
                         </div>
@@ -186,7 +186,7 @@ export function DashboardView() {
               <CardContent className="p-0">
                 <div className="divide-y max-h-[380px] overflow-y-auto">
                   {data.reviewQueue.length === 0 ? (
-                    <div className="p-6">
+                    <div className="p-4">
                       <EmptyState
                         icon={<CheckCircle2 className="h-5 w-5" />}
                         title="Queue empty"
@@ -221,7 +221,7 @@ export function DashboardView() {
           </div>
 
           {/* Queue health + Usage + Alerts */}
-          <div className="grid gap-6 lg:grid-cols-3">
+          <div className="grid gap-4 lg:grid-cols-3">
             {/* Queue health */}
             <Card className="lg:col-span-2">
               <CardHeader className="pb-3">
@@ -317,7 +317,7 @@ export function DashboardView() {
           </div>
 
           {/* Recently Viewed + Recent datasets */}
-          <div className="grid gap-6 lg:grid-cols-3">
+          <div className="grid gap-4 lg:grid-cols-3">
             {/* Recently viewed (from local store) */}
             <Card>
               <CardHeader className="flex flex-row items-center justify-between pb-3">
@@ -327,7 +327,7 @@ export function DashboardView() {
               </CardHeader>
               <CardContent className="p-0">
                 {recentItems.length === 0 ? (
-                  <div className="p-6">
+                  <div className="p-4">
                     <EmptyState
                       icon={<Clock className="h-5 w-5" />}
                       title="Nothing yet"
@@ -482,7 +482,7 @@ export function DashboardView() {
                     })}
                   </div>
                 ) : (
-                  <div className="p-6">
+                  <div className="p-4">
                     <EmptyState
                       icon={<Activity className="h-5 w-5" />}
                       title="No activity yet"

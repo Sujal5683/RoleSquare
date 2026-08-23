@@ -52,18 +52,24 @@ export async function POST(
         include: { dataset: true, requester: true },
       });
       if (req2.datasetId) {
-        await tx.sharingPermission.create({
+        // Write to the unified DatasetAccess table (replaces old SharingPermission)
+        await tx.datasetAccess.create({
           data: {
             datasetId: req2.datasetId,
-            organizationId,
+            ownerOrgId: organizationId,
+            granteeOrgId: req2.targetOrganizationId ?? null,
+            granteeUserId: req2.targetUserId ?? null,
             level: req2.level,
             fieldScope: req2.fieldScope,
             rowFilter: req2.rowFilter,
+            status: "active",
+            sourceRequestId: req2.id,
           },
         });
       }
       return req2;
     });
+
 
     await logAudit({
       organizationId,

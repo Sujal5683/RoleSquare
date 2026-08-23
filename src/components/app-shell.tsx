@@ -429,7 +429,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
         {/* Main content */}
         <main className="flex-1 overflow-x-hidden">
-          <div key={view} className="mx-auto max-w-7xl p-4 sm:p-6 lg:p-8 view-fade-in">
+          <div key={view} className="mx-auto max-w-7xl p-4 sm:p-4 lg:p-6 view-fade-in">
             {children}
           </div>
         </main>

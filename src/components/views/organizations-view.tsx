@@ -204,7 +204,7 @@ export function OrganizationsView() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <PageHeader
         title="Organizations"
         description="Manage the workspaces you belong to. Each organization has its own sources, datasets, members, and sharing policies."
@@ -284,7 +284,7 @@ export function OrganizationsView() {
             return (
               <Card
                 key={org.id}
-                className="flex flex-col gap-3 p-5 transition-shadow hover:shadow-md"
+                className="flex flex-col gap-3 p-4 transition-shadow hover:shadow-md"
               >
                 {/* Header */}
                 <div className="flex items-start justify-between gap-2">

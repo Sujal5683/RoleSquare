@@ -142,6 +142,8 @@ export interface GeminiResult {
   modelUsed: string;
   modelDisplayName: string;
   tokensUsed: number;
+  promptTokens: number;
+  completionTokens: number;
 }
 
 // ── Core call with fallback ──────────────────────────────────────────────────
@@ -229,13 +231,13 @@ export async function callGeminiWithFallback(
 
       const text = response.text();
       const usageMetadata = response.usageMetadata;
-      const tokensUsed =
-        (usageMetadata?.promptTokenCount ?? 0) +
-        (usageMetadata?.candidatesTokenCount ?? 0);
+      const promptTokens = usageMetadata?.promptTokenCount ?? 0;
+      const completionTokens = usageMetadata?.candidatesTokenCount ?? 0;
+      const tokensUsed = promptTokens + completionTokens;
 
       markSuccess(modelDef.id);
       console.info(
-        `[gemini] ${modelDef.id} succeeded — ${tokensUsed} tokens used`
+        `[gemini] ${modelDef.id} succeeded — ${tokensUsed} tokens used (${promptTokens} prompt, ${completionTokens} completion)`
       );
 
       return {
@@ -243,6 +245,8 @@ export async function callGeminiWithFallback(
         modelUsed: modelDef.id,
         modelDisplayName: modelDef.displayName,
         tokensUsed,
+        promptTokens,
+        completionTokens,
       };
     } catch (err) {
       const errMsg =

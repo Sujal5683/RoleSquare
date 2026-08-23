@@ -28,7 +28,11 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
+import { DateRuleEditor } from "@/components/source/date-rule-editor";
+import { AttachmentRuleEditor } from "@/components/source/attachment-rule-editor";
+import { DriveLinkRuleEditor } from "@/components/source/drive-link-rule-editor";
 import {
+
   Mail,
   HardDrive,
   FileText,
@@ -57,6 +61,7 @@ interface RuleDraft {
   filterType: string;
   operator: string;
   value: string; // raw text — comma-separated for arrays
+  metadata?: Record<string, unknown>; // for date presets, etc.
 }
 
 interface SourceFormState {
@@ -67,6 +72,7 @@ interface SourceFormState {
   rules: RuleDraft[];
   scheduleMode: string;
   scheduleExpr: string;
+  maxEmailsPerScan: number;
   schemaId: string;
   datasetId: string;
 }
@@ -86,6 +92,7 @@ const FILTER_TYPES = [
   { value: "date", label: "Date" },
   { value: "attachment", label: "Attachment" },
   { value: "link", label: "Link" },
+  { value: "drive_link", label: "Google Drive link" },
 ];
 
 const OPERATORS = [
@@ -113,6 +120,7 @@ const EMPTY_FORM: SourceFormState = {
   rules: [],
   scheduleMode: "interval",
   scheduleExpr: "6h",
+  maxEmailsPerScan: 100,
   schemaId: "",
   datasetId: "",
 };
@@ -147,9 +155,37 @@ function ruleValueFromString(raw: string): unknown {
 
 function ruleToText(r: RuleDraft): string {
   const ft = FILTER_TYPES.find((f) => f.value === r.filterType)?.label ?? r.filterType;
+  
+  if (r.filterType === "attachment") {
+    return r.value === "true" ? "Must have attachment" : "Must NOT have attachment";
+  }
+  if (r.filterType === "drive_link") {
+    return r.value === "true" ? "Must contain Google Drive link" : "Must NOT contain Google Drive link";
+  }
+  if (r.filterType === "date") {
+    const md = r.metadata as { preset?: string; startDate?: string; endDate?: string } | undefined;
+    if (r.operator === "between" && md?.startDate && md?.endDate) {
+      return `Date between ${md.startDate} and ${md.endDate}`;
+    }
+    if (r.operator === "gt" && md?.startDate) {
+      const presetLabel = PRESETS_LABEL_MAP[md.preset as keyof typeof PRESETS_LABEL_MAP] || md.preset;
+      return presetLabel ? `Date: ${presetLabel}` : `Date after ${md.startDate}`;
+    }
+    if (r.operator === "lt" && r.value) {
+      return `Date before ${r.value}`;
+    }
+  }
+
   const op = OPERATORS.find((o) => o.value === r.operator)?.label ?? r.operator;
   return `${ft} ${op.toLowerCase()} "${r.value || "—"}"`;
 }
+
+const PRESETS_LABEL_MAP = {
+  last_7_days: "Last 7 days",
+  last_30_days: "Last 30 days",
+  last_3_months: "Last 3 months",
+  last_year: "Last year",
+};
 
 // ── Component ────────────────────────────────────────────────────────────
 
@@ -210,6 +246,7 @@ export function SourceBuilderView() {
       rules,
       scheduleMode: existingSource.scheduleMode,
       scheduleExpr: existingSource.scheduleExpr,
+      maxEmailsPerScan: existingSource.maxEmailsPerScan ?? 100,
       schemaId: existingSource.schemaId ?? "",
       datasetId: existingSource.datasetId ?? "",
     });
@@ -338,6 +375,7 @@ export function SourceBuilderView() {
       filterType: r.filterType,
       operator: r.operator,
       value: ruleValueFromString(r.value),
+      metadata: r.metadata ?? null,
       position: i,
     }));
 
@@ -349,6 +387,7 @@ export function SourceBuilderView() {
         sourceType: form.sourceType,
         scheduleMode: form.scheduleMode,
         scheduleExpr: form.scheduleExpr,
+        maxEmailsPerScan: form.maxEmailsPerScan,
         schemaId: form.schemaId || null,
         datasetId: form.datasetId || null,
       });
@@ -373,6 +412,7 @@ export function SourceBuilderView() {
         datasetId: form.datasetId || null,
         scheduleMode: form.scheduleMode,
         scheduleExpr: form.scheduleExpr,
+        maxEmailsPerScan: form.maxEmailsPerScan,
         rules: rulesPayload,
       });
     }
@@ -382,7 +422,7 @@ export function SourceBuilderView() {
 
   // ── Render ─────────────────────────────────────────────────────────────
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <PageHeader
         title={isEdit ? "Edit source" : "New source"}
         description={
@@ -449,7 +489,7 @@ export function SourceBuilderView() {
         </CardContent>
       </Card>
 
-      <div className="grid gap-6 lg:grid-cols-3">
+      <div className="grid gap-4 lg:grid-cols-3">
         {/* Main step content */}
         <div className="lg:col-span-2">
           <Card>
@@ -671,13 +711,15 @@ export function SourceBuilderView() {
                               <Trash2 className="h-3.5 w-3.5" />
                             </Button>
                           </div>
+
+                          {/* Filter type selector — always shown */}
                           <div className="grid gap-2 sm:grid-cols-3">
                             <div className="space-y-1">
                               <Label className="text-[10px]">Filter</Label>
                               <Select
                                 value={r.filterType}
                                 onValueChange={(v) =>
-                                  updateRule(r.id, { filterType: v })
+                                  updateRule(r.id, { filterType: v, value: "", operator: "contains", metadata: undefined })
                                 }
                               >
                                 <SelectTrigger className="h-8 text-xs">
@@ -692,37 +734,79 @@ export function SourceBuilderView() {
                                 </SelectContent>
                               </Select>
                             </div>
-                            <div className="space-y-1">
-                              <Label className="text-[10px]">Operator</Label>
-                              <Select
-                                value={r.operator}
-                                onValueChange={(v) =>
-                                  updateRule(r.id, { operator: v })
-                                }
-                              >
-                                <SelectTrigger className="h-8 text-xs">
-                                  <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  {OPERATORS.map((o) => (
-                                    <SelectItem key={o.value} value={o.value}>
-                                      {o.label}
-                                    </SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                            </div>
-                            <div className="space-y-1">
-                              <Label className="text-[10px]">Value</Label>
-                              <Input
-                                className="h-8 text-xs"
-                                placeholder="comma-separated for arrays"
-                                value={r.value}
-                                onChange={(e) =>
-                                  updateRule(r.id, { value: e.target.value })
-                                }
-                              />
-                            </div>
+
+                            {/* For date/attachment/drive_link: show specialized editors instead of operator+value */}
+                            {r.filterType === "date" ? (
+                              <div className="sm:col-span-2">
+                                <DateRuleEditor
+                                  onChange={(v) =>
+                                    updateRule(r.id, {
+                                      operator: v.operator,
+                                      value: v.value,
+                                      metadata: v.metadata as Record<string, unknown>,
+                                    })
+                                  }
+                                />
+                              </div>
+                            ) : r.filterType === "attachment" ? (
+                              <div className="sm:col-span-2">
+                                <AttachmentRuleEditor
+                                  value={r.value === "true"}
+                                  onChange={(v) =>
+                                    updateRule(r.id, {
+                                      operator: v.operator,
+                                      value: String(v.value),
+                                    })
+                                  }
+                                />
+                              </div>
+                            ) : r.filterType === "drive_link" ? (
+                              <div className="sm:col-span-2">
+                                <DriveLinkRuleEditor
+                                  value={r.value !== "false"}
+                                  onChange={(v) =>
+                                    updateRule(r.id, {
+                                      operator: v.operator,
+                                      value: String(v.value),
+                                    })
+                                  }
+                                />
+                              </div>
+                            ) : (
+                              <>
+                                <div className="space-y-1">
+                                  <Label className="text-[10px]">Operator</Label>
+                                  <Select
+                                    value={r.operator}
+                                    onValueChange={(v) =>
+                                      updateRule(r.id, { operator: v })
+                                    }
+                                  >
+                                    <SelectTrigger className="h-8 text-xs">
+                                      <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      {OPERATORS.map((o) => (
+                                        <SelectItem key={o.value} value={o.value}>
+                                          {o.label}
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+                                <div className="space-y-1">
+                                  <Label className="text-[10px]">Value</Label>
+                                  <Input
+                                    className="h-8 text-xs"
+                                    placeholder="comma-separated for arrays"
+                                    value={r.value}
+                                    onChange={(e) =>
+                                      updateRule(r.id, { value: e.target.value })
+                                    }
+                                  />
+                                </div>
+                              </>
+                            )}
                           </div>
                         </div>
                       ))}
@@ -794,6 +878,52 @@ export function SourceBuilderView() {
                           ? "Standard 5-field cron expression."
                           : "Manual sources only run when triggered."}
                       </p>
+                    </div>
+                  </div>
+
+                  {/* maxEmailsPerScan slider */}
+                  <div className="space-y-4">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                      <div>
+                        <Label htmlFor="max-emails">Max emails per scan</Label>
+                        <p className="text-[10px] text-muted-foreground mt-0.5 max-w-[280px]">
+                          Limits the Gmail API list call to this many messages per scan run. Lower values are faster.
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <Input
+                          type="number"
+                          min={1}
+                          max={10000}
+                          value={form.maxEmailsPerScan}
+                          onChange={(e) => {
+                            let val = parseInt(e.target.value, 10);
+                            if (isNaN(val)) val = 1;
+                            setForm((f) => ({ ...f, maxEmailsPerScan: Math.min(10000, Math.max(1, val)) }));
+                          }}
+                          className="w-24 tabular-nums"
+                        />
+                      </div>
+                    </div>
+                    <div className="space-y-1">
+                      <input
+                        type="range"
+                        min={1}
+                        max={2000}
+                        step={1}
+                        value={Math.min(form.maxEmailsPerScan, 2000)}
+                        onChange={(e) =>
+                          setForm((f) => ({
+                            ...f,
+                            maxEmailsPerScan: Number(e.target.value),
+                          }))
+                        }
+                        className="w-full accent-primary"
+                      />
+                      <div className="flex justify-between text-[10px] text-muted-foreground">
+                        <span>1</span>
+                        <span>2,000</span>
+                      </div>
                     </div>
                   </div>
 

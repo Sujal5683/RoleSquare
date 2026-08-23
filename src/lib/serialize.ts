@@ -27,6 +27,9 @@ import type {
   AiOutputDTO,
   SharingRequestDTO,
   SharingPermissionDTO,
+  DatasetAccessDTO,
+  InvitationDTO,
+  AgentLogDTO,
   AuditLogDTO,
   UsageMetricDTO,
 } from "@/lib/types";
@@ -149,6 +152,7 @@ export function serializeSourceRule(r: any): SourceRuleDTO {
     filterType: r.filterType,
     operator: r.operator,
     value: parseJson(r.value, r.value),
+    metadata: r.metadata ? parseJson<Record<string, unknown>>(r.metadata, {}) : null,
     position: r.position,
   };
 }
@@ -177,6 +181,7 @@ export function serializeSource(s: any): SourceDTO {
     runState: s.runState,
     scheduleMode: s.scheduleMode,
     scheduleExpr: s.scheduleExpr,
+    maxEmailsPerScan: s.maxEmailsPerScan ?? 100,
     lastRunAt:
       s.lastRunAt instanceof Date ? s.lastRunAt.toISOString() : (s.lastRunAt ?? null),
     nextRunAt:
@@ -294,6 +299,10 @@ export function serializeAiOutput(o: any): AiOutputDTO {
     modelUsed: o.modelUsed,
     promptHash: o.promptHash,
     tokensUsed: o.tokensUsed,
+    promptTokens: o.promptTokens ?? 0,
+    completionTokens: o.completionTokens ?? 0,
+    costUsd: o.costUsd ?? 0,
+    rawResponse: o.rawResponse ?? null,
     createdAt:
       o.createdAt instanceof Date ? o.createdAt.toISOString() : o.createdAt,
   };
@@ -309,9 +318,16 @@ export function serializeSharingRequest(
     datasetName: r.dataset?.name ?? null,
     requestedBy: r.requestedBy,
     requesterName: r.requester?.name ?? null,
+    requesterEmail: r.requester?.email ?? null,
     status: r.status,
     level: r.level,
     reason: r.reason ?? null,
+    targetOrganizationId: r.targetOrganizationId ?? null,
+    targetOrganizationName: r.targetOrganization?.name ?? null,
+    targetUserId: r.targetUserId ?? null,
+    targetEmail: r.targetEmail ?? null,
+    direction: r.direction ?? "outgoing",
+    shareType: r.shareType ?? "request",
     createdAt:
       r.createdAt instanceof Date ? r.createdAt.toISOString() : r.createdAt,
     decidedAt:
@@ -383,6 +399,62 @@ export function offsetDate(days: number, from: Date = new Date()): Date {
   const d = new Date(from.getTime());
   d.setDate(d.getDate() + days);
   return d;
+}
+
+// Note: CrossOrgPermission table replaced by DatasetAccess — use serializeDatasetAccess instead.
+
+
+export function serializeAgentLog(l: any): AgentLogDTO {
+  return {
+    id: l.id,
+    jobId: l.jobId,
+    organizationId: l.organizationId,
+    agentKey: l.agentKey,
+    level: l.level,
+    message: l.message,
+    metadata: l.metadata ? parseJson<Record<string, unknown>>(l.metadata, {}) : null,
+    createdAt: l.createdAt instanceof Date ? l.createdAt.toISOString() : l.createdAt,
+  };
+}
+
+export function serializeDatasetAccess(a: any): DatasetAccessDTO {
+  return {
+    id: a.id,
+    datasetId: a.datasetId,
+    datasetName: a.dataset?.name ?? undefined,
+    ownerOrgId: a.ownerOrgId,
+    ownerOrgName: a.ownerOrg?.name ?? undefined,
+    granteeOrgId: a.granteeOrgId ?? null,
+    granteeOrgName: a.granteeOrg?.name ?? null,
+    granteeUserId: a.granteeUserId ?? null,
+    granteeUserEmail: a.granteeUser?.email ?? null,
+    granteeUserName: a.granteeUser?.name ?? null,
+    level: a.level,
+    status: a.status,
+    fieldScope: a.fieldScope ? parseJson<Record<string, unknown>>(a.fieldScope, {}) : null,
+    rowFilter: a.rowFilter ? parseJson<Record<string, unknown>>(a.rowFilter, {}) : null,
+    sourceRequestId: a.sourceRequestId ?? null,
+    createdAt: a.createdAt instanceof Date ? a.createdAt.toISOString() : a.createdAt,
+  };
+}
+
+export function serializeInvitation(i: any): InvitationDTO {
+  return {
+    id: i.id,
+    organizationId: i.organizationId,
+    organizationName: i.organization?.name ?? undefined,
+    email: i.email,
+    role: i.role,
+    token: i.token,
+    invitedBy: i.invitedBy,
+    inviterName: i.inviter?.name ?? undefined,
+    status: i.status,
+    expiresAt: i.expiresAt instanceof Date ? i.expiresAt.toISOString() : i.expiresAt,
+    acceptedAt: i.acceptedAt instanceof Date
+      ? i.acceptedAt.toISOString()
+      : (i.acceptedAt ?? null),
+    createdAt: i.createdAt instanceof Date ? i.createdAt.toISOString() : i.createdAt,
+  };
 }
 
 // ── Schema field attachment helpers ────────────────────────────────────

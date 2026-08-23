@@ -74,6 +74,9 @@ export async function POST(req: NextRequest) {
           runState: "idle",
           scheduleMode: body?.scheduleMode ?? "interval",
           scheduleExpr: body?.scheduleExpr ?? "6h",
+          maxEmailsPerScan: typeof body?.maxEmailsPerScan === "number"
+            ? Math.max(1, Math.min(2000, body.maxEmailsPerScan))
+            : 100,
           config: body?.config ? JSON.stringify(body.config) : "{}",
         },
       });
@@ -84,6 +87,7 @@ export async function POST(req: NextRequest) {
             filterType: String(r.filterType ?? ""),
             operator: String(r.operator ?? ""),
             value: JSON.stringify(r.value ?? null),
+            metadata: r.metadata ? JSON.stringify(r.metadata) : null,
             position: typeof r.position === "number" ? r.position : i,
           })),
         });

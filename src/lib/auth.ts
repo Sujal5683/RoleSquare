@@ -212,41 +212,138 @@ export async function getCurrentOrgId(
       ),
     };
   }
+  return { organizationId: 
+ * Resolution order:
+ *   1. `organizationId` query param — IF the user is an active member.
+ *   2. The user's first active organization (fallback).
+ *
+ * If the user passes `?organizationId=<org_they_dont_belong_to>`, this
+ * returns a 403 Forbidden response instead of leaking data.
+ */
+export async function getCurrentOrgId(
+  req: NextRequest
+): Promise<{ organizationId: string; error?: NextResponse }> {
+  const user = await getCurrentUser();
+  const url = new URL(req.url);
+  const explicit = url.searchParams.get("organizationId") || req.headers.get("x-organization-id");
+
+  if (explicit) {
+    const membership = user.memberships.find(
+      (m) => m.organizationId === explicit && m.status === "active"
+    );
+    if (membership) {
+      return { organizationId: explicit };
+    }
+    // If explicit is invalid/stale, we just fall through to the fallback below.
+  }
+
+  const firstActive = user.organizations[0];
+  if (!firstActive) {
+    return {
+      organizationId: "",
+      error: NextResponse.json(
+        { error: "You are not an active member of any organization" },
+        { status: 403 }
+      ),
+    };
+  }
+  return { organizationId: 
+ * Resolution order:
+ *   1. `organizationId` query param — IF the user is an active member.
+ *   2. The user's first active organization (fallback).
+ *
+ * If the user passes `?organizationId=<org_they_dont_belong_to>`, this
+ * returns a 403 Forbidden response instead of leaking data.
+ */
+export async function getCurrentOrgId(
+  req: NextRequest
+): Promise<{ organizationId: string; error?: NextResponse }> {
+  const user = await getCurrentUser();
+  const url = new URL(req.url);
+  const explicit = url.searchParams.get("organizationId") || req.headers.get("x-organization-id");
+
+  if (explicit) {
+    const membership = user.memberships.find(
+      (m) => m.organizationId === explicit && m.status === "active"
+    );
+    if (membership) {
+      return { organizationId: explicit };
+    }
+    // If explicit is invalid/stale, we just fall through to the fallback below.
+  }
+
+  const firstActive = user.organizations[0];
+  if (!firstActive) {
+    return {
+      organizationId: "",
+      error: NextResponse.json(
+        { error: "You are not an active member of any organization" },
+        { status: 403 }
+      ),
+    };
+  }
   return { organizationId: firstActive.id };
-}
-
-export interface OrgContext {
-  user: SessionUser;
-  organizationId: string;
-  membership: OrgMembership;
-}
-
-/**
- * Returns the session user + active org + membership, VERIFYING that the
- * user is an ACTIVE member. If the user passes `?organizationId=` for an
- * org they don't belong to (or are removed/invited-only), this automatically
- * falls back to their first active organization. If they have none, it throws 403.
+}\n\nexport interface OrgContext {\n  user: SessionUser;\n  organizationId: string;\n  membership: OrgMembership;\n}\n\n/**\n * Resolves the active organization for the request, VERIFYING that the\n * current user is an ACTIVE member of that organization.
+ *
+ * Resolution order:
+ *   1. `organizationId` query param — STRICT: if provided and user is not an
+ *      active member, throws 403. This prevents cross-tenant data leaks.
+ *   2. `x-organization-id` header (set by the api-client from localStorage) —
+ *      SOFT: used as a hint. If stale/invalid, silently falls back to step 3.
+ *   3. The user's first active organization.
+ *
+ * The distinction between 1 and 2 is intentional:
+ *   - Query params are explicit assertions (e.g., ?organizationId=X on sharing routes)
+ *   - The header is an ambient convenience set by the browser's stored state
+ *     and may be stale if the user recently switched orgs or was removed.
  */
 export async function requireOrgContext(
   req: NextRequest
 ): Promise<OrgContext> {
   const user = await getCurrentUser();
   const url = new URL(req.url);
-  const explicit = url.searchParams.get("organizationId") || req.headers.get("x-organization-id");
+  const queryParam = url.searchParams.get("organizationId");
+  const headerHint = req.headers.get("x-organization-id");
 
   let membership: OrgMembership | undefined;
 
-  if (explicit) {
-    membership = user.memberships.find((m) => m.organizationId === explicit && m.status === "active");
+  // 1. ?organizationId= query param — STRICT enforcement
+  if (queryParam) {
+    membership = user.memberships.find(
+      (m) => m.organizationId === queryParam && m.status === "active"
+    );
+
+    if (!membership) {
+      const pendingInvite = user.memberships.find(
+        (m) => m.organizationId === queryParam && m.status === "invited"
+      );
+      if (pendingInvite) {
+        throw new AuthError(
+          "You have a pending invitation to this organization. Accept it from your Invitations page before accessing its data.",
+          403
+        );
+      }
+      throw new AuthError(
+        "You are not an active member of this organization.",
+        403
+      );
+    }
+  } else if (headerHint) {
+    // 2. x-organization-id header — SOFT hint, fall through on mismatch
+    membership = user.memberships.find(
+      (m) => m.organizationId === headerHint && m.status === "active"
+    );
+    // If stale/invalid header, fall through to step 3 (no error)
   }
-  
+
+  // 3. Fallback to first active org
   if (!membership) {
     membership = user.memberships.find((m) => m.status === "active");
   }
 
   if (!membership) {
     throw new AuthError(
-      "You do not have access to this organization",
+      "You are not an active member of any organization. Check your Invitations page.",
       403
     );
   }
@@ -257,6 +354,57 @@ export async function requireOrgContext(
     membership,
   };
 }
+
+/**
+ * Like requireOrgContext but ALWAYS strictly enforces the organizationId,
+ * whether it comes from the query param OR the x-organization-id header.
+ * Use this for routes where the caller explicitly declares which org they
+ * want (sharing/permissions, members, invitations, etc.).
+ */
+export async function requireExplicitOrg(
+  req: NextRequest
+): Promise<OrgContext> {
+  const user = await getCurrentUser();
+  const url = new URL(req.url);
+  const explicit =
+    url.searchParams.get("organizationId") ||
+    req.headers.get("x-organization-id");
+
+  if (!explicit) {
+    // No explicit org — fall back to first active org (same as requireOrgContext)
+    const membership = user.memberships.find((m) => m.status === "active");
+    if (!membership) {
+      throw new AuthError(
+        "You are not an active member of any organization.",
+        403
+      );
+    }
+    return { user, organizationId: membership.organizationId, membership };
+  }
+
+  const membership = user.memberships.find(
+    (m) => m.organizationId === explicit && m.status === "active"
+  );
+
+  if (!membership) {
+    const pendingInvite = user.memberships.find(
+      (m) => m.organizationId === explicit && m.status === "invited"
+    );
+    if (pendingInvite) {
+      throw new AuthError(
+        "You have a pending invitation to this organization. Accept it from your Invitations page.",
+        403
+      );
+    }
+    throw new AuthError(
+      "You are not an active member of this organization.",
+      403
+    );
+  }
+
+  return { user, organizationId: membership.organizationId, membership };
+}
+
 
 /**
  * Returns the session user + org context, VERIFYING that the user's role

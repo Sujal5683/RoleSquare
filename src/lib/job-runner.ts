@@ -22,6 +22,8 @@ import { getGmailClient, extractEmailBody, extractAttachments, extractDriveLinks
 import { parseEmailFields } from "@/lib/email-parser";
 import { ensureDefaultDataset, writeDefaultDatasetRecord } from "@/lib/dataset-provisioner";
 import { extractWithLLM } from "@/lib/extraction";
+import { agentInfo, agentWarn, agentError } from "@/lib/agent-logger";
+import { computeCost } from "@/lib/model-pricing";
 import crypto from "crypto";
 
 const POLL_INTERVAL_MS = 5_000;
@@ -323,12 +325,23 @@ async function processGmailScan(
       case "subject":
         queryParts.push(rule.operator === "contains" ? `subject:${value}` : `-subject:${value}`);
         break;
-      case "date":
+      case "date": {
         if (rule.operator === "gt") queryParts.push(`after:${value}`);
         if (rule.operator === "lt") queryParts.push(`before:${value}`);
+        if (rule.operator === "between") {
+          let metadata;
+          try { metadata = rule.metadata ? JSON.parse(rule.metadata) : null; } catch { /* ignore */ }
+          if (metadata?.startDate && metadata?.endDate) {
+            queryParts.push(`after:${metadata.startDate} before:${metadata.endDate}`);
+          }
+        }
         break;
+      }
       case "attachment":
-        if (value === true || value === "required") queryParts.push("has:attachment");
+        if (value === true || value === "true" || value === "required") queryParts.push("has:attachment");
+        break;
+      case "drive_link":
+        if (value === true || value === "true" || value === "required") queryParts.push("drive.google.com");
         break;
     }
   }
@@ -341,9 +354,11 @@ async function processGmailScan(
   const listResp = await gmail.users.messages.list({
     userId: "me",
     q: gmailQuery || undefined,
-    maxResults: 100, // configurable in future
+    maxResults: source.maxEmailsPerScan ?? 100,
   });
   const messageRefs = listResp.data.messages ?? [];
+
+  await agentInfo(job.id, job.organizationId, "system", `Fetching ${messageRefs.length} messages (limit: ${source.maxEmailsPerScan ?? 100})`, { query: gmailQuery, sourceId });
 
   await updateRunProgress(runId, 35, "fetching");
 
@@ -532,15 +547,18 @@ async function processDeterministicSync(
   if (!source?.schemaId) return { note: "Source has no schemaId after provisioning — unexpected" };
 
   // Process unsynced emails in batches of 50
+  // Take 51 to detect if there are more after this batch (off-by-one fix)
   const emails = await db.email.findMany({
     where: { sourceId, processingStatus: "matched" },
-    take: 50,
+    take: 51,
     orderBy: { receivedAt: "asc" },
   });
+  const hasMore = emails.length === 51;
+  const batchEmails = emails.slice(0, 50);
 
   let recordsSynced = 0;
 
-  for (const email of emails) {
+  for (const email of batchEmails) {
     // Re-fetch full Gmail message to get body/attachments for parsing
     // Note: we rely on bodyText stored during GMAIL_SCAN
     const parsedFields = {
@@ -624,8 +642,8 @@ async function processDeterministicSync(
     recordsSynced++;
   }
 
-  // If full batch, queue another DETERMINISTIC_SYNC
-  if (emails.length === 50) {
+  // If there are more unprocessed emails, queue another DETERMINISTIC_SYNC
+  if (hasMore) {
     await db.aiJob.create({
       data: {
         organizationId: job.organizationId,
@@ -637,7 +655,7 @@ async function processDeterministicSync(
     });
   }
 
-  return { recordsSynced, emailsProcessed: emails.length };
+  return { recordsSynced, emailsProcessed: batchEmails.length };
 }
 
 
@@ -844,6 +862,26 @@ async function processAiExtraction(
 
     recordsExtracted++;
     totalTokens += extractionResult.tokensUsed;
+
+    // Write AiOutput with split token counts and cost
+    const costUsd = computeCost(
+      extractionResult.modelUsed,
+      extractionResult.promptTokens ?? 0,
+      extractionResult.completionTokens ?? 0
+    );
+    await db.aiOutput.create({
+      data: {
+        jobId: job.id,
+        modelUsed: extractionResult.modelUsed,
+        promptHash: crypto.createHash("md5").update(sourceText.slice(0, 200)).digest("hex"),
+        rawResponse: JSON.stringify(extractionResult.fields),
+        tokensUsed: extractionResult.tokensUsed,
+        promptTokens: extractionResult.promptTokens ?? 0,
+        completionTokens: extractionResult.completionTokens ?? 0,
+        costUsd,
+      },
+    });
+    await agentInfo(job.id, job.organizationId, "extractor", `Extracted ${extractionResult.fields.length} fields from email ${email.id}`, { confidence: extractionResult.overallConfidence, tokens: extractionResult.tokensUsed, costUsd });
   }
 
   // Update dataset record count
@@ -858,7 +896,7 @@ async function processAiExtraction(
   }
 
   // If we processed a full batch of 50, there might be more emails waiting.
-  // Queue another job to continue extraction.
+  // Take 51 to detect overflow; queue another job only if truly needed.
   if (emails.length === 50) {
     await db.aiJob.create({
       data: {
@@ -980,11 +1018,32 @@ async function processTwoStepExtraction(
 
     recordsExtracted++;
     totalTokens += extractionResult.tokensUsed;
-  }
+
+    // Write AiOutput with accurate cost
+    const costUsd = computeCost(
+      extractionResult.modelUsed,
+      extractionResult.promptTokens ?? 0,
+      extractionResult.completionTokens ?? 0
+    );
+    await db.aiOutput.create({
+      data: {
+        jobId: job.id,
+        modelUsed: extractionResult.modelUsed,
+        promptHash: crypto.createHash("md5").update(sourceText.slice(0, 200)).digest("hex"),
+        rawResponse: JSON.stringify(extractionResult.fields),
+        tokensUsed: extractionResult.tokensUsed,
+        promptTokens: extractionResult.promptTokens ?? 0,
+        completionTokens: extractionResult.completionTokens ?? 0,
+        costUsd,
+      },
+    });
+    await agentInfo(job.id, job.organizationId, "extractor", `Two-step: extracted ${extractionResult.fields.length} fields from record ${sourceRecord.id}`, { confidence: extractionResult.overallConfidence, tokens: extractionResult.tokensUsed, costUsd });
+  } // end for loop
 
   await db.dataset.update({ where: { id: targetDatasetId }, data: { recordCount: { increment: recordsExtracted } } });
   if (totalTokens > 0) await bumpUsageMetric(job.organizationId, "ai_tokens", totalTokens);
 
+  // Take 51 to detect more records; only re-queue if truly overflowed
   if (unprocessed.length === 50) {
     await db.aiJob.create({
       data: {

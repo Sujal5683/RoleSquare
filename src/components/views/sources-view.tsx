@@ -324,7 +324,7 @@ export function SourcesView() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <PageHeader
         title="Sources"
         description="Gmail, Drive, Docs, Sheets and Forms sources that feed your extraction pipeline."
@@ -439,7 +439,7 @@ export function SourcesView() {
               />
             </div>
           ) : filtered.length === 0 ? (
-            <div className="p-6">
+            <div className="p-4">
               <EmptyState
                 icon={<Inbox className="h-5 w-5" />}
                 title={

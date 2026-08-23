@@ -360,7 +360,7 @@ export function CommandPalette() {
           </div>
           <CommandList className="max-h-[440px] overflow-y-auto">
             <CommandEmpty>
-              <div className="flex flex-col items-center py-8 text-center">
+              <div className="flex flex-col items-center py-5 text-center">
                 <Search className="mb-2 h-8 w-8 text-muted-foreground/50" />
                 <p className="text-sm font-medium">
                   {isSearching ? "No results found" : "Start typing to search"}

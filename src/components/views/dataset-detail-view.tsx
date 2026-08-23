@@ -479,7 +479,7 @@ export function DatasetDetailView() {
 
   if (datasetLoading) {
     return (
-      <div className="space-y-6">
+      <div className="space-y-4">
         <DetailTopBar
           dataset={null}
           onBack={() => setView("datasets")}
@@ -495,7 +495,7 @@ export function DatasetDetailView() {
 
   if (datasetError || !dataset) {
     return (
-      <div className="space-y-6">
+      <div className="space-y-4">
         <DetailTopBar
           dataset={null}
           onBack={() => setView("datasets")}
@@ -515,7 +515,7 @@ export function DatasetDetailView() {
   // ── No schema → empty state ───────────────────────────────────────────
   if (!dataset.schema) {
     return (
-      <div className="space-y-6">
+      <div className="space-y-4">
         <DetailTopBar
           dataset={dataset}
           onBack={() => setView("datasets")}
@@ -540,7 +540,7 @@ export function DatasetDetailView() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <DetailTopBar
         dataset={dataset}
         onBack={() => setView("datasets")}
@@ -758,7 +758,7 @@ export function DatasetDetailView() {
                 <TableRow>
                   <TableCell
                     colSpan={visibleFields.length + 1}
-                    className="py-6"
+                    className="py-4"
                   >
                     <LoadingState rows={3} />
                   </TableCell>
@@ -767,7 +767,7 @@ export function DatasetDetailView() {
                 <TableRow>
                   <TableCell
                     colSpan={visibleFields.length + 1}
-                    className="py-6"
+                    className="py-4"
                   >
                     <ErrorState
                       message="Failed to load records"
@@ -779,7 +779,7 @@ export function DatasetDetailView() {
                 <TableRow>
                   <TableCell
                     colSpan={visibleFields.length + 1}
-                    className="py-10"
+                    className="py-6"
                   >
                     <EmptyState
                       icon={<Database className="h-5 w-5" />}
@@ -1212,7 +1212,7 @@ function EvidenceDrawer({
         >
           {record && (
             <>
-              <SheetHeader className="border-b p-5">
+              <SheetHeader className="border-b p-4">
                 <SheetTitle className="flex items-center gap-2 text-lg">
                   <Database className="h-4 w-4 text-primary" />
                   Record evidence
@@ -1242,7 +1242,7 @@ function EvidenceDrawer({
               </SheetHeader>
 
               {/* Field values list */}
-              <div className="flex-1 space-y-4 overflow-y-auto p-5">
+              <div className="flex-1 space-y-4 overflow-y-auto p-4">
                 <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                   {record.values.length} extracted field
                   {record.values.length === 1 ? "" : "s"}

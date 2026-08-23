@@ -125,7 +125,7 @@ export function SettingsView() {
   const [tab, setTab] = useState("profile");
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <PageHeader
         title="Settings"
         description="Manage your profile, connected accounts, security, notifications, billing, data retention, and integrations."
@@ -135,7 +135,7 @@ export function SettingsView() {
       <Tabs
         value={tab}
         onValueChange={setTab}
-        className="w-full flex flex-col lg:flex-row gap-6"
+        className="w-full flex flex-col lg:flex-row gap-4"
       >
         <TabsList
           className="lg:w-56 lg:h-fit lg:grid lg:grid-cols-1 lg:gap-1 h-auto flex-wrap"
@@ -170,7 +170,7 @@ export function SettingsView() {
           </TabsTrigger>
         </TabsList>
 
-        <div className="flex-1 min-w-0 space-y-6">
+        <div className="flex-1 min-w-0 space-y-4">
           <TabsContent value="profile" className="mt-0">
             <ProfileSection />
           </TabsContent>
@@ -191,7 +191,7 @@ export function SettingsView() {
           </TabsContent>
           <TabsContent value="integrations" className="mt-0">
             <IntegrationsSection />
-            <div className="mt-6">
+            <div className="mt-4">
               <WebhooksSection />
             </div>
           </TabsContent>
@@ -268,7 +268,7 @@ function ProfileSection() {
           Update your personal information. Email address cannot be changed.
         </CardDescription>
       </CardHeader>
-      <CardContent className="space-y-6">
+      <CardContent className="space-y-4">
         {/* Avatar + identity */}
         <div className="flex flex-col sm:flex-row sm:items-center gap-4">
           <Avatar className="h-16 w-16">
@@ -1651,7 +1651,7 @@ function WebhooksSection() {
         {/* Create dialog */}
         {createOpen && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => setCreateOpen(false)}>
-            <div className="bg-background rounded-lg border p-6 max-w-lg w-full max-h-[80vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            <div className="bg-background rounded-lg border p-4 max-w-lg w-full max-h-[80vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
               <h3 className="text-lg font-semibold mb-1">Add webhook</h3>
               <p className="text-sm text-muted-foreground mb-4">
                 Configure an external endpoint to receive event notifications.
@@ -1692,7 +1692,7 @@ function WebhooksSection() {
                   </div>
                 </div>
               </div>
-              <div className="flex justify-end gap-2 mt-6">
+              <div className="flex justify-end gap-2 mt-4">
                 <Button variant="outline" onClick={() => setCreateOpen(false)}>Cancel</Button>
                 <Button onClick={handleCreate} disabled={!newUrl.trim()}>
                   Create webhook

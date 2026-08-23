@@ -86,7 +86,7 @@ export function ErrorState({
   onRetry?: () => void;
 }) {
   return (
-    <div className="flex flex-col items-center justify-center rounded-lg border border-destructive/30 bg-destructive/5 p-8 text-center">
+    <div className="flex flex-col items-center justify-center rounded-lg border border-destructive/30 bg-destructive/5 p-6 text-center">
       <p className="text-sm font-medium text-destructive">{message}</p>
       {onRetry && (
         <button
@@ -118,7 +118,7 @@ export function StatCard({
   return (
     <div
       className={cn(
-        "rounded-xl border bg-card p-5 shadow-sm transition-shadow hover:shadow-md",
+        "rounded-xl border bg-card p-4 shadow-sm transition-shadow hover:shadow-md",
         className
       )}
     >

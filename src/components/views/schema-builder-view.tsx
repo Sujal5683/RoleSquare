@@ -354,7 +354,7 @@ export function SchemaBuilderView() {
 
   // ── Render ─────────────────────────────────────────────────────────────
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <PageHeader
         title="Schema Builder"
         description="Define the structured fields the AI will extract from each source. Every extraction is evidence-backed."
@@ -438,7 +438,7 @@ export function SchemaBuilderView() {
         <LoadingState rows={3} />
       ) : !activeSchemaId ? (
         <Card>
-          <CardContent className="p-6">
+          <CardContent className="p-4">
             <EmptyState
               icon={<FileJson className="h-5 w-5" />}
               title="No schema selected"
@@ -457,9 +457,9 @@ export function SchemaBuilderView() {
       ) : !activeSchema ? (
         <ErrorState message="Schema not found" />
       ) : (
-        <div className="grid gap-6 lg:grid-cols-3">
+        <div className="grid gap-4 lg:grid-cols-3">
           {/* Left: schema metadata + fields */}
-          <div className="lg:col-span-2 space-y-6">
+          <div className="lg:col-span-2 space-y-4">
             {/* Metadata */}
             <Card>
               <CardHeader className="pb-3">
@@ -542,7 +542,7 @@ export function SchemaBuilderView() {
               </CardHeader>
               <CardContent className="p-0">
                 {activeSchema.fields.length === 0 ? (
-                  <div className="p-6">
+                  <div className="p-4">
                     <EmptyState
                       icon={<Sparkles className="h-5 w-5" />}
                       title="No fields yet"
@@ -623,7 +623,7 @@ export function SchemaBuilderView() {
           </div>
 
           {/* Right: prompt preview + test extraction */}
-          <div className="lg:col-span-1 space-y-6">
+          <div className="lg:col-span-1 space-y-4">
             <Card>
               <CardHeader className="pb-3">
                 <CardTitle className="text-base flex items-center gap-2">

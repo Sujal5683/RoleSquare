@@ -124,6 +124,7 @@ export interface SourceRuleDTO {
   filterType: string;
   operator: string;
   value: unknown;
+  metadata: Record<string, unknown> | null;
   position: number;
 }
 
@@ -144,6 +145,7 @@ export interface SourceDTO {
   runState: RunState;
   scheduleMode: string;
   scheduleExpr: string;
+  maxEmailsPerScan: number;
   lastRunAt: string | null;
   nextRunAt: string | null;
   rules?: SourceRuleDTO[];
@@ -202,6 +204,11 @@ export interface DatasetDTO {
   isDefault: boolean;
   createdAt: string;
   sourceId?: string | null;
+  // Sharing metadata (populated when dataset comes from a DatasetAccess grant)
+  accessLevel?: "owner" | "read" | "comment" | "edit";
+  isShared?: boolean;
+  ownerOrgName?: string;
+  ownerOrgId?: string;
 }
 
 export interface AiJobDTO {
@@ -225,6 +232,10 @@ export interface AiOutputDTO {
   modelUsed: string;
   promptHash: string;
   tokensUsed: number;
+  promptTokens: number;
+  completionTokens: number;
+  costUsd: number;
+  rawResponse: string | null;
   createdAt: string;
 }
 
@@ -235,9 +246,16 @@ export interface SharingRequestDTO {
   datasetName?: string | null;
   requestedBy: string;
   requesterName?: string;
+  requesterEmail?: string;
   status: string;
   level: string;
   reason: string | null;
+  targetOrganizationId: string | null;
+  targetOrganizationName?: string | null;
+  targetUserId: string | null;
+  targetEmail?: string | null;
+  direction: string;
+  shareType: string;
   createdAt: string;
   decidedAt: string | null;
 }
@@ -251,6 +269,51 @@ export interface SharingPermissionDTO {
   level: string;
   fieldScope: Record<string, unknown> | null;
   rowFilter: Record<string, unknown> | null;
+  createdAt: string;
+}
+
+export interface DatasetAccessDTO {
+  id: string;
+  datasetId: string;
+  datasetName?: string;
+  ownerOrgId: string;
+  ownerOrgName?: string;
+  granteeOrgId: string | null;
+  granteeOrgName?: string | null;
+  granteeUserId: string | null;
+  granteeUserEmail?: string | null;
+  granteeUserName?: string | null;
+  level: string;
+  status: string;
+  fieldScope: Record<string, unknown> | null;
+  rowFilter: Record<string, unknown> | null;
+  sourceRequestId: string | null;
+  createdAt: string;
+}
+
+export interface InvitationDTO {
+  id: string;
+  organizationId: string;
+  organizationName?: string;
+  email: string;
+  role: string;
+  token: string;
+  invitedBy: string;
+  inviterName?: string;
+  status: string;
+  expiresAt: string;
+  acceptedAt: string | null;
+  createdAt: string;
+}
+
+export interface AgentLogDTO {
+  id: string;
+  jobId: string;
+  organizationId: string;
+  agentKey: string;
+  level: string;
+  message: string;
+  metadata: Record<string, unknown> | null;
   createdAt: string;
 }
 
@@ -318,6 +381,8 @@ export interface ExtractionResult {
   modelUsed: string;
   promptVersion: string;
   tokensUsed: number;
+  promptTokens: number;
+  completionTokens: number;
   overallConfidence: number;
   reviewFlags?: FieldReviewFlag[];
   fieldsNeedingReview?: number;

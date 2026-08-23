@@ -70,6 +70,9 @@ export async function PATCH(
     if (typeof body?.description === "string") data.description = body.description || null;
     if (body?.schemaId !== undefined) data.schemaId = body.schemaId || null;
     if (body?.datasetId !== undefined) data.datasetId = body.datasetId || null;
+    if (typeof body?.maxEmailsPerScan === "number") {
+      data.maxEmailsPerScan = Math.max(1, Math.min(2000, body.maxEmailsPerScan));
+    }
 
     await db.source.update({ where: { id }, data });
     const updated = await loadSourceInOrg(id, organizationId);

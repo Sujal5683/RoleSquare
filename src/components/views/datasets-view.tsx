@@ -99,6 +99,7 @@ export function DatasetsView() {
   const setView = useAppStore((s) => s.setView);
 
   const [search, setSearch] = useState("");
+  const [datasetFilter, setDatasetFilter] = useState<"all" | "mine" | "shared">("all");
   const [createOpen, setCreateOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<DatasetDTO | null>(null);
 
@@ -111,7 +112,8 @@ export function DatasetsView() {
     isFetching,
   } = useQuery({
     queryKey: ["datasets", activeOrgId],
-    queryFn: () => api.get<DatasetDTO[]>("/api/datasets"),
+    queryFn: () =>
+      api.get<DatasetDTO[]>(`/api/datasets?organizationId=${activeOrgId}`),
     enabled: !!activeOrgId,
   });
 
@@ -166,14 +168,20 @@ export function DatasetsView() {
   const filtered = useMemo(() => {
     if (!datasets) return [];
     const q = search.trim().toLowerCase();
-    if (!q) return datasets;
-    return datasets.filter(
+    let base = datasets;
+    if (datasetFilter === "mine") base = base.filter((d) => !d.isShared);
+    if (datasetFilter === "shared") base = base.filter((d) => d.isShared);
+    if (!q) return base;
+    return base.filter(
       (d) =>
         d.name.toLowerCase().includes(q) ||
         (d.description ?? "").toLowerCase().includes(q) ||
-        (d.schema?.name ?? "").toLowerCase().includes(q)
+        (d.schema?.name ?? "").toLowerCase().includes(q) ||
+        (d.ownerOrgName ?? "").toLowerCase().includes(q)
     );
-  }, [datasets, search]);
+  }, [datasets, search, datasetFilter]);
+
+  const sharedCount = useMemo(() => (datasets ?? []).filter((d) => d.isShared).length, [datasets]);
 
   const handleShare = (d: DatasetDTO) => {
     toast.info("Share link copied", {
@@ -183,7 +191,7 @@ export function DatasetsView() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <PageHeader
         title="Datasets"
         description="Structured, evidence-backed datasets extracted from your sources. Open a dataset to explore records, review evidence, and approve corrections."
@@ -209,17 +217,34 @@ export function DatasetsView() {
         }
       />
 
-      {/* Search */}
+      {/* Search + filter */}
       <Card>
         <CardContent className="p-4">
-          <div className="relative max-w-md">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              placeholder="Search datasets by name, description or schema…"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="pl-9"
-            />
+          <div className="flex items-center gap-3 flex-wrap">
+            <div className="relative flex-1 min-w-[200px] max-w-md">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                placeholder="Search datasets by name, description or schema…"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="pl-9"
+              />
+            </div>
+            <div className="flex items-center gap-1 rounded-lg border p-1">
+              {(["all", "mine", "shared"] as const).map((f) => (
+                <button
+                  key={f}
+                  onClick={() => setDatasetFilter(f)}
+                  className={`rounded px-3 py-1 text-sm font-medium transition-colors ${
+                    datasetFilter === f
+                      ? "bg-primary text-primary-foreground"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  {f === "all" ? "All" : f === "mine" ? "Mine" : `Shared${sharedCount > 0 ? ` (${sharedCount})` : ""}`}
+                </button>
+              ))}
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -259,7 +284,7 @@ export function DatasetsView() {
           {filtered.map((d) => (
             <Card
               key={d.id}
-              className="flex flex-col gap-3 p-5 transition-shadow hover:shadow-md"
+              className="flex flex-col gap-3 p-4 transition-shadow hover:shadow-md"
             >
               {/* Header */}
               <div className="flex items-start justify-between gap-3">
@@ -275,17 +300,30 @@ export function DatasetsView() {
                     >
                       {d.name}
                     </button>
-                    {d.schema ? (
-                      <Badge variant="secondary" className="font-normal">
-                        {d.schema.name}
-                        {d.schema.fields?.length
-                          ? ` · ${d.schema.fields.length} fields`
-                          : ""}
-                      </Badge>
-                    ) : (
-                      <Badge variant="outline" className="font-normal text-muted-foreground">
-                        No schema
-                      </Badge>
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      {d.isShared && (
+                        <Badge className="bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400 font-normal text-xs">
+                          Shared
+                        </Badge>
+                      )}
+                      {d.schema ? (
+                        <Badge variant="secondary" className="font-normal">
+                          {d.schema.name}
+                          {d.schema.fields?.length
+                            ? ` · ${d.schema.fields.length} fields`
+                            : ""}
+                        </Badge>
+                      ) : (
+                        <Badge variant="outline" className="font-normal text-muted-foreground">
+                          No schema
+                        </Badge>
+                      )}
+                    </div>
+                    {d.isShared && d.ownerOrgName && (
+                      <div className="text-xs text-muted-foreground flex items-center gap-1">
+                        <ChevronRight className="h-3 w-3" />
+                        From: {d.ownerOrgName}
+                      </div>
                     )}
                   </div>
                 </div>

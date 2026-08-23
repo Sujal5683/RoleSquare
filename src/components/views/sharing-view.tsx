@@ -1,1024 +1,469 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { formatDistanceToNow, format } from "date-fns";
 import { toast } from "sonner";
-import { api, ApiError } from "@/lib/api-client";
-import type {
-  DatasetDTO,
-  SharingPermissionDTO,
-  SharingRequestDTO,
-} from "@/lib/types";
+import { formatDistanceToNow } from "date-fns";
+import {
+  Share2, Users, Download, Upload, Clock, ShieldCheck, Building2,
+  User, Loader2, MoreHorizontal, Trash2, CheckCircle2, XCircle,
+  Plus, Database, ArrowUpRight,
+} from "lucide-react";
+import { api } from "@/lib/api-client";
+import { useActiveOrg } from "@/hooks/use-active-org";
+import type { DatasetAccessDTO, SharingRequestDTO, DatasetDTO } from "@/lib/types";
+
 import {
   PageHeader,
   EmptyState,
   LoadingState,
   ErrorState,
 } from "@/components/ui/page-elements";
-import { StatusBadge } from "@/components/ui/status-badge";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-  CardDescription,
-} from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
+  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from "@/components/ui/tabs";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import {
-  Share2,
-  Inbox,
-  Send,
-  Database,
-  Network,
-  Plus,
-  RefreshCw,
-  Check,
-  X,
-  Trash2,
-  ChevronRight,
-  Filter,
-  Eye,
-} from "lucide-react";
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Badge } from "@/components/ui/badge";
+import { NewShareRequestDialog } from "@/components/sharing/new-share-request-dialog";
 
-// ── Helpers ──────────────────────────────────────────────────────────────
+// ── Types ────────────────────────────────────────────────────────────────
 
-function relativeTime(iso: string | null | undefined): string {
-  if (!iso) return "—";
-  try {
-    return formatDistanceToNow(new Date(iso), { addSuffix: true });
-  } catch {
-    return "—";
-  }
+interface PermissionsResponse {
+  owned: DatasetAccessDTO[];
+  received: DatasetAccessDTO[];
 }
 
-function formatDate(iso: string | null | undefined): string {
-  if (!iso) return "—";
-  try {
-    return format(new Date(iso), "MMM d, yyyy");
-  } catch {
-    return "—";
-  }
-}
+// ── Level badge helper ───────────────────────────────────────────────────
 
-const LEVEL_OPTIONS = [
-  { value: "read", label: "Read" },
-  { value: "comment", label: "Comment" },
-  { value: "edit", label: "Edit" },
-  { value: "admin", label: "Admin" },
-];
-
-function levelBadge(level: string) {
-  const variant: "default" | "secondary" | "outline" =
-    level === "admin"
-      ? "default"
-      : level === "edit"
-        ? "secondary"
-        : level === "comment"
-          ? "secondary"
-          : "outline";
+function LevelBadge({ level }: { level: string }) {
+  const map: Record<string, string> = {
+    owner: "bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400",
+    read: "bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-400",
+    comment: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400",
+    edit: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400",
+  };
   return (
-    <Badge variant={variant} className="capitalize font-medium">
-      {level}
+    <Badge className={`capitalize ${map[level] ?? ""}`}>
+      {level === "read" ? "Viewer" : level === "comment" ? "Commenter" : level === "edit" ? "Editor" : level}
     </Badge>
   );
 }
 
-function summarizeFieldScope(
-  scope: Record<string, unknown> | null
-): string {
-  if (!scope) return "All fields";
-  if (Array.isArray(scope)) return `${scope.length} field(s) included`;
-  const keys = Object.keys(scope);
-  if (keys.length === 0) return "All fields";
-  const excluded = scope.exclude;
-  if (Array.isArray(excluded)) {
-    return `Exclude: ${excluded.slice(0, 3).join(", ")}${excluded.length > 3 ? ` +${excluded.length - 3}` : ""}`;
+function GranteeCell({ access }: { access: DatasetAccessDTO }) {
+  if (access.granteeOrgId) {
+    return (
+      <div className="flex items-center gap-2">
+        <div className="flex h-7 w-7 items-center justify-center rounded bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400">
+          <Building2 className="h-3.5 w-3.5" />
+        </div>
+        <div>
+          <div className="text-sm font-medium">{access.granteeOrgName ?? "Unknown org"}</div>
+          <div className="text-xs text-muted-foreground">Organization</div>
+        </div>
+      </div>
+    );
   }
-  return `${keys.length} field(s) scoped`;
+  return (
+    <div className="flex items-center gap-2">
+      <div className="flex h-7 w-7 items-center justify-center rounded bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
+        <User className="h-3.5 w-3.5" />
+      </div>
+      <div>
+        <div className="text-sm font-medium">{access.granteeUserName ?? access.granteeUserEmail ?? "Unknown user"}</div>
+        <div className="text-xs text-muted-foreground">{access.granteeUserEmail}</div>
+      </div>
+    </div>
+  );
 }
 
-function summarizeRowFilter(filter: Record<string, unknown> | null): string {
-  if (!filter) return "All rows";
-  const keys = Object.keys(filter);
-  if (keys.length === 0) return "All rows";
-  return keys
-    .slice(0, 2)
-    .map((k) => `${k}=${String(filter[k])}`)
-    .join(", ") + (keys.length > 2 ? ` +${keys.length - 2}` : "");
-}
-
-import { useActiveOrg } from "@/hooks/use-active-org";
-
-// ── Main component ───────────────────────────────────────────────────────
+// ── Main View ────────────────────────────────────────────────────────────
 
 export function SharingView() {
+  const [tab, setTab] = useState("received");
+  const [shareDialogOpen, setShareDialogOpen] = useState(false);
+  const [selectedDataset, setSelectedDataset] = useState<DatasetDTO | null>(null);
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <PageHeader
+          title="Sharing Center"
+          description="Manage dataset sharing with users and organizations."
+          icon={<Share2 className="h-5 w-5" />}
+        />
+        <Button onClick={() => setShareDialogOpen(true)}>
+          <Plus className="mr-2 h-4 w-4" />
+          Share a Dataset
+        </Button>
+      </div>
+
+      <Tabs value={tab} onValueChange={setTab} className="space-y-4">
+        <TabsList>
+          <TabsTrigger value="received">
+            <Download className="mr-2 h-4 w-4" />
+            Shared with me
+          </TabsTrigger>
+          <TabsTrigger value="owned">
+            <Upload className="mr-2 h-4 w-4" />
+            Shared by me
+          </TabsTrigger>
+          <TabsTrigger value="requests">
+            <Clock className="mr-2 h-4 w-4" />
+            Requests
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="received">
+          <ReceivedTab />
+        </TabsContent>
+
+        <TabsContent value="owned">
+          <OwnedTab onShare={(ds) => { setSelectedDataset(ds); setShareDialogOpen(true); }} />
+        </TabsContent>
+
+        <TabsContent value="requests">
+          <RequestsTab />
+        </TabsContent>
+      </Tabs>
+
+      <NewShareRequestDialog
+        open={shareDialogOpen}
+        onOpenChange={setShareDialogOpen}
+        dataset={selectedDataset}
+      />
+    </div>
+  );
+}
+
+// ── Tab: Shared with me ──────────────────────────────────────────────────
+
+function ReceivedTab() {
+  const activeOrgId = useActiveOrg();
+
+  const { data, isLoading, isError, refetch } = useQuery({
+    queryKey: ["sharing-permissions", activeOrgId, "received"],
+    queryFn: () =>
+      api.get<PermissionsResponse>(
+        `/api/sharing/permissions?organizationId=${activeOrgId}&view=received`
+      ),
+    enabled: !!activeOrgId,
+  });
+
+  if (!activeOrgId) return <EmptyState icon={<Building2 className="h-5 w-5" />} title="No organization selected" description="" />;
+  if (isLoading) return <LoadingState rows={4} />;
+  if (isError) return <ErrorState message="Failed to load shared datasets" onRetry={() => refetch()} />;
+
+  const received = data?.received ?? [];
+  if (received.length === 0) {
+    return (
+      <EmptyState
+        icon={<Download className="h-5 w-5" />}
+        title="No datasets shared with you"
+        description="When someone shares a dataset with you or your organization, it will appear here."
+      />
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      {received.map((access) => (
+        <Card key={access.id} className="flex items-center gap-4 p-4">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-400">
+            <Database className="h-5 w-5" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="font-semibold text-sm truncate">{access.datasetName ?? access.datasetId}</div>
+            <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+              <span className="text-xs text-muted-foreground flex items-center gap-1">
+                <Building2 className="h-3 w-3" />
+                {access.ownerOrgName ?? "Unknown org"}
+              </span>
+              <span className="text-muted-foreground">·</span>
+              <span className="text-xs text-muted-foreground">
+                Shared {formatDistanceToNow(new Date(access.createdAt), { addSuffix: true })}
+              </span>
+            </div>
+          </div>
+          <LevelBadge level={access.level} />
+        </Card>
+      ))}
+    </div>
+  );
+}
+
+// ── Tab: Shared by me ────────────────────────────────────────────────────
+
+function OwnedTab({ onShare }: { onShare: (ds: DatasetDTO) => void }) {
   const queryClient = useQueryClient();
   const activeOrgId = useActiveOrg();
-  const [tab, setTab] = useState("incoming");
-  const [createOpen, setCreateOpen] = useState(false);
-  const [revokeTarget, setRevokeTarget] =
-    useState<SharingPermissionDTO | null>(null);
-  const [manageDataset, setManageDataset] = useState<{
-    datasetId: string;
-    datasetName: string;
-  } | null>(null);
 
-  // ── Queries ────────────────────────────────────────────────────────────
-  const {
-    data: requests,
-    isLoading: reqLoading,
-    isError: reqError,
-    refetch: refetchRequests,
-    isFetching: reqFetching,
-  } = useQuery({
-    queryKey: ["sharing", "requests", activeOrgId],
+  const { data, isLoading, isError, refetch } = useQuery({
+    queryKey: ["sharing-permissions", activeOrgId, "owned"],
     queryFn: () =>
-      api.get<SharingRequestDTO[]>("/api/sharing/requests"),
+      api.get<PermissionsResponse>(
+        `/api/sharing/permissions?organizationId=${activeOrgId}&view=owned`
+      ),
     enabled: !!activeOrgId,
   });
 
-  const {
-    data: permissions,
-    isLoading: permLoading,
-    isError: permError,
-    refetch: refetchPermissions,
-    isFetching: permFetching,
-  } = useQuery({
-    queryKey: ["sharing", "permissions", activeOrgId],
-    queryFn: () =>
-      api.get<SharingPermissionDTO[]>("/api/sharing/permissions"),
-    enabled: !!activeOrgId,
-  });
-
-  // Datasets list — used in the new-share dialog dropdown
-  const { data: datasets } = useQuery({
-    queryKey: ["datasets", activeOrgId],
-    queryFn: () => api.get<DatasetDTO[]>("/api/datasets"),
-    enabled: !!activeOrgId,
-  });
-
-  // ── Mutations ──────────────────────────────────────────────────────────
-  const approveMutation = useMutation({
+  const revokeMutation = useMutation({
     mutationFn: (id: string) =>
-      api.post<SharingRequestDTO>(`/api/sharing/requests/${id}/approve`),
-    onSuccess: (r) => {
-      toast.success("Request approved", {
-        description: `Dataset share is now active at ${r.level} level.`,
-      });
-      queryClient.invalidateQueries({ queryKey: ["sharing"] });
+      api.delete("/api/sharing/permissions", { id }),
+    onSuccess: () => {
+      toast.success("Access revoked");
+      queryClient.invalidateQueries({ queryKey: ["sharing-permissions"] });
     },
     onError: (err: unknown) => {
-      const msg = err instanceof Error ? err.message : "Failed to approve";
-      toast.error("Approve failed", { description: msg });
+      toast.error("Failed to revoke", { description: err instanceof Error ? err.message : undefined });
+    },
+  });
+
+  if (!activeOrgId) return <EmptyState icon={<Building2 className="h-5 w-5" />} title="No organization selected" description="" />;
+  if (isLoading) return <LoadingState rows={4} />;
+  if (isError) return <ErrorState message="Failed to load shared-out datasets" onRetry={() => refetch()} />;
+
+  const owned = (data?.owned ?? []).filter((a) => a.status === "active");
+
+  if (owned.length === 0) {
+    return (
+      <EmptyState
+        icon={<Upload className="h-5 w-5" />}
+        title="You haven't shared any datasets yet"
+        description='Use the "Share a Dataset" button above to give others access to your data.'
+      />
+    );
+  }
+
+  return (
+    <Card>
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Dataset</TableHead>
+            <TableHead>Shared with</TableHead>
+            <TableHead>Access</TableHead>
+            <TableHead>Granted</TableHead>
+            <TableHead className="w-[50px]"></TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {owned.map((access) => (
+            <TableRow key={access.id}>
+              <TableCell>
+                <div className="flex items-center gap-2">
+                  <Database className="h-4 w-4 text-muted-foreground" />
+                  <span className="font-medium text-sm">{access.datasetName ?? access.datasetId}</span>
+                </div>
+              </TableCell>
+              <TableCell>
+                <GranteeCell access={access} />
+              </TableCell>
+              <TableCell>
+                <LevelBadge level={access.level} />
+              </TableCell>
+              <TableCell className="text-sm text-muted-foreground">
+                {formatDistanceToNow(new Date(access.createdAt), { addSuffix: true })}
+              </TableCell>
+              <TableCell>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="icon" className="h-8 w-8">
+                      <MoreHorizontal className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem
+                      className="text-destructive focus:text-destructive"
+                      onClick={() => revokeMutation.mutate(access.id)}
+                      disabled={revokeMutation.isPending}
+                    >
+                      <Trash2 className="mr-2 h-4 w-4" />
+                      Revoke access
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </Card>
+  );
+}
+
+// ── Tab: Requests ────────────────────────────────────────────────────────
+
+function RequestsTab() {
+  const queryClient = useQueryClient();
+  const activeOrgId = useActiveOrg();
+
+  const { data, isLoading, isError, refetch } = useQuery({
+    queryKey: ["cross-org-shares", activeOrgId],
+    queryFn: () =>
+      api.get<{ outgoing: SharingRequestDTO[]; incoming: SharingRequestDTO[] }>(
+        `/api/sharing/cross-org?organizationId=${activeOrgId}`
+      ),
+    enabled: !!activeOrgId,
+  });
+
+  const approveMutation = useMutation({
+    mutationFn: (id: string) =>
+      api.post(`/api/sharing/requests/${id}/approve`, {}),
+    onSuccess: () => {
+      toast.success("Request approved");
+      queryClient.invalidateQueries({ queryKey: ["cross-org-shares"] });
+      queryClient.invalidateQueries({ queryKey: ["sharing-permissions"] });
+    },
+    onError: (err: unknown) => {
+      toast.error("Failed to approve", { description: err instanceof Error ? err.message : undefined });
     },
   });
 
   const rejectMutation = useMutation({
     mutationFn: (id: string) =>
-      api.post<SharingRequestDTO>(`/api/sharing/requests/${id}/reject`),
+      api.post(`/api/sharing/requests/${id}/reject`, {}),
     onSuccess: () => {
       toast.success("Request rejected");
-      queryClient.invalidateQueries({ queryKey: ["sharing"] });
+      queryClient.invalidateQueries({ queryKey: ["cross-org-shares"] });
     },
     onError: (err: unknown) => {
-      const msg = err instanceof Error ? err.message : "Failed to reject";
-      toast.error("Reject failed", { description: msg });
+      toast.error("Failed to reject", { description: err instanceof Error ? err.message : undefined });
     },
   });
 
-  const revokeMutation = useMutation({
-    mutationFn: (id: string) =>
-      api.delete<void>("/api/sharing/permissions", { id }),
-    onSuccess: () => {
-      toast.success("Share revoked");
-      queryClient.invalidateQueries({ queryKey: ["sharing"] });
-      setRevokeTarget(null);
-    },
-    onError: (err: unknown) => {
-      const msg = err instanceof Error ? err.message : "Failed to revoke";
-      toast.error("Revoke failed", { description: msg });
-    },
-  });
+  if (!activeOrgId) return <EmptyState icon={<Building2 className="h-5 w-5" />} title="No organization selected" description="" />;
+  if (isLoading) return <LoadingState rows={3} />;
+  if (isError) return <ErrorState message="Failed to load sharing requests" onRetry={() => refetch()} />;
 
-  // Aggregate permissions by dataset for the Shared Assets tab
-  const sharedAssets = useMemo(() => {
-    if (!permissions) return [];
-    const map = new Map<
-      string,
-      { datasetId: string; datasetName: string; permissions: SharingPermissionDTO[] }
-    >();
-    for (const p of permissions) {
-      const key = p.datasetId;
-      if (!map.has(key)) {
-        map.set(key, {
-          datasetId: p.datasetId,
-          datasetName: p.datasetName ?? "Untitled dataset",
-          permissions: [],
-        });
-      }
-      map.get(key)!.permissions.push(p);
-    }
-    return Array.from(map.values());
-  }, [permissions]);
+  const outgoing = data?.outgoing ?? [];
+  const incoming = data?.incoming ?? [];
+  const pendingIncoming = incoming.filter((r) => r.status === "pending");
 
-  // Stats
-  const pendingCount = (requests ?? []).filter(
-    (r) => r.status === "pending"
-  ).length;
-  const activeShareCount = (permissions ?? []).length;
-  const datasetSharedCount = sharedAssets.length;
+  if (outgoing.length === 0 && incoming.length === 0) {
+    return (
+      <EmptyState
+        icon={<Clock className="h-5 w-5" />}
+        title="No sharing requests"
+        description="Requests to access or share datasets with other organizations appear here."
+      />
+    );
+  }
+
+  function StatusBadge({ status }: { status: string }) {
+    const map: Record<string, string> = {
+      pending: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400",
+      approved: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400",
+      rejected: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
+    };
+    return <Badge className={`capitalize ${map[status] ?? ""}`}>{status}</Badge>;
+  }
 
   return (
     <div className="space-y-6">
-      <PageHeader
-        title="Sharing Center"
-        description="Govern how your datasets are shared across organizations. Approve incoming requests, manage outgoing shares, and review shared assets."
-        icon={<Share2 className="h-5 w-5" />}
-        actions={
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                refetchRequests();
-                refetchPermissions();
-              }}
-              disabled={!activeOrgId || reqFetching || permFetching}
-            >
-              <RefreshCw
-                className={`mr-2 h-3.5 w-3.5 ${reqFetching || permFetching ? "animate-spin" : ""}`}
-              />
-              Refresh
-            </Button>
-            <Button size="sm" onClick={() => setCreateOpen(true)} disabled={!activeOrgId}>
-              <Plus className="mr-2 h-3.5 w-3.5" />
-              New share request
-            </Button>
-          </div>
-        }
-      />
-
-      {/* Stat cards */}
-      <div className="grid gap-4 sm:grid-cols-3">
-        <Card className="p-4">
-          <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300">
-              <Inbox className="h-4 w-4" />
-            </div>
-            <div>
-              <p className="text-xs uppercase tracking-wide text-muted-foreground">
-                Pending requests
-              </p>
-              <p className="text-2xl font-semibold tabular-nums">
-                {pendingCount}
-              </p>
-            </div>
-          </div>
-        </Card>
-        <Card className="p-4">
-          <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">
-              <Send className="h-4 w-4" />
-            </div>
-            <div>
-              <p className="text-xs uppercase tracking-wide text-muted-foreground">
-                Active shares
-              </p>
-              <p className="text-2xl font-semibold tabular-nums">
-                {activeShareCount}
-              </p>
-            </div>
-          </div>
-        </Card>
-        <Card className="p-4">
-          <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-violet-100 text-violet-700 dark:bg-violet-950 dark:text-violet-300">
-              <Database className="h-4 w-4" />
-            </div>
-            <div>
-              <p className="text-xs uppercase tracking-wide text-muted-foreground">
-                Shared datasets
-              </p>
-              <p className="text-2xl font-semibold tabular-nums">
-                {datasetSharedCount}
-              </p>
-            </div>
-          </div>
-        </Card>
-      </div>
-
-      {/* Tabs */}
-      <Tabs value={tab} onValueChange={setTab} className="w-full">
-        <TabsList>
-          <TabsTrigger value="incoming">
-            <Inbox className="mr-2 h-3.5 w-3.5" />
-            Incoming Requests
-            {pendingCount > 0 && (
-              <Badge
-                variant="secondary"
-                className="ml-2 h-5 px-1.5 text-[10px] tabular-nums"
-              >
-                {pendingCount}
-              </Badge>
-            )}
-          </TabsTrigger>
-          <TabsTrigger value="outgoing">
-            <Send className="mr-2 h-3.5 w-3.5" />
-            Outgoing Shares
-          </TabsTrigger>
-          <TabsTrigger value="assets">
-            <Network className="mr-2 h-3.5 w-3.5" />
-            Shared Assets
-          </TabsTrigger>
-        </TabsList>
-
-        {/* Incoming requests */}
-        <TabsContent value="incoming" className="mt-4">
+      {pendingIncoming.length > 0 && (
+        <div>
+          <h3 className="text-sm font-semibold text-muted-foreground mb-2 flex items-center gap-2">
+            <Download className="h-4 w-4" /> Incoming Requests
+          </h3>
           <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Incoming requests</CardTitle>
-              <CardDescription>
-                Approve or reject requests from other organizations asking for
-                access to your datasets.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="p-0">
-              {reqLoading ? (
-                <div className="px-6 pb-6">
-                  <LoadingState rows={3} />
-                </div>
-              ) : reqError ? (
-                <div className="px-6 pb-6">
-                  <ErrorState
-                    message="Failed to load requests"
-                    onRetry={() => refetchRequests()}
-                  />
-                </div>
-              ) : !requests || requests.length === 0 ? (
-                <EmptyState
-                  icon={<Inbox className="h-5 w-5" />}
-                  title="No incoming requests"
-                  description="When another organization requests access to one of your datasets, it will appear here for review."
-                  className="mx-6 mb-6"
-                />
-              ) : (
-                <div className="max-h-[28rem] overflow-y-auto">
-                  <Table>
-                    <TableHeader className="sticky top-0 bg-card">
-                      <TableRow>
-                        <TableHead>Dataset</TableHead>
-                        <TableHead>Requester</TableHead>
-                        <TableHead>Level</TableHead>
-                        <TableHead>Reason</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead>Requested</TableHead>
-                        <TableHead className="text-right">Actions</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {requests.map((r) => (
-                        <TableRow key={r.id}>
-                          <TableCell className="font-medium">
-                            {r.datasetName ?? (
-                              <span className="text-muted-foreground italic">
-                                Untitled dataset
-                              </span>
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            {r.requesterName ?? (
-                              <span className="text-muted-foreground italic">
-                                Unknown
-                              </span>
-                            )}
-                          </TableCell>
-                          <TableCell>{levelBadge(r.level)}</TableCell>
-                          <TableCell
-                            className="max-w-xs truncate text-sm text-muted-foreground"
-                            title={r.reason ?? ""}
-                          >
-                            {r.reason ?? "—"}
-                          </TableCell>
-                          <TableCell>
-                            <StatusBadge status={r.status} />
-                          </TableCell>
-                          <TableCell
-                            className="text-sm text-muted-foreground"
-                            title={formatDate(r.createdAt)}
-                          >
-                            {relativeTime(r.createdAt)}
-                          </TableCell>
-                          <TableCell className="text-right">
-                            {r.status === "pending" ? (
-                              <div className="flex justify-end gap-1">
-                                <Button
-                                  size="sm"
-                                  variant="default"
-                                  className="h-8"
-                                  onClick={() => approveMutation.mutate(r.id)}
-                                  disabled={
-                                    approveMutation.isPending ||
-                                    rejectMutation.isPending
-                                  }
-                                >
-                                  <Check className="mr-1 h-3.5 w-3.5" />
-                                  Approve
-                                </Button>
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  className="h-8"
-                                  onClick={() => rejectMutation.mutate(r.id)}
-                                  disabled={
-                                    approveMutation.isPending ||
-                                    rejectMutation.isPending
-                                  }
-                                >
-                                  <X className="mr-1 h-3.5 w-3.5" />
-                                  Reject
-                                </Button>
-                              </div>
-                            ) : (
-                              <span className="text-xs text-muted-foreground">
-                                {r.decidedAt
-                                  ? `Decided ${relativeTime(r.decidedAt)}`
-                                  : "—"}
-                              </span>
-                            )}
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* Outgoing shares */}
-        <TabsContent value="outgoing" className="mt-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Outgoing shares</CardTitle>
-              <CardDescription>
-                Active permissions you have granted to other organizations.
-                Revoke to instantly withdraw access.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="p-0">
-              {permLoading ? (
-                <div className="px-6 pb-6">
-                  <LoadingState rows={3} />
-                </div>
-              ) : permError ? (
-                <div className="px-6 pb-6">
-                  <ErrorState
-                    message="Failed to load outgoing shares"
-                    onRetry={() => refetchPermissions()}
-                  />
-                </div>
-              ) : !permissions || permissions.length === 0 ? (
-                <EmptyState
-                  icon={<Send className="h-5 w-5" />}
-                  title="No outgoing shares"
-                  description="Use the New share request button to grant another organization access to one of your datasets."
-                  className="mx-6 mb-6"
-                />
-              ) : (
-                <div className="max-h-[28rem] overflow-y-auto">
-                  <Table>
-                    <TableHeader className="sticky top-0 bg-card">
-                      <TableRow>
-                        <TableHead>Dataset</TableHead>
-                        <TableHead>Organization</TableHead>
-                        <TableHead>Level</TableHead>
-                        <TableHead>Field scope</TableHead>
-                        <TableHead>Row filter</TableHead>
-                        <TableHead>Created</TableHead>
-                        <TableHead className="text-right">Actions</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {permissions.map((p) => (
-                        <TableRow key={p.id}>
-                          <TableCell className="font-medium">
-                            {p.datasetName ?? "Untitled"}
-                          </TableCell>
-                          <TableCell>
-                            <span className="inline-flex items-center gap-1.5">
-                              <Network className="h-3.5 w-3.5 text-muted-foreground" />
-                              {p.organizationName ?? "Unknown org"}
-                            </span>
-                          </TableCell>
-                          <TableCell>{levelBadge(p.level)}</TableCell>
-                          <TableCell
-                            className="max-w-xs truncate text-sm text-muted-foreground"
-                            title={summarizeFieldScope(p.fieldScope)}
-                          >
-                            <span className="inline-flex items-center gap-1">
-                              <Filter className="h-3 w-3" />
-                              {summarizeFieldScope(p.fieldScope)}
-                            </span>
-                          </TableCell>
-                          <TableCell
-                            className="max-w-xs truncate text-sm text-muted-foreground"
-                            title={summarizeRowFilter(p.rowFilter)}
-                          >
-                            {summarizeRowFilter(p.rowFilter)}
-                          </TableCell>
-                          <TableCell
-                            className="text-sm text-muted-foreground"
-                            title={formatDate(p.createdAt)}
-                          >
-                            {relativeTime(p.createdAt)}
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="h-8 text-destructive hover:text-destructive"
-                              onClick={() => setRevokeTarget(p)}
-                              disabled={revokeMutation.isPending}
-                            >
-                              <Trash2 className="mr-1 h-3.5 w-3.5" />
-                              Revoke
-                            </Button>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* Shared assets */}
-        <TabsContent value="assets" className="mt-4">
-          {permLoading ? (
-            <LoadingState rows={3} />
-          ) : !sharedAssets || sharedAssets.length === 0 ? (
-            <EmptyState
-              icon={<Network className="h-5 w-5" />}
-              title="No shared datasets"
-              description="Datasets you have shared with other organizations will appear here as cards."
-            />
-          ) : (
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {sharedAssets.map((a) => (
-                <Card
-                  key={a.datasetId}
-                  className="flex flex-col gap-3 p-5 transition-shadow hover:shadow-md"
-                >
-                  <div className="flex items-start gap-3">
-                    <div className="mt-0.5 flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                      <Database className="h-4 w-4" />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="font-semibold leading-tight truncate">
-                        {a.datasetName}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        {a.permissions.length} active share
-                        {a.permissions.length === 1 ? "" : "s"}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex flex-wrap gap-1.5">
-                    {a.permissions.slice(0, 3).map((p) => (
-                      <Badge
-                        key={p.id}
-                        variant="outline"
-                        className="text-xs font-normal"
-                      >
-                        {p.organizationName ?? "Unknown"} · {p.level}
-                      </Badge>
-                    ))}
-                    {a.permissions.length > 3 && (
-                      <Badge variant="secondary" className="text-xs">
-                        +{a.permissions.length - 3}
-                      </Badge>
-                    )}
-                  </div>
-                  <div className="mt-auto flex items-center justify-end border-t pt-3">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() =>
-                        setManageDataset({
-                          datasetId: a.datasetId,
-                          datasetName: a.datasetName,
-                        })
-                      }
-                    >
-                      <Eye className="mr-1.5 h-3.5 w-3.5" />
-                      Manage
-                      <ChevronRight className="ml-1.5 h-3.5 w-3.5" />
-                    </Button>
-                  </div>
-                </Card>
-              ))}
-            </div>
-          )}
-        </TabsContent>
-      </Tabs>
-
-      {/* New share dialog */}
-      <NewShareDialog
-        open={createOpen}
-        onClose={() => setCreateOpen(false)}
-        datasets={datasets ?? []}
-      />
-
-      {/* Revoke confirmation */}
-      <AlertDialog
-        open={!!revokeTarget}
-        onOpenChange={(open) => {
-          if (!open) setRevokeTarget(null);
-        }}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Revoke share?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This will immediately withdraw access to{" "}
-              <span className="font-medium text-foreground">
-                {revokeTarget?.datasetName ?? "this dataset"}
-              </span>{" "}
-              for{" "}
-              <span className="font-medium text-foreground">
-                {revokeTarget?.organizationName ?? "the recipient organization"}
-              </span>
-              . The recipient will no longer be able to read or query this
-              dataset.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={revokeMutation.isPending}>
-              Cancel
-            </AlertDialogCancel>
-            <AlertDialogAction
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              disabled={revokeMutation.isPending}
-              onClick={(e) => {
-                e.preventDefault();
-                if (revokeTarget) revokeMutation.mutate(revokeTarget.id);
-              }}
-            >
-              {revokeMutation.isPending ? "Revoking…" : "Revoke share"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      {/* Manage dialog */}
-      <Dialog
-        open={!!manageDataset}
-        onOpenChange={(open) => {
-          if (!open) setManageDataset(null);
-        }}
-      >
-        <DialogContent className="sm:max-w-2xl">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Database className="h-4 w-4 text-primary" />
-              {manageDataset?.datasetName ?? "Manage shares"}
-            </DialogTitle>
-            <DialogDescription>
-              Active shares for this dataset. Revoke individual permissions to
-              withdraw access.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="max-h-96 overflow-y-auto -mx-2 px-2">
             <Table>
-              <TableHeader className="sticky top-0 bg-card">
+              <TableHeader>
                 <TableRow>
-                  <TableHead>Organization</TableHead>
-                  <TableHead>Level</TableHead>
-                  <TableHead>Field scope</TableHead>
-                  <TableHead>Row filter</TableHead>
-                  <TableHead className="text-right">Action</TableHead>
+                  <TableHead>Dataset</TableHead>
+                  <TableHead>From</TableHead>
+                  <TableHead>Access</TableHead>
+                  <TableHead>Requested</TableHead>
+                  <TableHead>Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {(permissions ?? [])
-                  .filter((p) => p.datasetId === manageDataset?.datasetId)
-                  .map((p) => (
-                    <TableRow key={p.id}>
-                      <TableCell className="font-medium">
-                        {p.organizationName ?? "Unknown"}
-                      </TableCell>
-                      <TableCell>{levelBadge(p.level)}</TableCell>
-                      <TableCell className="text-xs text-muted-foreground">
-                        {summarizeFieldScope(p.fieldScope)}
-                      </TableCell>
-                      <TableCell className="text-xs text-muted-foreground">
-                        {summarizeRowFilter(p.rowFilter)}
-                      </TableCell>
-                      <TableCell className="text-right">
+                {pendingIncoming.map((r) => (
+                  <TableRow key={r.id}>
+                    <TableCell className="font-medium">{r.datasetName ?? r.datasetId}</TableCell>
+                    <TableCell>
+                      <div className="text-sm">{r.requesterName ?? r.requestedBy}</div>
+                      {r.requesterEmail && (
+                        <div className="text-xs text-muted-foreground">{r.requesterEmail}</div>
+                      )}
+                    </TableCell>
+                    <TableCell><LevelBadge level={r.level} /></TableCell>
+                    <TableCell className="text-sm text-muted-foreground">
+                      {formatDistanceToNow(new Date(r.createdAt), { addSuffix: true })}
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
                         <Button
                           size="sm"
-                          variant="ghost"
-                          className="h-8 text-destructive hover:text-destructive"
-                          disabled={revokeMutation.isPending}
-                          onClick={() => {
-                            setManageDataset(null);
-                            setRevokeTarget(p);
-                          }}
+                          variant="outline"
+                          className="text-emerald-600 border-emerald-300 hover:bg-emerald-50"
+                          onClick={() => approveMutation.mutate(r.id)}
+                          disabled={approveMutation.isPending}
                         >
-                          <Trash2 className="mr-1 h-3.5 w-3.5" />
-                          Revoke
+                          <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" />
+                          Approve
                         </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="text-destructive border-destructive/30 hover:bg-destructive/10"
+                          onClick={() => rejectMutation.mutate(r.id)}
+                          disabled={rejectMutation.isPending}
+                        >
+                          <XCircle className="mr-1.5 h-3.5 w-3.5" />
+                          Reject
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
               </TableBody>
             </Table>
-          </div>
-        </DialogContent>
-      </Dialog>
-    </div>
-  );
-}
-
-// ── New share dialog ─────────────────────────────────────────────────────
-
-function NewShareDialog({
-  open,
-  onClose,
-  datasets,
-}: {
-  open: boolean;
-  onClose: () => void;
-  datasets: DatasetDTO[];
-}) {
-  const queryClient = useQueryClient();
-  const [datasetId, setDatasetId] = useState("");
-  const [targetOrg, setTargetOrg] = useState("");
-  const [level, setLevel] = useState("read");
-  const [reason, setReason] = useState("");
-  const [fieldScopeCsv, setFieldScopeCsv] = useState("");
-  const [rowFilterText, setRowFilterText] = useState("");
-
-  const createMutation = useMutation({
-    mutationFn: (payload: {
-      datasetId?: string;
-      level: string;
-      reason?: string;
-      fieldScope?: Record<string, unknown>;
-      rowFilter?: Record<string, unknown>;
-    }) =>
-      api.post<SharingRequestDTO>("/api/sharing/requests", payload),
-    onSuccess: (r) => {
-      toast.success("Share request submitted", {
-        description: `Pending approval for ${r.datasetName ?? "dataset"} at ${r.level} level.`,
-      });
-      queryClient.invalidateQueries({ queryKey: ["sharing"] });
-      // Reset form
-      setDatasetId("");
-      setTargetOrg("");
-      setLevel("read");
-      setReason("");
-      setFieldScopeCsv("");
-      setRowFilterText("");
-      onClose();
-    },
-    onError: (err: unknown) => {
-      let msg = "Failed to create share request";
-      if (err instanceof ApiError || err instanceof Error) {
-        msg = err.message;
-      }
-      toast.error("Share failed", { description: msg });
-    },
-  });
-
-  const handleSubmit = () => {
-    if (!datasetId) {
-      toast.error("Please select a dataset");
-      return;
-    }
-    // Parse field scope: "field1, field2, field3" -> { exclude: [...] }
-    const excludedFields = fieldScopeCsv
-      .split(",")
-      .map((s) => s.trim())
-      .filter(Boolean);
-    const fieldScope = excludedFields.length
-      ? { exclude: excludedFields }
-      : undefined;
-    // Parse row filter: either JSON or key=value pairs (one per line)
-    let rowFilter: Record<string, unknown> | undefined;
-    const trimmed = rowFilterText.trim();
-    if (trimmed) {
-      if (trimmed.startsWith("{")) {
-        try {
-          rowFilter = JSON.parse(trimmed);
-        } catch {
-          toast.error("Row filter is not valid JSON");
-          return;
-        }
-      } else {
-        // key=value per line
-        rowFilter = {};
-        const lines = trimmed.split(/\n+/).map((l) => l.trim()).filter(Boolean);
-        for (const line of lines) {
-          const idx = line.indexOf("=");
-          if (idx === -1) {
-            toast.error("Row filter lines must be key=value");
-            return;
-          }
-          const k = line.slice(0, idx).trim();
-          const v = line.slice(idx + 1).trim();
-          if (k) rowFilter[k] = v;
-        }
-        if (Object.keys(rowFilter).length === 0) rowFilter = undefined;
-      }
-    }
-    createMutation.mutate({
-      datasetId,
-      level,
-      reason: reason.trim() || undefined,
-      fieldScope,
-      rowFilter,
-    });
-  };
-
-  return (
-    <Dialog
-      open={open}
-      onOpenChange={(o) => {
-        if (!o) onClose();
-      }}
-    >
-      <DialogContent className="sm:max-w-lg">
-        <DialogHeader>
-          <DialogTitle>New share request</DialogTitle>
-          <DialogDescription>
-            Request access to one of your datasets on behalf of another
-            organization. The request will appear in the Incoming Requests tab
-            for approval.
-          </DialogDescription>
-        </DialogHeader>
-        <div className="space-y-4 py-2">
-          <div className="space-y-1.5">
-            <Label>Dataset *</Label>
-            <Select value={datasetId} onValueChange={setDatasetId}>
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Select a dataset" />
-              </SelectTrigger>
-              <SelectContent>
-                {datasets.length === 0 ? (
-                  <div className="px-2 py-3 text-xs text-muted-foreground">
-                    No datasets available — create one first.
-                  </div>
-                ) : (
-                  datasets.map((d) => (
-                    <SelectItem key={d.id} value={d.id}>
-                      {d.name} · {d.recordCount} record(s)
-                    </SelectItem>
-                  ))
-                )}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="target-org">Target organization</Label>
-            <Input
-              id="target-org"
-              placeholder="org-name or recipient@email.com"
-              value={targetOrg}
-              onChange={(e) => setTargetOrg(e.target.value)}
-            />
-            <p className="text-xs text-muted-foreground">
-              The recipient organization name or external email. (Used for
-              display purposes in this demo.)
-            </p>
-          </div>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-1.5">
-              <Label>Access level</Label>
-              <Select value={level} onValueChange={setLevel}>
-                <SelectTrigger className="w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {LEVEL_OPTIONS.map((o) => (
-                    <SelectItem key={o.value} value={o.value}>
-                      {o.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="share-reason">Reason</Label>
-            <Textarea
-              id="share-reason"
-              placeholder="Why is this share being requested?"
-              value={reason}
-              onChange={(e) => setReason(e.target.value)}
-              rows={2}
-            />
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="field-scope">
-              Field scope (fields to exclude)
-            </Label>
-            <Input
-              id="field-scope"
-              placeholder="internal_notes, customer_email, …"
-              value={fieldScopeCsv}
-              onChange={(e) => setFieldScopeCsv(e.target.value)}
-            />
-            <p className="text-xs text-muted-foreground">
-              Comma-separated list of fields the recipient should{" "}
-              <span className="font-medium">not</span> see. Leave blank to
-              share all fields.
-            </p>
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="row-filter">Row filter</Label>
-            <Textarea
-              id="row-filter"
-              placeholder={"status=active\nregion=us-east"}
-              value={rowFilterText}
-              onChange={(e) => setRowFilterText(e.target.value)}
-              rows={3}
-              className="font-mono text-xs"
-            />
-            <p className="text-xs text-muted-foreground">
-              Either JSON ({`{ "status": "active" }`}) or one{" "}
-              <code>key=value</code> per line. Leave blank to share all rows.
-            </p>
-          </div>
+          </Card>
         </div>
-        <DialogFooter>
-          <Button
-            variant="outline"
-            onClick={onClose}
-            disabled={createMutation.isPending}
-          >
-            Cancel
-          </Button>
-          <Button
-            onClick={handleSubmit}
-            disabled={!datasetId || createMutation.isPending}
-          >
-            {createMutation.isPending ? (
-              <RefreshCw className="mr-2 h-3.5 w-3.5 animate-spin" />
-            ) : (
-              <Share2 className="mr-2 h-3.5 w-3.5" />
-            )}
-            Submit request
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+      )}
+
+      {outgoing.length > 0 && (
+        <div>
+          <h3 className="text-sm font-semibold text-muted-foreground mb-2 flex items-center gap-2">
+            <Upload className="h-4 w-4" /> Outgoing Requests / Grants
+          </h3>
+          <Card>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Dataset</TableHead>
+                  <TableHead>Shared with</TableHead>
+                  <TableHead>Access</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Date</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {outgoing.map((r) => (
+                  <TableRow key={r.id}>
+                    <TableCell className="font-medium">{r.datasetName ?? r.datasetId}</TableCell>
+                    <TableCell>
+                      <div className="text-sm">
+                        {r.targetOrganizationName ?? r.targetOrganizationId ?? r.targetEmail ?? r.targetUserId ?? "—"}
+                      </div>
+                    </TableCell>
+                    <TableCell><LevelBadge level={r.level} /></TableCell>
+                    <TableCell><StatusBadge status={r.status} /></TableCell>
+                    <TableCell className="text-sm text-muted-foreground">
+                      {formatDistanceToNow(new Date(r.createdAt), { addSuffix: true })}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </Card>
+        </div>
+      )}
+    </div>
   );
 }

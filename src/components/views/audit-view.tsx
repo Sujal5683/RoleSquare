@@ -259,7 +259,7 @@ export function AuditView() {
     !!search.trim();
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <PageHeader
         title="Audit Logs"
         description="Every change in the platform is recorded here — from source scans to record approvals, sharing decisions, and member role changes. Filter, search, and export for compliance."

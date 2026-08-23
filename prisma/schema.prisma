@@ -25,15 +25,17 @@ model User {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  organizations  OrganizationMember[]
-  connections    GoogleConnection[]
-  sources        Source[]
-  schemas        Schema[]
-  datasets       Dataset[]
-  auditLogs      AuditLog[]      @relation("AuditActor")
-  sharingReqs    SharingRequest[] @relation("SharingRequester")
-  approvedShares SharingRequest[] @relation("SharingDecider")
-  jobs           AiJob[]
+  organizations      OrganizationMember[]
+  connections        GoogleConnection[]
+  sources            Source[]
+  schemas            Schema[]
+  datasets           Dataset[]
+  auditLogs          AuditLog[]       @relation("AuditActor")
+  sharingReqs        SharingRequest[] @relation("SharingRequester")
+  approvedShares     SharingRequest[] @relation("SharingDecider")
+  jobs               AiJob[]
+  sentInvitations    Invitation[]     @relation("SentInvitations")
+  datasetAccessGrants DatasetAccess[] @relation("GranteeUserAccess")
 }
 
 model Organization {
@@ -45,17 +47,21 @@ model Organization {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  members       OrganizationMember[]
-  connections   GoogleConnection[]
-  sources       Source[]
-  schemas       Schema[]
-  datasets      Dataset[]
-  jobs          AiJob[]
-  auditLogs     AuditLog[]
-  usageMetrics  UsageMetric[]
-  sharingReqs   SharingRequest[]
-  sharePerms    SharingPermission[]
-  webhooks      Webhook[]
+  members            OrganizationMember[]
+  connections        GoogleConnection[]
+  sources            Source[]
+  schemas            Schema[]
+  datasets           Dataset[]
+  jobs               AiJob[]
+  auditLogs          AuditLog[]
+  usageMetrics       UsageMetric[]
+  sharingReqs        SharingRequest[]
+  sharePerms         SharingPermission[]
+  webhooks           Webhook[]
+  crossOrgPerms      CrossOrgPermission[] @relation("OwnedCrossOrgPerms")
+  invitations        Invitation[]
+  ownedAccesses      DatasetAccess[]      @relation("OwnerOrgAccess")
+  granteeOrgAccesses DatasetAccess[]      @relation("GranteeOrgAccess")
 }
 
 model OrganizationMember {
@@ -121,6 +127,7 @@ model Source {
   runState           String   @default("idle") // idle | scanning | parsing | extracting | validating
   scheduleMode       String   @default("interval") // interval | cron | manual
   scheduleExpr       String   @default("6h")
+  maxEmailsPerScan   Int      @default(100) // max emails to fetch per Gmail scan run
   config             String   @default("{}") // JSON: processing limits, depth, etc.
   lastRunAt          DateTime?
   nextRunAt          DateTime?
@@ -143,9 +150,10 @@ model Source {
 model SourceRule {
   id         String  @id @default(cuid())
   sourceId   String
-  filterType String  // sender | subject | body | date | attachment | link
-  operator   String  // eq | contains | excludes | regex | domain | gt | lt | required
+  filterType String  // sender | subject | body | date | attachment | link | drive_link
+  operator   String  // eq | contains | excludes | regex | domain | gt | lt | between | required
   value      String  // JSON-encoded value (array, string, boolean, etc.)
+  metadata   String? // JSON: { preset?, startDate?, endDate? } for date rules
   position   Int     @default(0)
 
   source Source @relation(fields: [sourceId], references: [id], onDelete: Cascade)
@@ -320,13 +328,15 @@ model Dataset {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
-  organization Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  schema       Schema?        @relation(fields: [schemaId], references: [id], onDelete: SetNull)
-  creator      User           @relation(fields: [createdBy], references: [id])
-  sources      Source[]
-  records      DatasetRecord[]
-  sharePerms   SharingPermission[]
-  sharingReqs  SharingRequest[]
+  organization    Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  schema          Schema?         @relation(fields: [schemaId], references: [id], onDelete: SetNull)
+  creator         User            @relation(fields: [createdBy], references: [id])
+  sources         Source[]
+  records         DatasetRecord[]
+  sharePerms      SharingPermission[]
+  sharingReqs     SharingRequest[]
+  crossOrgPerms   CrossOrgPermission[]
+  datasetAccesses DatasetAccess[]
 
   @@index([organizationId])
 }
@@ -382,6 +392,7 @@ model AiJob {
   type           String   // GMAIL_SCAN | DETERMINISTIC_SYNC | EMAIL_PARSE | ATTACHMENT_PROCESS | DRIVE_DISCOVERY | DOCUMENT_PARSE | AI_EXTRACTION | AI_VALIDATION | EXPORT
   status         String   @default("queued") // queued | running | success | failed | retry | dlq
   payload        String   @default("{}") // JSON
+  agentKey       String?  // extractor | analyst | validator | transformer | researcher | assistant
   attempts       Int      @default(0)
   progress       Int      @default(0)
   errorMessage   String?
@@ -394,6 +405,7 @@ model AiJob {
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   user         User?        @relation(fields: [userId], references: [id])
   outputs      AiOutput[]
+  agentLogs    AgentLog[]
 
   @@index([organizationId])
   @@index([status])
@@ -401,13 +413,16 @@ model AiJob {
 }
 
 model AiOutput {
-  id         String   @id @default(cuid())
-  jobId      String
-  modelUsed  String
-  promptHash String
-  rawResponse String  // JSON
-  tokensUsed Int      @default(0)
-  createdAt  DateTime @default(now())
+  id               String   @id @default(cuid())
+  jobId            String
+  modelUsed        String
+  promptHash       String
+  rawResponse      String   // JSON
+  tokensUsed       Int      @default(0)
+  promptTokens     Int      @default(0)
+  completionTokens Int      @default(0)
+  costUsd          Float    @default(0) // pre-computed at write time from model pricing
+  createdAt        DateTime @default(now())
 
   job AiJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
 
@@ -419,25 +434,32 @@ model AiOutput {
 // ────────────────────────────────────────────────────────────────────────────
 
 model SharingRequest {
-  id            String   @id @default(cuid())
-  organizationId String
-  datasetId     String?
-  requestedBy   String
-  status        String   @default("pending") // pending | approved | rejected
-  decidedBy     String?
-  reason        String?
-  level         String   @default("read") // read | comment | edit | admin
-  fieldScope    String?  // JSON
-  rowFilter     String?  // JSON
-  createdAt     DateTime @default(now())
-  decidedAt     DateTime?
+  id                   String   @id @default(cuid())
+  organizationId       String
+  datasetId            String?
+  requestedBy          String
+  status               String   @default("pending") // pending | approved | rejected | revoked
+  decidedBy            String?
+  reason               String?
+  level                String   @default("read") // read | comment | edit | admin
+  fieldScope           String?  // JSON
+  rowFilter            String?  // JSON
+  targetOrganizationId String?  // org being asked / org receiving the share
+  targetUserId         String?  // specific user (optional)
+  targetEmail          String?  // email-based lookup for user-to-user sharing
+  direction            String   @default("outgoing") // outgoing | incoming
+  shareType            String   @default("request") // request | grant
+  createdAt            DateTime @default(now())
+  decidedAt            DateTime?
 
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  dataset      Dataset?     @relation(fields: [datasetId], references: [id], onDelete: SetNull)
-  requester    User         @relation("SharingRequester", fields: [requestedBy], references: [id])
-  decider      User?        @relation("SharingDecider", fields: [decidedBy], references: [id])
+  organization       Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  dataset            Dataset?      @relation(fields: [datasetId], references: [id], onDelete: SetNull)
+  requester          User          @relation("SharingRequester", fields: [requestedBy], references: [id])
+  decider            User?         @relation("SharingDecider", fields: [decidedBy], references: [id])
 
   @@index([organizationId])
+  @@index([targetOrganizationId])
+  @@index([targetEmail])
   @@index([status])
 }
 
@@ -507,4 +529,111 @@ model Webhook {
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   @@index([organizationId])
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Cross-Organisation Permissions
+// ────────────────────────────────────────────────────────────────────────────
+
+model CrossOrgPermission {
+  id                  String   @id @default(cuid())
+  datasetId           String
+  ownerOrganizationId String
+  granteeOrgId        String?  // target org receiving access
+  granteeUserId       String?  // or specific user
+  level               String   @default("read") // read | comment | edit
+  fieldScope          String?  // JSON
+  rowFilter           String?  // JSON
+  status              String   @default("active") // active | revoked
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  dataset           Dataset      @relation(fields: [datasetId], references: [id], onDelete: Cascade)
+  ownerOrganization Organization @relation("OwnedCrossOrgPerms", fields: [ownerOrganizationId], references: [id], onDelete: Cascade)
+
+  @@index([datasetId])
+  @@index([ownerOrganizationId])
+  @@index([granteeOrgId])
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Unified Dataset Access — replaces the split SharingPermission / CrossOrgPermission
+// approach. Supports: org-to-org, user-to-user, org-to-user sharing.
+// ────────────────────────────────────────────────────────────────────────────
+
+model DatasetAccess {
+  id              String   @id @default(cuid())
+  datasetId       String
+  ownerOrgId      String   // The org that owns the dataset and granted this access
+
+  // Exactly one of these must be set (or both null for a pending request)
+  granteeOrgId    String?  // grant to an entire organization
+  granteeUserId   String?  // grant to a specific user
+
+  level           String   @default("read") // read | comment | edit
+  fieldScope      String?  // JSON: { include?: string[], exclude?: string[] }
+  rowFilter       String?  // JSON: arbitrary row-level filter
+  status          String   @default("active") // active | revoked
+  sourceRequestId String?  // back-ref to the SharingRequest that created this
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  dataset    Dataset      @relation(fields: [datasetId], references: [id], onDelete: Cascade)
+  ownerOrg   Organization @relation("OwnerOrgAccess", fields: [ownerOrgId], references: [id], onDelete: Cascade)
+  granteeOrg Organization? @relation("GranteeOrgAccess", fields: [granteeOrgId], references: [id], onDelete: SetNull)
+  granteeUser User?        @relation("GranteeUserAccess", fields: [granteeUserId], references: [id], onDelete: SetNull)
+
+  @@index([datasetId])
+  @@index([ownerOrgId])
+  @@index([granteeOrgId])
+  @@index([granteeUserId])
+  @@index([status])
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Invitations — proper invite flow replacing the broken status="invited" hack.
+// ────────────────────────────────────────────────────────────────────────────
+
+model Invitation {
+  id             String   @id @default(cuid())
+  organizationId String
+  email          String   // email of the invitee
+  role           String   @default("member") // owner | admin | manager | member | viewer
+  token          String   @unique @default(cuid()) // URL-safe accept token
+  invitedBy      String
+  status         String   @default("pending") // pending | accepted | expired | cancelled
+  expiresAt      DateTime // default +7 days
+  acceptedAt     DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  inviter      User         @relation("SentInvitations", fields: [invitedBy], references: [id])
+
+  @@unique([organizationId, email])
+  @@index([token])
+  @@index([email])
+  @@index([organizationId])
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Structured Agent Logs
+// ────────────────────────────────────────────────────────────────────────────
+
+model AgentLog {
+  id             String   @id @default(cuid())
+  jobId          String
+  organizationId String
+  agentKey       String   // extractor | analyst | validator | transformer | researcher | assistant | system
+  level          String   @default("info") // info | warn | error | debug
+  message        String
+  metadata       String?  // JSON
+  createdAt      DateTime @default(now())
+
+  job AiJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  @@index([jobId])
+  @@index([organizationId, agentKey])
+  @@index([createdAt])
 }
