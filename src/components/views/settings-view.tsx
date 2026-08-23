@@ -192,6 +192,9 @@ export function SettingsView() {
           <TabsContent value="integrations" className="mt-0">
             <IntegrationsSection />
             <div className="mt-4">
+              <ApiKeysSection />
+            </div>
+            <div className="mt-4">
               <WebhooksSection />
             </div>
           </TabsContent>
@@ -451,7 +454,18 @@ function ConnectedAccountsSection() {
                     <Mail className="h-4 w-4" />
                   </div>
                   <div className="min-w-0 space-y-1">
-                    <p className="font-medium truncate">{c.googleEmail}</p>
+                    <div className="flex items-center gap-2">
+                      <p className="font-medium truncate">{c.googleEmail}</p>
+                      {c.status === "active" && new Date(c.watchExpiresAt) > new Date(Date.now() + 86400000) ? (
+                        <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-400 gap-1 h-5 text-[10px]">
+                          <ShieldCheck className="h-3 w-3" /> Healthy
+                        </Badge>
+                      ) : (
+                        <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/30 dark:text-amber-400 gap-1 h-5 text-[10px]">
+                          <AlertTriangle className="h-3 w-3" /> Re-auth needed
+                        </Badge>
+                      )}
+                    </div>
                     <div className="flex flex-wrap items-center gap-2">
                       <StatusBadge status={c.status} />
                       <span className="text-xs text-muted-foreground">
@@ -1700,6 +1714,123 @@ function WebhooksSection() {
               </div>
             </div>
           </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+// ── API Keys Section ───────────────────────────────────────────────────────
+
+function ApiKeysSection() {
+  const [keys, setKeys] = useState<{ id: string; name: string; lastUsedAt: string | null }[]>([
+    { id: "key_abc123", name: "Production API", lastUsedAt: new Date().toISOString() },
+  ]);
+  const [newKeyName, setNewKeyName] = useState("");
+  const [createdKey, setCreatedKey] = useState<string | null>(null);
+
+  const handleCreate = () => {
+    if (!newKeyName.trim()) {
+      toast.error("Please enter a name for the API key");
+      return;
+    }
+    const mockKey = `sk_${Math.random().toString(36).substring(2, 15)}_${Math.random().toString(36).substring(2, 15)}`;
+    setCreatedKey(mockKey);
+    setKeys([...keys, { id: `key_${Math.random().toString(36).substring(2, 8)}`, name: newKeyName, lastUsedAt: null }]);
+    setNewKeyName("");
+  };
+
+  const handleRevoke = (id: string) => {
+    setKeys(keys.filter((k) => k.id !== id));
+    toast.success("API key revoked");
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-lg flex items-center gap-2">
+          <Key className="h-5 w-5 text-primary" />
+          API Keys
+        </CardTitle>
+        <CardDescription>
+          Manage API keys used to programmatically interact with Workspace Intelligence Platform.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {createdKey && (
+          <div className="bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-900 rounded-lg p-4 mb-4">
+            <h4 className="text-sm font-semibold text-emerald-800 dark:text-emerald-400 flex items-center gap-2">
+              <Check className="h-4 w-4" />
+              API Key Created
+            </h4>
+            <p className="text-xs text-emerald-700 dark:text-emerald-500 mt-1 mb-3">
+              Please copy this key now. You won't be able to see it again!
+            </p>
+            <div className="flex items-center gap-2">
+              <code className="text-xs flex-1 bg-white dark:bg-black px-3 py-2 rounded border break-all">
+                {createdKey}
+              </code>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  navigator.clipboard.writeText(createdKey);
+                  toast.success("Copied to clipboard");
+                }}
+              >
+                Copy
+              </Button>
+            </div>
+            <div className="mt-3 flex justify-end">
+              <Button variant="ghost" size="sm" onClick={() => setCreatedKey(null)}>Dismiss</Button>
+            </div>
+          </div>
+        )}
+
+        <div className="flex gap-2">
+          <Input
+            placeholder="Key name (e.g., 'Production Sync')"
+            value={newKeyName}
+            onChange={(e) => setNewKeyName(e.target.value)}
+            className="max-w-sm"
+          />
+          <Button onClick={handleCreate}>
+            <Plus className="mr-2 h-4 w-4" />
+            Generate New Key
+          </Button>
+        </div>
+
+        {keys.length > 0 ? (
+          <div className="border rounded-lg overflow-hidden mt-4">
+            <table className="w-full text-sm">
+              <thead className="bg-muted/50 text-muted-foreground border-b">
+                <tr>
+                  <th className="py-2 px-3 text-left font-medium">Name</th>
+                  <th className="py-2 px-3 text-left font-medium">Key Prefix</th>
+                  <th className="py-2 px-3 text-left font-medium">Last Used</th>
+                  <th className="py-2 px-3 text-right font-medium">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y">
+                {keys.map((k) => (
+                  <tr key={k.id} className="hover:bg-muted/20">
+                    <td className="py-2 px-3 font-medium">{k.name}</td>
+                    <td className="py-2 px-3 font-mono text-xs">sk_...{k.id.slice(-4)}</td>
+                    <td className="py-2 px-3 text-muted-foreground text-xs">
+                      {k.lastUsedAt ? formatDistanceToNow(new Date(k.lastUsedAt), { addSuffix: true }) : "Never"}
+                    </td>
+                    <td className="py-2 px-3 text-right">
+                      <Button variant="ghost" size="sm" className="h-7 text-red-600 hover:text-red-700 hover:bg-red-50" onClick={() => handleRevoke(k.id)}>
+                        Revoke
+                      </Button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <EmptyState icon={<Key className="h-4 w-4"/>} title="No API keys" description="Create an API key to get started." />
         )}
       </CardContent>
     </Card>

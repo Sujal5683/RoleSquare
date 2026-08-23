@@ -56,11 +56,17 @@ export async function POST(
         instructions: body?.instructions ?? null,
         required: !!body?.required,
         options: body?.options ? JSON.stringify(body.options) : null,
+        validation: body?.validation ? JSON.stringify(body.validation) : null,
         position,
         confidenceThreshold: typeof body?.confidenceThreshold === "number"
           ? Math.max(0, Math.min(1, body.confidenceThreshold))
           : 0.7,
       },
+    });
+
+    await db.schema.update({
+      where: { id },
+      data: { version: { increment: 1 } },
     });
 
     await logAudit({

@@ -160,18 +160,51 @@ export async function GET(req: NextRequest) {
 
     // ── Quota calculation ───────────────────────────────────────────────
     // Assume team plan = 100,000 tokens/month, free = 1,000, enterprise = 1,000,000
-    const quotaMap: Record<string, number> = {
-      free: 1_000,
-      team: 100_000,
-      enterprise: 1_000_000,
+    const planLimits: Record<string, { tokens: number, jobs: number, records: number }> = {
+      free: { tokens: 10_000, jobs: 100, records: 50 },
+      team: { tokens: 1_000_000, jobs: 1_000, records: 500 },
+      enterprise: { tokens: 10_000_000, jobs: 10_000, records: 5_000 },
     };
     const org = await db.organization.findUnique({
       where: { id: organizationId },
       select: { plan: true },
     });
-    const quota = quotaMap[org?.plan || "free"] || 1_000;
-    const quotaUsed = Math.min(currentMonthTokens, quota);
-    const quotaPercent = quota > 0 ? (quotaUsed / quota) * 100 : 0;
+    
+    const limits = planLimits[org?.plan || "free"] || planLimits.free;
+
+    // We can count total records extracted this month
+    const currentMonthRecords = await db.datasetRecord.count({
+      where: { dataset: { organizationId }, createdAt: { gte: startOfMonth } }
+    });
+    
+    const currentMonthJobs = aiJobs.filter(j => j.createdAt >= startOfMonth).length;
+
+    const quotas = [
+      {
+        id: "tokens",
+        name: "AI Tokens",
+        limit: limits.tokens,
+        used: currentMonthTokens,
+        remaining: Math.max(0, limits.tokens - currentMonthTokens),
+        percent: limits.tokens > 0 ? Math.min(100, (currentMonthTokens / limits.tokens) * 100) : 0,
+      },
+      {
+        id: "jobs",
+        name: "AI Jobs",
+        limit: limits.jobs,
+        used: currentMonthJobs,
+        remaining: Math.max(0, limits.jobs - currentMonthJobs),
+        percent: limits.jobs > 0 ? Math.min(100, (currentMonthJobs / limits.jobs) * 100) : 0,
+      },
+      {
+        id: "records",
+        name: "Records Extracted",
+        limit: limits.records,
+        used: currentMonthRecords,
+        remaining: Math.max(0, limits.records - currentMonthRecords),
+        percent: limits.records > 0 ? Math.min(100, (currentMonthRecords / limits.records) * 100) : 0,
+      }
+    ];
 
     return NextResponse.json({
       dailyTokens,
@@ -193,13 +226,14 @@ export async function GET(req: NextRequest) {
             ? ((currentMonthTokens - prevMonthTokens) / prevMonthTokens) * 100
             : 0,
       },
-      quota: {
+      quota: { // legacy support for older components
         plan: org?.plan || "free",
-        limit: quota,
-        used: quotaUsed,
-        remaining: Math.max(0, quota - currentMonthTokens),
-        percent: quotaPercent,
+        limit: limits.tokens,
+        used: Math.min(currentMonthTokens, limits.tokens),
+        remaining: Math.max(0, limits.tokens - currentMonthTokens),
+        percent: limits.tokens > 0 ? (currentMonthTokens / limits.tokens) * 100 : 0,
       },
+      quotas,
       counts: {
         sources,
         datasets,

@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api-client";
 import { useAppStore } from "@/lib/store";
@@ -11,6 +12,19 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
 import {
   Inbox,
   Database,
@@ -33,7 +47,13 @@ import {
   Trash2,
   Share2,
   Download,
+  Calendar,
 } from "lucide-react";
+import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip as RechartsTooltip, XAxis, YAxis } from "recharts";
+
+type ExtendedDashboardData = DashboardData & {
+  chartData: Array<{ date: string; records: number; jobs: number }>;
+};
 
 export function DashboardView() {
   const selectedOrgId = useAppStore((s) => s.selectedOrganizationId);
@@ -42,6 +62,8 @@ export function DashboardView() {
   const openSource = useAppStore((s) => s.openSource);
   const openSchema = useAppStore((s) => s.openSchema);
   const recentItems = useAppStore((s) => s.recentItems);
+  
+  const [dateRange, setDateRange] = useState("30d");
 
   const { data: session } = useQuery({
     queryKey: ["session"],
@@ -52,8 +74,8 @@ export function DashboardView() {
   const activeOrgId = (selectedOrgId && isValidSelectedOrg) ? selectedOrgId : session?.organizations?.[0]?.id ?? null;
 
   const { data, isLoading, refetch, isFetching } = useQuery({
-    queryKey: ["dashboard", activeOrgId],
-    queryFn: () => api.get<DashboardData>(`/api/dashboard?organizationId=${activeOrgId}`),
+    queryKey: ["dashboard", activeOrgId, dateRange],
+    queryFn: () => api.get<ExtendedDashboardData>(`/api/dashboard?organizationId=${activeOrgId}&dateRange=${dateRange}`),
     enabled: !!activeOrgId,
   });
 
@@ -72,10 +94,23 @@ export function DashboardView() {
         description="Real-time view of your ingestion pipeline, AI extraction activity, and review queue."
         icon={<Activity className="h-5 w-5" />}
         actions={
-          <Button variant="outline" size="sm" onClick={() => refetch()} disabled={isFetching}>
-            <RefreshCw className={`mr-2 h-3.5 w-3.5 ${isFetching ? "animate-spin" : ""}`} />
-            Refresh
-          </Button>
+          <div className="flex items-center gap-2">
+            <Select value={dateRange} onValueChange={setDateRange}>
+              <SelectTrigger className="w-[140px] h-9">
+                <Calendar className="mr-2 h-4 w-4 text-muted-foreground" />
+                <SelectValue placeholder="Select range" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="7d">Last 7 days</SelectItem>
+                <SelectItem value="30d">Last 30 days</SelectItem>
+                <SelectItem value="90d">Last 90 days</SelectItem>
+              </SelectContent>
+            </Select>
+            <Button variant="outline" size="sm" onClick={() => refetch()} disabled={isFetching}>
+              <RefreshCw className={`mr-2 h-3.5 w-3.5 ${isFetching ? "animate-spin" : ""}`} />
+              Refresh
+            </Button>
+          </div>
         }
       />
 
@@ -125,6 +160,57 @@ export function DashboardView() {
               hint="Need retry"
             />
           </div>
+
+          {/* Time-series Chart */}
+          <Card>
+            <CardHeader className="pb-3 flex flex-row items-center justify-between">
+              <CardTitle className="text-base flex items-center gap-2">
+                <Activity className="h-4 w-4" /> Activity (Last {dateRange.replace('d', '')} Days)
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="h-[250px] w-full mt-4">
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={data.chartData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+                    <defs>
+                      <linearGradient id="colorRecords" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3} />
+                        <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
+                      </linearGradient>
+                      <linearGradient id="colorJobs" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#10b981" stopOpacity={0.3} />
+                        <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
+                      </linearGradient>
+                    </defs>
+                    <XAxis 
+                      dataKey="date" 
+                      tickFormatter={(val) => {
+                        const d = new Date(val);
+                        return `${d.getMonth() + 1}/${d.getDate()}`;
+                      }}
+                      stroke="#888888" 
+                      fontSize={12} 
+                      tickLine={false} 
+                      axisLine={false} 
+                    />
+                    <YAxis 
+                      stroke="#888888" 
+                      fontSize={12} 
+                      tickLine={false} 
+                      axisLine={false} 
+                      tickFormatter={(value) => `${value}`} 
+                    />
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="currentColor" opacity={0.1} />
+                    <RechartsTooltip 
+                      contentStyle={{ borderRadius: '8px', border: '1px solid var(--border)', backgroundColor: 'var(--background)', color: 'var(--foreground)' }}
+                    />
+                    <Area type="monotone" dataKey="records" name="Records Extracted" stroke="#3b82f6" fillOpacity={1} fill="url(#colorRecords)" />
+                    <Area type="monotone" dataKey="jobs" name="AI Jobs" stroke="#10b981" fillOpacity={1} fill="url(#colorJobs)" />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
+            </CardContent>
+          </Card>
 
           {/* Recent runs + Review queue */}
           <div className="grid gap-4 lg:grid-cols-3">
@@ -476,6 +562,20 @@ export function DashboardView() {
                             <p className="text-[10px] text-muted-foreground mt-0.5">
                               {new Date(log.createdAt).toLocaleString()}
                             </p>
+                            {log.metadata && Object.keys(log.metadata).length > 0 && (
+                              <Accordion type="single" collapsible className="w-full mt-2">
+                                <AccordionItem value="payload" className="border-b-0">
+                                  <AccordionTrigger className="py-1 px-2 text-[10px] bg-muted/50 rounded-md hover:no-underline">
+                                    View Payload
+                                  </AccordionTrigger>
+                                  <AccordionContent className="pt-2">
+                                    <pre className="text-[10px] bg-muted p-2 rounded-md overflow-x-auto text-muted-foreground font-mono">
+                                      {JSON.stringify(log.metadata, null, 2)}
+                                    </pre>
+                                  </AccordionContent>
+                                </AccordionItem>
+                              </Accordion>
+                            )}
                           </div>
                         </div>
                       );

@@ -211,10 +211,12 @@ export function DatasetDetailView() {
     "all"
   );
   const [search, setSearch] = useState("");
+  const [minConfidence, setMinConfidence] = useState([0]);
   const [hiddenFields, setHiddenFields] = useState<Set<string>>(new Set());
   const [selectedRecordId, setSelectedRecordId] = useState<string | null>(
     null
   );
+  const [selectedRecords, setSelectedRecords] = useState<Set<string>>(new Set());
   const [savedViews, setSavedViews] = useState<
     { id: string; name: string; statusFilter: string; search: string; hiddenFields: string[] }[]
   >(() => {
@@ -235,6 +237,15 @@ export function DatasetDetailView() {
   const [extractDialog, setExtractDialog] = useState(false);
   const [extractSchemaId, setExtractSchemaId] = useState("");
   const [extractDatasetName, setExtractDatasetName] = useState("");
+
+  // Inline Record Editing state
+  const [editValue, setEditValue] = useState<DatasetValueDTO | null>(null);
+  const [editNonce, setEditNonce] = useState(0);
+
+  const handleEditClick = (v: DatasetValueDTO) => {
+    setEditNonce((n) => n + 1);
+    setEditValue(v);
+  };
 
 
   // Persist saved views to localStorage whenever they change
@@ -442,17 +453,23 @@ export function DatasetDetailView() {
   const total = recordsPage?.total ?? 0;
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
-  // ── Derived: filtered records (client-side search across all field values) ──
+  // ── Derived: filtered records (client-side search & confidence filtering) ──
   const filteredRecords = useMemo(() => {
     const q = search.trim().toLowerCase();
-    if (!q) return records;
-    return records.filter((r) =>
-      r.values.some((v) => {
+    const minConf = minConfidence[0] / 100;
+    
+    return records.filter((r) => {
+      // Filter by confidence
+      if (r.confidence < minConf) return false;
+      
+      // Filter by search query
+      if (!q) return true;
+      return r.values.some((v) => {
         const txt = formatValueCompact(v.value, v.fieldType ?? "text").text;
         return txt.toLowerCase().includes(q);
-      })
-    );
-  }, [records, search]);
+      });
+    });
+  }, [records, search, minConfidence]);
 
   // Selected record (latest from query data, so it updates after PATCH)
   const selectedRecord = useMemo(
@@ -619,6 +636,29 @@ export function DatasetDetailView() {
                   className="pl-9"
                 />
               </div>
+              {/* Confidence filter */}
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" className="shrink-0">
+                    <Zap className="mr-2 h-4 w-4 text-amber-500" />
+                    Min Confidence: {minConfidence[0]}%
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent align="start" className="w-80">
+                  <div className="space-y-4">
+                    <h4 className="font-medium leading-none">Confidence Filter</h4>
+                    <p className="text-sm text-muted-foreground">
+                      Only show records with an overall confidence score greater than {minConfidence[0]}%.
+                    </p>
+                    <Slider
+                      value={minConfidence}
+                      onValueChange={setMinConfidence}
+                      max={100}
+                      step={1}
+                    />
+                  </div>
+                </PopoverContent>
+              </Popover>
             </div>
 
             {/* Save view + Import + Column visibility */}
@@ -722,12 +762,73 @@ export function DatasetDetailView() {
         </CardContent>
       </Card>
 
+      {selectedRecords.size > 0 && (
+        <div className="flex items-center gap-3 p-3 bg-primary/10 rounded-md border border-primary/20 text-sm">
+          <span className="font-medium text-primary">
+            {selectedRecords.size} record{selectedRecords.size > 1 ? "s" : ""} selected
+          </span>
+          <Separator orientation="vertical" className="h-4 bg-primary/20" />
+          <Button 
+            variant="outline" 
+            size="sm" 
+            className="h-8 bg-background"
+            disabled={statusMutation.isPending}
+            onClick={() => {
+              const promises = Array.from(selectedRecords).map(id => statusMutation.mutateAsync({ recordId: id, status: "approved" }).catch(() => {}));
+              toast.promise(Promise.all(promises), {
+                loading: "Approving records...",
+                success: () => {
+                  setSelectedRecords(new Set());
+                  return `Approved ${selectedRecords.size} records`;
+                },
+                error: "Failed to approve some records"
+              });
+            }}
+          >
+            <CheckCircle2 className="mr-1.5 h-3.5 w-3.5 text-emerald-600" />
+            Approve
+          </Button>
+          <Button 
+            variant="outline" 
+            size="sm" 
+            className="h-8 bg-background"
+            disabled={statusMutation.isPending}
+            onClick={() => {
+              const promises = Array.from(selectedRecords).map(id => statusMutation.mutateAsync({ recordId: id, status: "rejected" }).catch(() => {}));
+              toast.promise(Promise.all(promises), {
+                loading: "Rejecting records...",
+                success: () => {
+                  setSelectedRecords(new Set());
+                  return `Rejected ${selectedRecords.size} records`;
+                },
+                error: "Failed to reject some records"
+              });
+            }}
+          >
+            <ThumbsDown className="mr-1.5 h-3.5 w-3.5 text-destructive" />
+            Reject
+          </Button>
+        </div>
+      )}
+
       {/* Airtable-style grid */}
       <Card className="overflow-hidden">
         <div className="overflow-x-auto">
           <Table className="w-full">
             <TableHeader>
               <TableRow className="bg-muted/60 hover:bg-muted/60 sticky top-0 z-10">
+                <TableHead className="w-10 border-r text-center">
+                  <Checkbox 
+                    checked={selectedRecords.size > 0 && selectedRecords.size === filteredRecords.length}
+                    onCheckedChange={(checked) => {
+                      if (checked) {
+                        setSelectedRecords(new Set(filteredRecords.map((r) => r.id)));
+                      } else {
+                        setSelectedRecords(new Set());
+                      }
+                    }}
+                  />
+                </TableHead>
                 <TableHead className="w-[120px] min-w-[120px] border-r">
                   <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                     Record
@@ -757,7 +858,7 @@ export function DatasetDetailView() {
               {recordsLoading ? (
                 <TableRow>
                   <TableCell
-                    colSpan={visibleFields.length + 1}
+                    colSpan={visibleFields.length + 2}
                     className="py-4"
                   >
                     <LoadingState rows={3} />
@@ -766,7 +867,7 @@ export function DatasetDetailView() {
               ) : recordsError ? (
                 <TableRow>
                   <TableCell
-                    colSpan={visibleFields.length + 1}
+                    colSpan={visibleFields.length + 2}
                     className="py-4"
                   >
                     <ErrorState
@@ -778,7 +879,7 @@ export function DatasetDetailView() {
               ) : filteredRecords.length === 0 ? (
                 <TableRow>
                   <TableCell
-                    colSpan={visibleFields.length + 1}
+                    colSpan={visibleFields.length + 2}
                     className="py-6"
                   >
                     <EmptyState
@@ -803,6 +904,17 @@ export function DatasetDetailView() {
                     className={`h-12 cursor-pointer hover:bg-muted/40 ${idx % 2 === 1 ? "bg-muted/20" : ""} ${selectedRecordId === r.id ? "ring-1 ring-inset ring-primary" : ""}`}
                     onClick={() => setSelectedRecordId(r.id)}
                   >
+                    <TableCell className="border-r w-10 text-center" onClick={(e) => e.stopPropagation()}>
+                      <Checkbox 
+                        checked={selectedRecords.has(r.id)}
+                        onCheckedChange={(checked) => {
+                          const next = new Set(selectedRecords);
+                          if (checked) next.add(r.id);
+                          else next.delete(r.id);
+                          setSelectedRecords(next);
+                        }}
+                      />
+                    </TableCell>
                     {/* Record-status cell */}
                     <TableCell className="border-r align-middle">
                       <div className="flex items-center gap-2">
@@ -822,37 +934,52 @@ export function DatasetDetailView() {
                       return (
                         <TableCell
                           key={f.id}
-                          className="border-r last:border-r-0 align-middle"
+                          className="border-r last:border-r-0 align-middle group/cell"
                         >
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setSelectedRecordId(r.id);
-                            }}
-                            className="flex w-full items-center gap-2 text-left hover:underline-offset-2"
-                          >
-                            <span
-                              className={`min-w-0 flex-1 truncate text-sm ${
-                                f.type === "number"
-                                  ? "tabular-nums"
-                                  : ""
-                              }`}
-                              title={fmt.text}
+                          <div className="flex w-full items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSelectedRecordId(r.id);
+                              }}
+                              className="flex flex-1 min-w-0 items-center gap-2 text-left hover:underline-offset-2"
                             >
-                              {fmt.node ?? (
-                                <span className="text-muted-foreground">
-                                  {fmt.text || "—"}
-                                </span>
-                              )}
-                            </span>
-                            {v && (
                               <span
-                                className={`inline-block h-1.5 w-1.5 shrink-0 rounded-full ${confidenceColor(v.confidence)}`}
-                                title={`Confidence ${Math.round(v.confidence * 100)}%`}
-                              />
+                                className={`min-w-0 flex-1 truncate text-sm ${
+                                  f.type === "number"
+                                    ? "tabular-nums"
+                                    : ""
+                                }`}
+                                title={fmt.text}
+                              >
+                                {fmt.node ?? (
+                                  <span className="text-muted-foreground">
+                                    {fmt.text || "—"}
+                                  </span>
+                                )}
+                              </span>
+                              {v && (
+                                <span
+                                  className={`inline-block h-1.5 w-1.5 shrink-0 rounded-full ${confidenceColor(v.confidence)}`}
+                                  title={`Confidence ${Math.round(v.confidence * 100)}%`}
+                                />
+                              )}
+                            </button>
+                            {v && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-6 w-6 opacity-0 group-hover/cell:opacity-100 transition-opacity"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleEditClick(v);
+                                }}
+                              >
+                                <Pencil className="h-3 w-3" />
+                              </Button>
                             )}
-                          </button>
+                          </div>
                         </TableCell>
                       );
                     })}
@@ -900,6 +1027,7 @@ export function DatasetDetailView() {
         open={!!selectedRecord}
         record={selectedRecord}
         onClose={() => setSelectedRecordId(null)}
+        onEditClick={handleEditClick}
         onStatusChange={(status) => {
           if (selectedRecord) {
             statusMutation.mutate({ recordId: selectedRecord.id, status });
@@ -1067,6 +1195,15 @@ export function DatasetDetailView() {
           onClose={() => setExtractDialog(false)}
         />
       )}
+      {/* Edit value dialog (keyed by nonce so it remounts fresh each open) */}
+      <EditValueDialog
+        key={editNonce}
+        open={!!editValue}
+        value={editValue}
+        datasetId={datasetId}
+        recordId={editValue?.recordId ?? null}
+        onClose={() => setEditValue(null)}
+      />
     </div>
   );
 }
@@ -1183,21 +1320,15 @@ function EvidenceDrawer({
   onClose,
   onStatusChange,
   statusPending,
+  onEditClick,
 }: {
   open: boolean;
   record: DatasetRecordDTO | null;
   onClose: () => void;
   onStatusChange: (status: RecordStatus) => void;
   statusPending: boolean;
+  onEditClick: (v: DatasetValueDTO) => void;
 }) {
-  const [editValue, setEditValue] = useState<DatasetValueDTO | null>(null);
-  const [editNonce, setEditNonce] = useState(0);
-
-  const handleEditClick = (v: DatasetValueDTO) => {
-    setEditNonce((n) => n + 1);
-    setEditValue(v);
-  };
-
   return (
     <>
       <Sheet
@@ -1258,7 +1389,7 @@ function EvidenceDrawer({
                     <FieldValueCard
                       key={v.id}
                       value={v}
-                      onEdit={() => handleEditClick(v)}
+                      onEdit={() => onEditClick(v)}
                     />
                   ))
                 )}
@@ -1302,16 +1433,6 @@ function EvidenceDrawer({
           )}
         </SheetContent>
       </Sheet>
-
-      {/* Edit value dialog (keyed by nonce so it remounts fresh each open) */}
-      <EditValueDialog
-        key={editNonce}
-        open={!!editValue}
-        value={editValue}
-        datasetId={record?.datasetId ?? null}
-        recordId={record?.id ?? null}
-        onClose={() => setEditValue(null)}
-      />
     </>
   );
 }

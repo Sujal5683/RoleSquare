@@ -99,6 +99,8 @@ import {
   Layers,
   Gauge,
   CheckCircle2,
+  ThumbsUp,
+  ThumbsDown,
 } from "lucide-react";
 import { ExtractionRunsTab } from "@/components/ai-studio/extraction-runs-tab";
 import { AgentLogsTab } from "@/components/ai-studio/agent-logs-tab";
@@ -194,6 +196,7 @@ export function AiStudioView() {
 function TestSandboxTab() {
   const [schemaId, setSchemaId] = useState<string>("");
   const [sourceText, setSourceText] = useState<string>(SAMPLE_TEXT);
+  const [hoveredEvidence, setHoveredEvidence] = useState<string | null>(null);
 
   // Schemas list
   const { data: schemas } = useQuery({
@@ -272,14 +275,31 @@ function TestSandboxTab() {
 
           <div className="space-y-1.5">
             <Label htmlFor="source-text">Source text</Label>
-            <Textarea
-              id="source-text"
-              value={sourceText}
-              onChange={(e) => setSourceText(e.target.value)}
-              rows={12}
-              className="font-mono text-xs"
-              placeholder="Paste an email body, document excerpt, or any unstructured text…"
-            />
+            {hoveredEvidence ? (
+              <div className="relative">
+                <div className="whitespace-pre-wrap rounded-md border border-transparent px-3 py-2 text-xs font-mono max-h-[280px] overflow-y-auto overflow-x-hidden bg-muted/20">
+                  {sourceText.split(hoveredEvidence).map((part, i, arr) => (
+                    <span key={i}>
+                      {part}
+                      {i < arr.length - 1 && (
+                        <mark className="bg-primary/30 text-primary-foreground font-bold px-0.5 rounded-sm">
+                          {hoveredEvidence}
+                        </mark>
+                      )}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <Textarea
+                id="source-text"
+                value={sourceText}
+                onChange={(e) => setSourceText(e.target.value)}
+                rows={12}
+                className="font-mono text-xs max-h-[280px]"
+                placeholder="Paste an email body, document excerpt, or any unstructured text…"
+              />
+            )}
             <p className="text-xs text-muted-foreground">
               The extractor treats this content as untrusted — every output
               field is returned with a quoted evidence snippet and confidence
@@ -425,6 +445,7 @@ function TestSandboxTab() {
                         key={`${f.fieldName}-${i}`}
                         field={f}
                         reviewFlag={flag}
+                        onHover={(isHovering) => setHoveredEvidence(isHovering ? (f.evidence ?? null) : null)}
                       />
                     );
                   })
@@ -441,13 +462,19 @@ function TestSandboxTab() {
 function SandboxFieldCard({
   field,
   reviewFlag,
+  onHover,
 }: {
   field: ExtractionFieldResult;
   reviewFlag?: FieldReviewFlag;
+  onHover?: (isHovering: boolean) => void;
 }) {
+  const [feedback, setFeedback] = useState<"up" | "down" | null>(null);
+
   return (
     <div
-      className={`rounded-lg border bg-card p-3 ${reviewFlag?.needsReview
+      onMouseEnter={() => onHover?.(true)}
+      onMouseLeave={() => onHover?.(false)}
+      className={`rounded-lg border bg-card p-3 transition-colors hover:border-primary/50 ${reviewFlag?.needsReview
           ? "border-amber-300 dark:border-amber-800"
           : ""
         }`}
@@ -503,6 +530,27 @@ function SandboxFieldCard({
             <span className="tabular-nums">p.{field.pageNumber}</span>
           </span>
         )}
+        <div className="flex-1" />
+        <div className="flex items-center gap-1">
+          <Button
+            variant="ghost"
+            size="icon"
+            className={`h-6 w-6 ${feedback === "up" ? "text-emerald-500 bg-emerald-500/10" : "text-muted-foreground"}`}
+            onClick={() => setFeedback(f => f === "up" ? null : "up")}
+            title="Good extraction"
+          >
+            <ThumbsUp className="h-3 w-3" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className={`h-6 w-6 ${feedback === "down" ? "text-red-500 bg-red-500/10" : "text-muted-foreground"}`}
+            onClick={() => setFeedback(f => f === "down" ? null : "down")}
+            title="Poor extraction"
+          >
+            <ThumbsDown className="h-3 w-3" />
+          </Button>
+        </div>
       </div>
     </div>
   );

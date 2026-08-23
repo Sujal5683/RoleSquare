@@ -31,6 +31,7 @@ import { Separator } from "@/components/ui/separator";
 import { DateRuleEditor } from "@/components/source/date-rule-editor";
 import { AttachmentRuleEditor } from "@/components/source/attachment-rule-editor";
 import { DriveLinkRuleEditor } from "@/components/source/drive-link-rule-editor";
+import { CronEditor } from "@/components/source/cron-editor";
 import {
 
   Mail,
@@ -70,6 +71,7 @@ interface SourceFormState {
   sourceType: SourceType;
   googleConnectionId: string;
   rules: RuleDraft[];
+  ruleOperator: "AND" | "OR";
   scheduleMode: string;
   scheduleExpr: string;
   maxEmailsPerScan: number;
@@ -118,6 +120,7 @@ const EMPTY_FORM: SourceFormState = {
   sourceType: "gmail",
   googleConnectionId: "",
   rules: [],
+  ruleOperator: "AND",
   scheduleMode: "interval",
   scheduleExpr: "6h",
   maxEmailsPerScan: 100,
@@ -157,7 +160,11 @@ function ruleToText(r: RuleDraft): string {
   const ft = FILTER_TYPES.find((f) => f.value === r.filterType)?.label ?? r.filterType;
   
   if (r.filterType === "attachment") {
-    return r.value === "true" ? "Must have attachment" : "Must NOT have attachment";
+    if (r.value === "true") {
+      const ext = (r.metadata as any)?.allowedExtensions;
+      return ext ? `Must have attachment (${ext})` : "Must have attachment";
+    }
+    return "Must NOT have attachment";
   }
   if (r.filterType === "drive_link") {
     return r.value === "true" ? "Must contain Google Drive link" : "Must NOT contain Google Drive link";
@@ -226,6 +233,9 @@ export function SourceBuilderView() {
     enabled: !!selectedSourceId,
   });
 
+  const [isSimulating, setIsSimulating] = useState(false);
+  const [simulationResult, setSimulationResult] = useState<any>(null);
+
   // Prefill form when editing — render-time state adjustment (React
   // recommended pattern, avoids setState-in-effect). Re-prefills whenever the
   // loaded source id changes (e.g. user opens a different source to edit).
@@ -236,14 +246,24 @@ export function SourceBuilderView() {
         filterType: r.filterType,
         operator: r.operator,
         value: ruleValueToString(r.value),
+        metadata: r.metadata ? JSON.parse(r.metadata) : undefined,
       })
     );
+    let ruleOperator: "AND" | "OR" = "AND";
+    if (existingSource.config) {
+      try {
+        const config = JSON.parse(existingSource.config);
+        if (config.ruleOperator === "OR") ruleOperator = "OR";
+      } catch (e) { /* ignore */ }
+    }
+
     setForm({
       name: existingSource.name,
       description: existingSource.description ?? "",
       sourceType: existingSource.sourceType,
       googleConnectionId: existingSource.googleConnectionId,
       rules,
+      ruleOperator,
       scheduleMode: existingSource.scheduleMode,
       scheduleExpr: existingSource.scheduleExpr,
       maxEmailsPerScan: existingSource.maxEmailsPerScan ?? 100,
@@ -252,6 +272,24 @@ export function SourceBuilderView() {
     });
     setPrefilledSourceId(existingSource.id);
   }
+
+  const handleTestSimulation = async () => {
+    if (!form.googleConnectionId) return;
+    setIsSimulating(true);
+    setSimulationResult(null);
+    try {
+      const res = await api.post("/api/sources/test-scan", {
+        googleConnectionId: form.googleConnectionId,
+        rules: form.rules,
+        ruleOperator: form.ruleOperator,
+      });
+      setSimulationResult(res);
+    } catch (err: any) {
+      toast.error("Simulation failed", { description: err.message });
+    } finally {
+      setIsSimulating(false);
+    }
+  };
 
   // ── Mutations ──────────────────────────────────────────────────────────
   const createMutation = useMutation({
@@ -379,6 +417,10 @@ export function SourceBuilderView() {
       position: i,
     }));
 
+    const configPayload = JSON.stringify({
+      ruleOperator: form.ruleOperator
+    });
+
     if (isEdit && selectedSourceId) {
       // PATCH source fields, then PUT rules
       updateMutation.mutate({
@@ -390,6 +432,7 @@ export function SourceBuilderView() {
         maxEmailsPerScan: form.maxEmailsPerScan,
         schemaId: form.schemaId || null,
         datasetId: form.datasetId || null,
+        config: configPayload,
       });
       // Best-effort rules sync (the API replaces all rules).
       if (form.rules.length > 0 || true) {
@@ -414,6 +457,7 @@ export function SourceBuilderView() {
         scheduleExpr: form.scheduleExpr,
         maxEmailsPerScan: form.maxEmailsPerScan,
         rules: rulesPayload,
+        config: configPayload,
       });
     }
   };
@@ -672,10 +716,24 @@ export function SourceBuilderView() {
                         Match emails or documents that meet these criteria.
                       </p>
                     </div>
-                    <Button size="sm" variant="outline" onClick={addRule}>
-                      <Plus className="mr-2 h-3.5 w-3.5" />
-                      Add rule
-                    </Button>
+                    <div className="flex items-center gap-2">
+                      <Select
+                        value={form.ruleOperator}
+                        onValueChange={(v: "AND" | "OR") => setForm(f => ({ ...f, ruleOperator: v }))}
+                      >
+                        <SelectTrigger className="h-8 w-32 text-xs">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="AND">Match ALL</SelectItem>
+                          <SelectItem value="OR">Match ANY</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <Button size="sm" variant="outline" onClick={addRule}>
+                        <Plus className="mr-2 h-3.5 w-3.5" />
+                        Add rule
+                      </Button>
+                    </div>
                   </div>
                   <Separator />
                   {form.rules.length === 0 ? (
@@ -752,10 +810,12 @@ export function SourceBuilderView() {
                               <div className="sm:col-span-2">
                                 <AttachmentRuleEditor
                                   value={r.value === "true"}
+                                  metadata={r.metadata}
                                   onChange={(v) =>
                                     updateRule(r.id, {
                                       operator: v.operator,
                                       value: String(v.value),
+                                      metadata: v.metadata as Record<string, unknown>,
                                     })
                                   }
                                 />
@@ -827,6 +887,47 @@ export function SourceBuilderView() {
                       </ul>
                     </div>
                   )}
+
+                  {/* Test Run Simulator */}
+                  <div className="pt-2 border-t mt-4 flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium">Simulation preview</p>
+                      <p className="text-[10px] text-muted-foreground">Test these rules against your inbox to ensure they work.</p>
+                    </div>
+                    <Button 
+                      variant="secondary" 
+                      size="sm"
+                      onClick={() => handleTestSimulation()}
+                      disabled={isSimulating || !form.googleConnectionId}
+                    >
+                      {isSimulating ? (
+                        <RefreshCw className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <Sparkles className="mr-1.5 h-3.5 w-3.5" />
+                      )}
+                      Test rules
+                    </Button>
+                  </div>
+                  {simulationResult && (
+                    <div className="rounded-md border p-3 mt-2 bg-muted/10 space-y-2">
+                      <p className="text-xs font-mono text-muted-foreground">
+                        Gmail Query: {simulationResult.query || "(matches all emails)"}
+                      </p>
+                      <p className="text-xs font-medium">Found ~{simulationResult.count} matches. Previewing top 5:</p>
+                      <div className="space-y-1.5 divide-y max-h-60 overflow-y-auto pr-2">
+                        {simulationResult.previews.map((p: any) => (
+                          <div key={p.id} className="pt-1.5 text-xs">
+                            <p className="font-medium truncate">{p.subject}</p>
+                            <p className="text-[10px] text-muted-foreground truncate">{p.from}</p>
+                            <p className="text-[10px] text-muted-foreground truncate italic">{p.snippet}</p>
+                          </div>
+                        ))}
+                        {simulationResult.previews.length === 0 && (
+                          <p className="text-xs text-muted-foreground py-2 text-center">No emails matched these rules.</p>
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </>
               )}
 
@@ -854,30 +955,40 @@ export function SourceBuilderView() {
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="sched-expr">Schedule expression</Label>
-                      <Input
-                        id="sched-expr"
-                        placeholder={
-                          form.scheduleMode === "cron"
-                            ? "0 9 * * *"
-                            : form.scheduleMode === "manual"
-                            ? "(manual)"
-                            : "6h"
-                        }
-                        value={form.scheduleExpr}
-                        onChange={(e) =>
-                          setForm((f) => ({
-                            ...f,
-                            scheduleExpr: e.target.value,
-                          }))
-                        }
-                      />
-                      <p className="text-[10px] text-muted-foreground">
-                        {form.scheduleMode === "interval"
-                          ? "Use '6h', '15m', '1d' etc."
-                          : form.scheduleMode === "cron"
-                          ? "Standard 5-field cron expression."
-                          : "Manual sources only run when triggered."}
-                      </p>
+                      {form.scheduleMode === "cron" ? (
+                        <CronEditor
+                          value={form.scheduleExpr}
+                          onChange={(v) =>
+                            setForm((f) => ({
+                              ...f,
+                              scheduleExpr: v,
+                            }))
+                          }
+                        />
+                      ) : (
+                        <>
+                          <Input
+                            id="sched-expr"
+                            placeholder={
+                              form.scheduleMode === "manual"
+                                ? "(manual)"
+                                : "6h"
+                            }
+                            value={form.scheduleExpr}
+                            onChange={(e) =>
+                              setForm((f) => ({
+                                ...f,
+                                scheduleExpr: e.target.value,
+                              }))
+                            }
+                          />
+                          <p className="text-[10px] text-muted-foreground">
+                            {form.scheduleMode === "interval"
+                              ? "Use '6h', '15m', '1d' etc."
+                              : "Manual sources only run when triggered."}
+                          </p>
+                        </>
+                      )}
                     </div>
                   </div>
 

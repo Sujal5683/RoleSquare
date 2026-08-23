@@ -666,6 +666,39 @@ export function SourcesView() {
                               )}
                               Scan
                             </Button>
+                            {s.status === "paused" ? (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() =>
+                                  pauseResumeMutation.mutate({
+                                    id: s.id,
+                                    status: "active",
+                                  })
+                                }
+                                disabled={pauseResumeMutation.isPending}
+                                title="Resume source"
+                              >
+                                <Play className="mr-1.5 h-3 w-3" />
+                                Resume
+                              </Button>
+                            ) : (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() =>
+                                  pauseResumeMutation.mutate({
+                                    id: s.id,
+                                    status: "paused",
+                                  })
+                                }
+                                disabled={pauseResumeMutation.isPending}
+                                title="Pause source"
+                              >
+                                <Pause className="mr-1.5 h-3 w-3" />
+                                Pause
+                              </Button>
+                            )}
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
                                 <Button
@@ -692,32 +725,6 @@ export function SourcesView() {
                                   <Pencil className="mr-2 h-4 w-4" />
                                   Edit
                                 </DropdownMenuItem>
-                                <DropdownMenuSeparator />
-                                {s.status === "paused" ? (
-                                  <DropdownMenuItem
-                                    onClick={() =>
-                                      pauseResumeMutation.mutate({
-                                        id: s.id,
-                                        status: "active",
-                                      })
-                                    }
-                                  >
-                                    <Play className="mr-2 h-4 w-4" />
-                                    Resume
-                                  </DropdownMenuItem>
-                                ) : (
-                                  <DropdownMenuItem
-                                    onClick={() =>
-                                      pauseResumeMutation.mutate({
-                                        id: s.id,
-                                        status: "paused",
-                                      })
-                                    }
-                                  >
-                                    <Pause className="mr-2 h-4 w-4" />
-                                    Pause
-                                  </DropdownMenuItem>
-                                )}
                                 <DropdownMenuItem
                                   onClick={() => {
                                     const name = prompt("Clone source name:", `${s.name} (copy)`);

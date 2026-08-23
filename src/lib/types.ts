@@ -103,6 +103,7 @@ export interface SchemaFieldDTO {
   instructions: string | null;
   required: boolean;
   options: string[] | null;
+  validation: Record<string, unknown> | null;
   position: number;
   confidenceThreshold: number;
 }

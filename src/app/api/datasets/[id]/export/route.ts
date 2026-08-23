@@ -1,152 +1,120 @@
-// POST /api/datasets/[id]/export — kick off an export job.
-//   Body: { format: "csv" | "json" | "xlsx" }
-//   Creates an EXPORT ai_job and returns the job id. For small datasets
-//   (<=500 records) and CSV format, also returns a synthetic data URL
-//   containing the flattened CSV payload so the UI can offer an immediate
-//   download without waiting for the job to finish.
-
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { requireOrgContext, AuthError, authErrorResponse } from "@/lib/auth";
-import { logAudit } from "@/lib/audit";
-import { bumpUsageMetric } from "@/lib/usage";
-import { dispatchWebhookEvent } from "@/lib/webhook-dispatcher";
-
-function csvEscape(value: unknown): string {
-  if (value == null) return "";
-  const s =
-    typeof value === "string"
-      ? value
-      : Array.isArray(value)
-        ? value.join("; ")
-        : JSON.stringify(value);
-  if (/[",\n\r]/.test(s)) {
-    return `"${s.replace(/"/g, '""')}"`;
-  }
-  return s;
-}
+import { parseJsonSafely } from "@/lib/utils";
 
 export async function POST(
   req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: { id: string } }
 ) {
   try {
-    const { id } = await params;
-    const { user, organizationId } = await requireOrgContext(req);
+    const { id } = params;
+    const { format } = await req.json();
+    
+    if (format !== "csv" && format !== "json") {
+      return NextResponse.json({ error: "Invalid format" }, { status: 400 });
+    }
+
+    const count = await db.datasetRecord.count({ where: { datasetId: id } });
+
+    return NextResponse.json({
+      jobId: `exp-${Date.now()}`,
+      downloadUrl: `/api/datasets/${id}/export?format=${format}`,
+      recordCount: count
+    });
+  } catch (err: any) {
+    return NextResponse.json({ error: err.message }, { status: 500 });
+  }
+}
+
+export async function GET(
+  req: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  try {
+    const { id } = params;
+    const { searchParams } = new URL(req.url);
+    const format = searchParams.get("format");
+
     const dataset = await db.dataset.findUnique({
       where: { id },
-      include: { schema: { include: { fields: { orderBy: { position: "asc" } } } } },
-    });
-    if (!dataset) {
-      return NextResponse.json({ error: "Dataset not found" }, { status: 404 });
-    }
-    const { verifyDatasetAccess } = await import("@/lib/auth");
-    if (!(await verifyDatasetAccess(dataset, organizationId, user.id, "read"))) {
-      return NextResponse.json({ error: "Dataset not found" }, { status: 404 });
-    }
-    const body = await req.json().catch(() => ({}));
-    const format =
-      body?.format === "json" || body?.format === "xlsx" ? body.format : "csv";
-
-    const now = new Date();
-    const job = await db.aiJob.create({
-      data: {
-        organizationId,
-        userId: user.id,
-        type: "EXPORT",
-        status: "queued",
-        payload: JSON.stringify({ datasetId: id, format, datasetName: dataset.name }),
-        progress: 0,
+      include: {
+        schema: { include: { fields: true } },
+        records: { include: { values: true } },
       },
     });
 
-    await bumpUsageMetric(organizationId, "exports", 1);
-
-    // For small CSV exports, generate a synthetic data URL the client can
-    // open directly. Cap at 500 records to keep the URL under a sane size.
-    let downloadUrl: string | undefined;
-    let recordCount = 0;
-    if (format === "csv") {
-      const fields = dataset.schema?.fields ?? [];
-      const records = await db.datasetRecord.findMany({
-        where: { datasetId: id },
-        include: { values: true },
-        orderBy: { createdAt: "asc" },
-        take: 500,
-      });
-      recordCount = records.length;
-
-      const header = ["recordId", "status", "confidence", ...fields.map((f) => f.name)];
-      const rows = records.map((r) => {
-        const byField = new Map(r.values.map((v) => [v.fieldId, v]));
-        return [
-          r.id,
-          r.status,
-          String(r.confidence ?? 0),
-          ...fields.map((f) => {
-            const v = byField.get(f.id);
-            if (!v) return "";
-            try {
-              return csvEscape(JSON.parse(v.value));
-            } catch {
-              return csvEscape(v.value);
-            }
-          }),
-        ];
-      });
-      const csv = [header, ...rows].map((r) => r.join(",")).join("\n");
-      downloadUrl =
-        "data:text/csv;base64," +
-        Buffer.from(csv, "utf-8").toString("base64");
+    if (!dataset) {
+      return new NextResponse("Dataset not found", { status: 404 });
     }
 
-    // Mark job as success for small synchronous exports.
-    if (downloadUrl) {
-      await db.aiJob.update({
-        where: { id: job.id },
-        data: {
-          status: "success",
-          progress: 100,
-          finishedAt: now,
-          result: JSON.stringify({ format, recordCount, downloadUrl: !!downloadUrl }),
+    const { records, schema } = dataset;
+    const fields = schema?.fields || [];
+
+    const normalizedData = records.map((r) => {
+      const row: Record<string, any> = {
+        _recordId: r.id,
+        _status: r.status,
+        _confidence: r.confidence,
+        _createdAt: r.createdAt,
+      };
+
+      for (const field of fields) {
+        const val = r.values.find((v) => v.fieldId === field.id);
+        if (val) {
+          const parsedVal = parseJsonSafely(val.value);
+          row[field.name] = parsedVal !== null ? parsedVal : val.value;
+        } else {
+          row[field.name] = null;
+        }
+      }
+
+      return row;
+    });
+
+    if (format === "json") {
+      const jsonString = JSON.stringify(normalizedData, null, 2);
+      return new NextResponse(jsonString, {
+        headers: {
+          "Content-Type": "application/json",
+          "Content-Disposition": `attachment; filename="${dataset.name.replace(/[^a-z0-9]/gi, "_").toLowerCase()}_export.json"`,
         },
       });
     }
 
-    await logAudit({
-      organizationId,
-      actorId: user.id,
-      action: "export",
-      entity: "dataset",
-      entityId: id,
-      after: { format, jobId: job.id, recordCount },
-    });
+    if (format === "csv") {
+      const headerRow = [
+        "_recordId", "_status", "_confidence", "_createdAt",
+        ...fields.map((f) => f.name),
+      ];
 
-    // Dispatch webhook event for export completion
-    dispatchWebhookEvent({
-      event: "export.completed",
-      organizationId,
-      data: {
-        datasetId: id,
-        datasetName: dataset.name,
-        format,
-        jobId: job.id,
-        recordCount,
-        exportedBy: user.id,
-      },
-    });
+      const csvRows = normalizedData.map((row) => {
+        return headerRow
+          .map((fieldName) => {
+            let val = row[fieldName];
+            if (val == null) return "";
+            if (typeof val === "object") val = JSON.stringify(val);
+            else val = String(val);
+            
+            val = val.replace(/"/g, '""');
+            if (val.includes(",") || val.includes("\n") || val.includes('"')) {
+              return `"${val}"`;
+            }
+            return val;
+          })
+          .join(",");
+      });
 
-    return NextResponse.json({
-      jobId: job.id,
-      format,
-      recordCount,
-      downloadUrl,
-    }, { status: 201 });
-  } catch (err) {
-    if (err instanceof AuthError) return authErrorResponse(err);
-    return NextResponse.json(
-      { error: err instanceof Error ? err.message : "Failed to start export" },
-      { status: 500 }
-    );
+      const csvString = [headerRow.join(","), ...csvRows].join("\n");
+      return new NextResponse(csvString, {
+        headers: {
+          "Content-Type": "text/csv",
+          "Content-Disposition": `attachment; filename="${dataset.name.replace(/[^a-z0-9]/gi, "_").toLowerCase()}_export.csv"`,
+        },
+      });
+    }
+
+    return new NextResponse("Invalid format", { status: 400 });
+  } catch (err: any) {
+    return new NextResponse(err.message, { status: 500 });
   }
 }

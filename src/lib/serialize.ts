@@ -126,6 +126,7 @@ export function serializeSchemaField(f: any): SchemaFieldDTO {
     instructions: f.instructions ?? null,
     required: !!f.required,
     options: f.options ? parseJson<string[] | null>(f.options, null) : null,
+    validation: f.validation ? parseJson<Record<string, unknown> | null>(f.validation, null) : null,
     position: f.position,
     confidenceThreshold: f.confidenceThreshold ?? 0.7,
   };

@@ -39,12 +39,20 @@ export async function PATCH(
     if (body?.options !== undefined) {
       data.options = body.options ? JSON.stringify(body.options) : null;
     }
+    if (body?.validation !== undefined) {
+      data.validation = body.validation ? JSON.stringify(body.validation) : null;
+    }
     if (typeof body?.position === "number") data.position = body.position;
     if (typeof body?.confidenceThreshold === "number") {
       data.confidenceThreshold = Math.max(0, Math.min(1, body.confidenceThreshold));
     }
 
     const field = await db.schemaField.update({ where: { id: fieldId }, data });
+
+    await db.schema.update({
+      where: { id },
+      data: { version: { increment: 1 } },
+    });
 
     await logAudit({
       organizationId,
@@ -82,6 +90,11 @@ export async function DELETE(
       );
     }
     await db.schemaField.delete({ where: { id: fieldId } });
+
+    await db.schema.update({
+      where: { id },
+      data: { version: { increment: 1 } },
+    });
 
     await logAudit({
       organizationId,

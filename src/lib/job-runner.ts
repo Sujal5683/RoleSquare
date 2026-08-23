@@ -337,15 +337,38 @@ async function processGmailScan(
         }
         break;
       }
-      case "attachment":
-        if (value === true || value === "true" || value === "required") queryParts.push("has:attachment");
+      case "attachment": {
+        if (value === true || value === "true" || value === "required") {
+          queryParts.push("has:attachment");
+          let metadata;
+          try { metadata = rule.metadata ? JSON.parse(rule.metadata) : null; } catch { /* ignore */ }
+          if (metadata?.allowedExtensions) {
+            const exts = (metadata.allowedExtensions as string)
+              .split(",")
+              .map(e => e.trim().replace(/^\./, ""))
+              .filter(Boolean);
+            if (exts.length > 0) {
+              const filenameQuery = exts.map(e => `filename:${e}`).join(" OR ");
+              queryParts.push(`(${filenameQuery})`);
+            }
+          }
+        }
         break;
+      }
       case "drive_link":
         if (value === true || value === "true" || value === "required") queryParts.push("drive.google.com");
         break;
     }
   }
-  const gmailQuery = queryParts.length > 0 ? queryParts.join(" ") : "";
+  let ruleOperator = "AND";
+  if (source.config) {
+    try {
+      const config = JSON.parse(source.config);
+      if (config.ruleOperator === "OR") ruleOperator = "OR";
+    } catch { /* ignore */ }
+  }
+  const operatorStr = ruleOperator === "OR" ? " OR " : " ";
+  const gmailQuery = queryParts.length > 0 ? queryParts.join(operatorStr) : "";
 
   await updateRunProgress(runId, 20, "scanning");
 

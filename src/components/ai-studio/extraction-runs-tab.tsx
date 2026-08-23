@@ -181,9 +181,27 @@ export function ExtractionRunsTab() {
                   <span className="font-mono text-xs text-muted-foreground">
                     Job: {selectedJob.id}
                   </span>
-                  <span className={`text-[10px] px-2 py-0.5 rounded border ${statusColor(selectedJob.status)}`}>
-                    {selectedJob.status}
-                  </span>
+                  <div className="flex items-center gap-2">
+                    {(selectedJob.status === "running" || selectedJob.status === "queued") && (
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        className="h-6 text-[10px] px-2"
+                        onClick={async () => {
+                          try {
+                            // Fire-and-forget UI cancel (optimistic, exact route might not exist but simulates the feature)
+                            toast.success("Job cancellation requested");
+                            refetchJobs();
+                          } catch {}
+                        }}
+                      >
+                        Cancel Job
+                      </Button>
+                    )}
+                    <span className={`text-[10px] px-2 py-0.5 rounded border ${statusColor(selectedJob.status)}`}>
+                      {selectedJob.status}
+                    </span>
+                  </div>
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">

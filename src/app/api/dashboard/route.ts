@@ -116,10 +116,51 @@ export async function GET(req: NextRequest) {
     const fieldsMap = fieldsByIdMap(schemaFields);
     const reviewQueueEnriched = attachFieldsToRecords(reviewQueueRaw, fieldsMap);
 
-    // Import serializeSharingRequest
     const { serializeSharingRequest } = await import("@/lib/serialize");
 
-    const data: DashboardData = {
+    const url = new URL(req.url);
+    const dateRangeParam = url.searchParams.get("dateRange") || "30d";
+    const rangeDays = parseInt(dateRangeParam.replace("d", ""), 10) || 30;
+
+    // Fetch time-series data for the requested range
+    const rangeAgo = new Date(Date.now() - rangeDays * 24 * 60 * 60 * 1000);
+    const recentRecords = await db.datasetRecord.findMany({
+      where: { dataset: { organizationId }, createdAt: { gte: rangeAgo } },
+      select: { createdAt: true },
+    });
+
+    const recentJobs = await db.aiJob.findMany({
+      where: { organizationId, createdAt: { gte: rangeAgo } },
+      select: { createdAt: true },
+    });
+
+    // Group by date string (YYYY-MM-DD)
+    const chartDataMap = new Map<string, { date: string, records: number, jobs: number }>();
+    
+    // Initialize map with range days
+    for (let i = rangeDays - 1; i >= 0; i--) {
+      const d = new Date(Date.now() - i * 24 * 60 * 60 * 1000);
+      const dateStr = d.toISOString().split("T")[0];
+      chartDataMap.set(dateStr, { date: dateStr, records: 0, jobs: 0 });
+    }
+
+    for (const r of recentRecords) {
+      const dateStr = r.createdAt.toISOString().split("T")[0];
+      if (chartDataMap.has(dateStr)) {
+        chartDataMap.get(dateStr)!.records += 1;
+      }
+    }
+
+    for (const j of recentJobs) {
+      const dateStr = j.createdAt.toISOString().split("T")[0];
+      if (chartDataMap.has(dateStr)) {
+        chartDataMap.get(dateStr)!.jobs += 1;
+      }
+    }
+
+    const chartData = Array.from(chartDataMap.values());
+
+    const data: DashboardData & { chartData: any[] } = {
       kpis: {
         connectedAccounts,
         activeSources,
@@ -145,6 +186,7 @@ export async function GET(req: NextRequest) {
       usageMetrics: usageRaw.map(serializeUsageMetric),
       connectionAlerts: connectionAlertsRaw.map(serializeGoogleConnection),
       pendingSharingRequests: pendingRequestsRaw.map(serializeSharingRequest),
+      chartData,
     };
 
     return NextResponse.json(data);

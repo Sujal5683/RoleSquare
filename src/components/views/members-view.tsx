@@ -271,6 +271,7 @@ export function MembersView() {
   });
 
   const [inviteOpen, setInviteOpen] = useState(false);
+  const [rbacOpen, setRbacOpen] = useState(false);
   const [removeTarget, setRemoveTarget] = useState<MemberDTO | null>(null);
 
   return (
@@ -295,6 +296,14 @@ export function MembersView() {
                 className={`mr-2 h-3.5 w-3.5 ${isFetching ? "animate-spin" : ""}`}
               />
               Refresh
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setRbacOpen(true)}
+            >
+              <Shield className="mr-2 h-3.5 w-3.5" />
+              Role Permissions
             </Button>
             <Button
               size="sm"
@@ -339,7 +348,7 @@ export function MembersView() {
       )}
 
       {/* Permission matrix */}
-      <PermissionMatrixCard />
+      <PermissionMatrixCard open={rbacOpen} onClose={() => setRbacOpen(false)} />
 
       {/* Members table */}
       <Card>
@@ -698,19 +707,26 @@ function PendingInvitationsCard({
 
 // ── Permission matrix card ─────────────────────────────────────────────────
 
-function PermissionMatrixCard() {
+function PermissionMatrixCard({
+  open,
+  onClose,
+}: {
+  open: boolean;
+  onClose: () => void;
+}) {
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-base">
-          <Shield className="h-4 w-4 text-primary" />
-          Role &amp; permission matrix
-        </CardTitle>
-        <CardDescription>
-          Reference for what each role can do within an organization.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="overflow-x-auto p-0">
+    <Dialog open={open} onOpenChange={(o) => { if (!o) onClose(); }}>
+      <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2 text-base">
+            <Shield className="h-4 w-4 text-primary" />
+            Role &amp; permission matrix
+          </DialogTitle>
+          <DialogDescription>
+            Reference for what each role can do within an organization. Enterprise customers can customize these permissions.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="overflow-x-auto p-0">
         <Table>
           <TableHeader className="sticky top-0 bg-card">
             <TableRow>
@@ -753,8 +769,9 @@ function PermissionMatrixCard() {
             ))}
           </TableBody>
         </Table>
-      </CardContent>
-    </Card>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 

@@ -66,6 +66,8 @@ import {
   ChevronLeft,
   FileText,
   Copy,
+  Download,
+  Upload,
 } from "lucide-react";
 
 // ── Constants ────────────────────────────────────────────────────────────
@@ -90,6 +92,7 @@ interface FieldDraft {
   instructions: string;
   required: boolean;
   options: string[];
+  validation: { min?: number; max?: number; regex?: string };
   confidenceThreshold: number;
 }
 
@@ -100,8 +103,34 @@ const EMPTY_FIELD: FieldDraft = {
   instructions: "",
   required: false,
   options: [],
+  validation: {},
   confidenceThreshold: 0.7,
 };
+
+const PREBUILT_TEMPLATES = [
+  {
+    name: "Invoice / Receipt",
+    description: "Standard financial document extraction",
+    fields: [
+      { name: "vendorName", type: "text", description: "Name of the merchant or vendor", required: true },
+      { name: "totalAmount", type: "number", description: "Total amount paid including tax", required: true },
+      { name: "date", type: "date", description: "Date of the transaction", required: true },
+      { name: "currency", type: "enum", description: "Currency of the transaction", required: false, options: ["USD", "EUR", "GBP", "INR"] },
+      { name: "taxAmount", type: "number", description: "Tax amount paid", required: false },
+    ]
+  },
+  {
+    name: "Job Applicant (Resume)",
+    description: "Extract candidate details from resumes or emails",
+    fields: [
+      { name: "candidateName", type: "text", description: "Full name of the candidate", required: true },
+      { name: "email", type: "text", description: "Candidate email address", required: true, validation: { regex: "^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$" } },
+      { name: "phone", type: "text", description: "Candidate phone number", required: false },
+      { name: "yearsOfExperience", type: "number", description: "Total years of professional experience", required: false },
+      { name: "skills", type: "array", description: "List of technical or professional skills", required: false },
+    ]
+  }
+];
 
 // ── Helpers ──────────────────────────────────────────────────────────────
 
@@ -153,6 +182,7 @@ export function SchemaBuilderView() {
     selectedSchemaId
   );
   const [createOpen, setCreateOpen] = useState(false);
+  const [templatesOpen, setTemplatesOpen] = useState(false);
   const [newName, setNewName] = useState("");
   const [newDescription, setNewDescription] = useState("");
   const [fieldDialog, setFieldDialog] = useState<{
@@ -320,6 +350,7 @@ export function SchemaBuilderView() {
           instructions: field.instructions ?? "",
           required: field.required,
           options: field.options ?? [],
+          validation: (field as any).validation ?? {},
           confidenceThreshold: field.confidenceThreshold ?? 0.7,
         },
       });
@@ -343,6 +374,7 @@ export function SchemaBuilderView() {
         OPTIONS_FIELD_TYPES.includes(field.type) && field.options.length > 0
           ? field.options
           : null,
+      validation: Object.keys(field.validation || {}).length > 0 ? field.validation : null,
       confidenceThreshold: field.confidenceThreshold,
     };
     if (field.id) {
@@ -399,37 +431,121 @@ export function SchemaBuilderView() {
                 </SelectContent>
               </Select>
             </div>
-            <Button size="sm" onClick={() => setCreateOpen(true)}>
-              <Plus className="mr-2 h-3.5 w-3.5" />
-              New schema
-            </Button>
-            {activeSchemaId && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  const name = window.prompt(
-                    "Cloned schema name:",
-                    `${activeSchema?.name ?? "Schema"} (copy)`
-                  );
-                  if (name && activeSchemaId) {
-                    api.post<SchemaDTO>(`/api/schemas/${activeSchemaId}/clone`, { name })
-                      .then((cloned) => {
-                        toast.success("Schema cloned", {
-                          description: `"${name}" created with ${cloned.fields?.length ?? 0} fields.`,
-                        });
-                        queryClient.invalidateQueries({ queryKey: ["schemas"] });
-                        setActiveSchemaId(cloned.id);
-                      })
-                      .catch(() => toast.error("Clone failed"));
-                  }
-                }}
-                title="Clone this schema with all its fields"
-              >
-                <Copy className="mr-2 h-3.5 w-3.5" />
-                Clone
+            <div className="flex items-center gap-2">
+              <Button size="sm" variant="secondary" onClick={() => setTemplatesOpen(true)}>
+                <FileText className="mr-2 h-3.5 w-3.5" />
+                Templates
               </Button>
-            )}
+              <Button size="sm" onClick={() => setCreateOpen(true)}>
+                <Plus className="mr-2 h-3.5 w-3.5" />
+                New schema
+              </Button>
+              {activeSchemaId && (
+                <>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      const name = window.prompt(
+                        "Cloned schema name:",
+                        `${activeSchema?.name ?? "Schema"} (copy)`
+                      );
+                      if (name && activeSchemaId) {
+                        api.post<SchemaDTO>(`/api/schemas/${activeSchemaId}/clone`, { name })
+                          .then((cloned) => {
+                            toast.success("Schema cloned", {
+                              description: `"${name}" created with ${cloned.fields?.length ?? 0} fields.`,
+                            });
+                            queryClient.invalidateQueries({ queryKey: ["schemas"] });
+                            setActiveSchemaId(cloned.id);
+                          })
+                          .catch(() => toast.error("Clone failed"));
+                      }
+                    }}
+                    title="Clone this schema with all its fields"
+                  >
+                    <Copy className="mr-2 h-3.5 w-3.5" />
+                    Clone
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      if (!activeSchema) return;
+                      const json = JSON.stringify(activeSchema, null, 2);
+                      const blob = new Blob([json], { type: "application/json" });
+                      const url = URL.createObjectURL(blob);
+                      const a = document.createElement("a");
+                      a.href = url;
+                      a.download = `schema-${activeSchema.name.toLowerCase().replace(/\s+/g, "-")}.json`;
+                      document.body.appendChild(a);
+                      a.click();
+                      document.body.removeChild(a);
+                      URL.revokeObjectURL(url);
+                    }}
+                    title="Export schema to JSON"
+                  >
+                    <Download className="mr-2 h-3.5 w-3.5" />
+                    Export
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      const input = document.createElement("input");
+                      input.type = "file";
+                      input.accept = ".json";
+                      input.onchange = (e) => {
+                        const file = (e.target as HTMLInputElement).files?.[0];
+                        if (!file) return;
+                        const reader = new FileReader();
+                        reader.onload = async (event) => {
+                          try {
+                            const data = JSON.parse(event.target?.result as string);
+                            // Basic validation
+                            if (!data.name || !Array.isArray(data.fields)) {
+                              throw new Error("Invalid schema JSON format");
+                            }
+                            
+                            // Create schema
+                            const created = await api.post<SchemaDTO>("/api/schemas", {
+                              name: `${data.name} (Imported)`,
+                              description: data.description,
+                            });
+                            
+                            // Add fields sequentially
+                            for (const field of data.fields) {
+                              await api.post(`/api/schemas/${created.id}/fields`, {
+                                name: field.name,
+                                type: field.type,
+                                description: field.description,
+                                instructions: field.instructions,
+                                required: field.required,
+                                options: field.options,
+                                validation: field.validation,
+                                confidenceThreshold: field.confidenceThreshold
+                              });
+                            }
+                            
+                            toast.success("Schema imported successfully");
+                            queryClient.invalidateQueries({ queryKey: ["schemas"] });
+                            setActiveSchemaId(created.id);
+                          } catch (err: any) {
+                            toast.error("Import failed", { description: err.message });
+                          }
+                        };
+                        reader.readAsText(file);
+                      };
+                      input.click();
+                    }}
+                    title="Import schema from JSON"
+                  >
+                    <Upload className="mr-2 h-3.5 w-3.5" />
+                    Import
+                  </Button>
+                </>
+              )}
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -580,6 +696,11 @@ export function SchemaBuilderView() {
                             {f.options && f.options.length > 0 && (
                               <span className="text-[10px] text-muted-foreground">
                                 {f.options.length} options
+                              </span>
+                            )}
+                            {(f as any).validation && Object.keys((f as any).validation).length > 0 && (
+                              <span className="inline-flex items-center rounded border px-1.5 py-0.5 text-[10px] font-mono text-muted-foreground">
+                                {Object.entries((f as any).validation).map(([k,v]) => `${k}:${v}`).join(' ')}
                               </span>
                             )}
                           </div>
@@ -842,6 +963,46 @@ export function SchemaBuilderView() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      {/* Templates Dialog */}
+      <Dialog open={templatesOpen} onOpenChange={setTemplatesOpen}>
+        <DialogContent className="sm:max-w-xl">
+          <DialogHeader>
+            <DialogTitle>Pre-built Schema Templates</DialogTitle>
+            <DialogDescription>
+              Select a template to quickly create a schema with standard fields.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            {PREBUILT_TEMPLATES.map((t, i) => (
+              <Card key={i} className="cursor-pointer hover:bg-muted/50 transition-colors" onClick={async () => {
+                setTemplatesOpen(false);
+                try {
+                  const created = await api.post<SchemaDTO>("/api/schemas", {
+                    name: t.name,
+                    description: t.description,
+                  });
+                  for (const field of t.fields) {
+                    await api.post(`/api/schemas/${created.id}/fields`, field);
+                  }
+                  toast.success("Template schema created!");
+                  queryClient.invalidateQueries({ queryKey: ["schemas"] });
+                  setActiveSchemaId(created.id);
+                } catch (err: any) {
+                  toast.error("Failed to create from template", { description: err.message });
+                }
+              }}>
+                <CardHeader className="p-4">
+                  <CardTitle className="text-sm">{t.name}</CardTitle>
+                  <DialogDescription className="text-xs">{t.description} ({t.fields.length} fields)</DialogDescription>
+                </CardHeader>
+              </Card>
+            ))}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setTemplatesOpen(false)}>Close</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -982,6 +1143,48 @@ function FieldEditorDialog({
                 setDraft((d) => ({ ...d, required: v }))
               }
             />
+          </div>
+
+          <div className="rounded-lg border p-3 space-y-3">
+            <div>
+              <Label className="text-sm font-medium">Validation rules</Label>
+              <p className="text-[10px] text-muted-foreground">Optional constraints enforced during extraction.</p>
+            </div>
+            
+            {(draft.type === "number" || draft.type === "date") && (
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Min</Label>
+                  <Input 
+                    type={draft.type === "number" ? "number" : "date"}
+                    className="h-8 text-xs" 
+                    value={(draft.validation?.min as string) || ""}
+                    onChange={(e) => setDraft(d => ({ ...d, validation: { ...d.validation, min: e.target.value ? Number(e.target.value) : undefined } }))} 
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Max</Label>
+                  <Input 
+                    type={draft.type === "number" ? "number" : "date"}
+                    className="h-8 text-xs" 
+                    value={(draft.validation?.max as string) || ""}
+                    onChange={(e) => setDraft(d => ({ ...d, validation: { ...d.validation, max: e.target.value ? Number(e.target.value) : undefined } }))} 
+                  />
+                </div>
+              </div>
+            )}
+            
+            {draft.type === "text" && (
+              <div className="space-y-1.5">
+                <Label className="text-xs">Regex Pattern</Label>
+                <Input 
+                  className="h-8 text-xs font-mono" 
+                  placeholder="^[A-Z]{3}-\d{4}$"
+                  value={draft.validation?.regex || ""}
+                  onChange={(e) => setDraft(d => ({ ...d, validation: { ...d.validation, regex: e.target.value || undefined } }))} 
+                />
+              </div>
+            )}
           </div>
 
           {/* Confidence threshold */}

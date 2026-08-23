@@ -67,6 +67,14 @@ interface UsageTrends {
     remaining: number;
     percent: number;
   };
+  quotas: {
+    id: string;
+    name: string;
+    limit: number;
+    used: number;
+    remaining: number;
+    percent: number;
+  }[];
   counts: {
     sources: number;
     datasets: number;
@@ -160,7 +168,7 @@ export function UsageView() {
         />
       </div>
 
-      {/* Quota progress bar */}
+      {/* Quotas progress bars */}
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="text-base flex items-center gap-2">
@@ -171,38 +179,36 @@ export function UsageView() {
             </Badge>
           </CardTitle>
         </CardHeader>
-        <CardContent className="space-y-3">
-          <div className="flex items-center justify-between text-sm">
-            <span className="text-muted-foreground">
-              {fmt(data.quota.used)} tokens used
-            </span>
-            <span className="text-muted-foreground">
-              {fmt(data.quota.remaining)} remaining
-            </span>
-          </div>
-          <Progress
-            value={data.quota.percent}
-            className="h-3"
-            // Color based on usage: green < 60%, amber < 85%, red >= 85%
-          />
-          <div className="flex items-center justify-between text-xs text-muted-foreground">
-            <span>
-              {data.quota.percent < 60 ? (
-                <span className="flex items-center gap-1 text-emerald-600">
-                  <CheckCircle2 className="h-3 w-3" /> Healthy usage
+        <CardContent className="space-y-6">
+          {data.quotas?.map(q => (
+            <div key={q.id} className="space-y-2">
+              <div className="flex items-center justify-between text-sm">
+                <span className="font-medium text-foreground">{q.name}</span>
+                <span className="text-muted-foreground">
+                  {fmt(q.used)} / {fmt(q.limit)}
                 </span>
-              ) : data.quota.percent < 85 ? (
-                <span className="flex items-center gap-1 text-amber-600">
-                  <AlertTriangle className="h-3 w-3" /> Approaching limit
+              </div>
+              <Progress
+                value={q.percent}
+                className="h-2"
+              />
+              <div className="flex items-center justify-between text-[10px] text-muted-foreground">
+                <span>{fmt(q.remaining)} remaining</span>
+                <span>
+                  {q.percent < 60 ? (
+                    <span className="text-emerald-600">Healthy</span>
+                  ) : q.percent < 85 ? (
+                    <span className="text-amber-600">Approaching limit</span>
+                  ) : (
+                    <span className="text-destructive">Near limit</span>
+                  )}
                 </span>
-              ) : (
-                <span className="flex items-center gap-1 text-destructive">
-                  <AlertTriangle className="h-3 w-3" /> Near quota limit
-                </span>
-              )}
-            </span>
+              </div>
+            </div>
+          ))}
+          <div className="flex justify-end">
             <button
-              className="text-primary hover:underline"
+              className="text-sm text-primary hover:underline"
               onClick={() => setView("settings")}
             >
               Upgrade plan →

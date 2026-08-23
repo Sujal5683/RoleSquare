@@ -292,14 +292,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   );
 
   return (
-    <div className="flex min-h-screen flex-col">
+    <div className="flex h-screen flex-col overflow-hidden">
       <CommandPalette />
       <KeyboardShortcutsDialog />
       {/* AI Assistant — floating button + slide-in panel */}
       <AssistantButton />
       <AssistantPanel />
       {/* Top bar */}
-      <header className="sticky top-0 z-40 flex h-14 items-center gap-3 border-b bg-background/95 px-4 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+      <header className="sticky top-0 z-40 flex h-14 shrink-0 items-center gap-3 border-b bg-background/95 px-4 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         {/* Mobile menu */}
         <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>
           <SheetTrigger asChild>
@@ -423,12 +423,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       </header>
 
       {/* Body: sidebar + main */}
-      <div className="flex flex-1">
+      <div className="flex flex-1 overflow-hidden">
         {/* Desktop sidebar */}
-        <aside className="hidden lg:block w-64 border-r bg-sidebar">{Sidebar}</aside>
+        <aside className="hidden lg:flex w-64 flex-col border-r bg-sidebar overflow-y-auto">{Sidebar}</aside>
 
         {/* Main content */}
-        <main className="flex-1 overflow-x-hidden">
+        <main className="flex-1 overflow-y-auto">
           <div key={view} className="mx-auto max-w-7xl p-4 sm:p-4 lg:p-6 view-fade-in">
             {children}
           </div>
@@ -436,7 +436,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       </div>
 
       {/* Sticky footer */}
-      <footer className="border-t bg-background px-4 py-3">
+      <footer className="shrink-0 border-t bg-background px-4 py-3">
         <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-2 text-xs text-muted-foreground sm:flex-row">
           <div className="flex items-center gap-2">
             <span className="flex h-4 w-4 items-center justify-center rounded bg-primary text-primary-foreground">

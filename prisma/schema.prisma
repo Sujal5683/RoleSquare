@@ -58,10 +58,25 @@ model Organization {
   sharingReqs        SharingRequest[]
   sharePerms         SharingPermission[]
   webhooks           Webhook[]
+  apiKeys            ApiKey[]
   crossOrgPerms      CrossOrgPermission[] @relation("OwnedCrossOrgPerms")
   invitations        Invitation[]
   ownedAccesses      DatasetAccess[]      @relation("OwnerOrgAccess")
   granteeOrgAccesses DatasetAccess[]      @relation("GranteeOrgAccess")
+}
+
+model ApiKey {
+  id             String       @id @default(cuid())
+  organizationId String
+  name           String
+  keyHash        String       @unique
+  lastUsedAt     DateTime?
+  expiresAt      DateTime?
+  createdAt      DateTime     @default(now())
+
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
 }
 
 model OrganizationMember {
@@ -303,6 +318,7 @@ model SchemaField {
   instructions      String?
   required          Boolean @default(false)
   options           String? // JSON array for enum/multiselect
+  validation        String? // JSON: { min?: number, max?: number, regex?: string }
   position          Int     @default(0)
   confidenceThreshold Float  @default(0.7) // min confidence before routing to review (0..1)
 
