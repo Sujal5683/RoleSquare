@@ -4,7 +4,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { requireOrgContext, AuthError, authErrorResponse } from "@/lib/auth";
+import { verifyDatasetAccess, requireOrgContext, AuthError, authErrorResponse } from "@/lib/auth";
 import { logAudit } from "@/lib/audit";
 import {
   attachFieldsToRecords,
@@ -12,18 +12,20 @@ import {
   serializeDatasetRecord,
 } from "@/lib/serialize";
 
-async function loadSchemaFields(datasetId: string, organizationId: string) {
+async function loadSchemaFields(datasetId: string, organizationId: string, userId: string) {
   const dataset = await db.dataset.findUnique({
     where: { id: datasetId },
     include: { schema: { include: { fields: true } } },
   });
-  if (!dataset || dataset.organizationId !== organizationId) return null;
+  if (!dataset) return null;
+  if (!(await verifyDatasetAccess(dataset, organizationId, userId, "read"))) return null;
   return fieldsByIdMap(dataset.schema?.fields ?? []);
 }
 
-async function requireRecord(id: string, recordId: string, organizationId: string) {
+async function requireRecord(id: string, recordId: string, organizationId: string, userId: string, requiredLevel: "read" | "comment" | "edit" | "owner" = "read") {
   const dataset = await db.dataset.findUnique({ where: { id } });
-  if (!dataset || dataset.organizationId !== organizationId) return null;
+  if (!dataset) return null;
+  if (!(await verifyDatasetAccess(dataset, organizationId, userId, requiredLevel))) return null;
   const record = await db.datasetRecord.findUnique({
     where: { id: recordId },
     include: { values: true },
@@ -38,15 +40,15 @@ export async function GET(
 ) {
   try {
     const { id, recordId } = await params;
-    const { organizationId } = await requireOrgContext(req);
-    const record = await requireRecord(id, recordId, organizationId);
+    const { user, organizationId } = await requireOrgContext(req);
+    const record = await requireRecord(id, recordId, organizationId, user.id);
     if (!record) {
       return NextResponse.json(
         { error: "Record not found" },
         { status: 404 }
       );
     }
-    const fieldsMap = await loadSchemaFields(id, organizationId);
+    const fieldsMap = await loadSchemaFields(id, organizationId, user.id);
     return NextResponse.json(
       serializeDatasetRecord(
         attachFieldsToRecords([record], fieldsMap ?? new Map())[0]
@@ -68,7 +70,7 @@ export async function PATCH(
   try {
     const { id, recordId } = await params;
     const { user, organizationId } = await requireOrgContext(req);
-    const before = await requireRecord(id, recordId, organizationId);
+    const before = await requireRecord(id, recordId, organizationId, user.id, "edit");
     if (!before) {
       return NextResponse.json(
         { error: "Record not found" },
@@ -86,7 +88,7 @@ export async function PATCH(
       include: { values: true },
     });
 
-    const fieldsMap = await loadSchemaFields(id, organizationId);
+    const fieldsMap = await loadSchemaFields(id, organizationId, user.id);
     const enriched = attachFieldsToRecords([record], fieldsMap ?? new Map())[0];
 
     await logAudit({

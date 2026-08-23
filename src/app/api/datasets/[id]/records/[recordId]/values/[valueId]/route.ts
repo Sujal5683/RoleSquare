@@ -8,27 +8,20 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { requireOrgContext, AuthError, authErrorResponse } from "@/lib/auth";
+import { verifyDatasetAccess, requireOrgContext, AuthError, authErrorResponse } from "@/lib/auth";
 import { logAudit } from "@/lib/audit";
 import { attachFieldInfo, fieldsByIdMap, serializeDatasetValue } from "@/lib/serialize";
-
-async function loadFieldForValue(fieldId: string, organizationId: string) {
-  const field = await db.schemaField.findUnique({ where: { id: fieldId } });
-  if (!field) return null;
-  // Verify the field's schema belongs to the org.
-  const schema = await db.schema.findUnique({ where: { id: field.schemaId } });
-  if (!schema || schema.organizationId !== organizationId) return null;
-  return field;
-}
 
 async function requireValue(
   datasetId: string,
   recordId: string,
   valueId: string,
-  organizationId: string
+  organizationId: string,
+  userId: string
 ) {
   const dataset = await db.dataset.findUnique({ where: { id: datasetId } });
-  if (!dataset || dataset.organizationId !== organizationId) return null;
+  if (!dataset) return null;
+  if (!(await verifyDatasetAccess(dataset, organizationId, userId, "edit"))) return null;
   const record = await db.datasetRecord.findUnique({
     where: { id: recordId },
   });
@@ -37,7 +30,7 @@ async function requireValue(
     where: { id: valueId },
   });
   if (!value || value.recordId !== recordId) return null;
-  const field = await loadFieldForValue(value.fieldId, organizationId);
+  const field = await db.schemaField.findUnique({ where: { id: value.fieldId } });
   return { ...value, field: field ?? null };
 }
 
@@ -48,7 +41,7 @@ export async function PATCH(
   try {
     const { id: datasetId, recordId, valueId } = await params;
     const { user, organizationId } = await requireOrgContext(req);
-    const before = await requireValue(datasetId, recordId, valueId, organizationId);
+    const before = await requireValue(datasetId, recordId, valueId, organizationId, user.id);
     if (!before) {
       return NextResponse.json(
         { error: "Value not found" },
@@ -85,7 +78,7 @@ export async function PATCH(
       where: { id: valueId },
       data,
     });
-    const field = await loadFieldForValue(value.fieldId, organizationId);
+    const field = await db.schemaField.findUnique({ where: { id: value.fieldId } });
     const enriched = attachFieldInfo(value, fieldsByIdMap(field ? [field] : []));
 
     await logAudit({

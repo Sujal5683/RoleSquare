@@ -34,12 +34,17 @@ export async function POST(
 
     // Fetch the dataset + schema fields
     const dataset = await db.dataset.findFirst({
-      where: { id: datasetId, organizationId },
+      where: { id: datasetId },
       include: { schema: { include: { fields: true } } },
     });
 
     if (!dataset) {
       return NextResponse.json({ error: "Dataset not found" }, { status: 404 });
+    }
+
+    const { verifyDatasetAccess } = await import("@/lib/auth");
+    if (!(await verifyDatasetAccess(dataset, organizationId, user.id, "edit"))) {
+      return NextResponse.json({ error: "Dataset not found or read-only access" }, { status: 403 });
     }
 
     if (!dataset.schema) {

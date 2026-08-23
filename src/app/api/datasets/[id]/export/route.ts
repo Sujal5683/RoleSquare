@@ -37,11 +37,12 @@ export async function POST(
       where: { id },
       include: { schema: { include: { fields: { orderBy: { position: "asc" } } } } },
     });
-    if (!dataset || dataset.organizationId !== organizationId) {
-      return NextResponse.json(
-        { error: "Dataset not found" },
-        { status: 404 }
-      );
+    if (!dataset) {
+      return NextResponse.json({ error: "Dataset not found" }, { status: 404 });
+    }
+    const { verifyDatasetAccess } = await import("@/lib/auth");
+    if (!(await verifyDatasetAccess(dataset, organizationId, user.id, "read"))) {
+      return NextResponse.json({ error: "Dataset not found" }, { status: 404 });
     }
     const body = await req.json().catch(() => ({}));
     const format =

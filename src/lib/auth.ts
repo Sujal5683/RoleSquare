@@ -410,3 +410,45 @@ export function authErrorResponse(err: AuthError): NextResponse {
     { status: err.status }
   );
 }
+
+/**
+ * Checks if a dataset is accessible to the current user/org context.
+ * Returns true if the dataset belongs to the org, or if there is an active
+ * DatasetAccess grant for this org or user that meets the required level.
+ */
+export async function verifyDatasetAccess(
+  dataset: { id: string; organizationId: string },
+  organizationId: string,
+  userId: string,
+  requiredLevel: "read" | "comment" | "edit" | "owner" = "read"
+): Promise<boolean> {
+  // If the dataset is owned by the current organization context, access is granted.
+  // (The route handler should separately check org membership roles if needed for edit/delete)
+  if (dataset.organizationId === organizationId) return true;
+
+  // Otherwise, check for an active DatasetAccess grant
+  const access = await db.datasetAccess.findFirst({
+    where: {
+      datasetId: dataset.id,
+      status: "active",
+      OR: [
+        { granteeOrgId: organizationId },
+        { granteeUserId: userId }
+      ]
+    }
+  });
+
+  if (!access) return false;
+
+  const LEVEL_WEIGHT: Record<string, number> = {
+    read: 1,
+    comment: 2,
+    edit: 3,
+    owner: 4,
+  };
+
+  const userLevel = LEVEL_WEIGHT[access.level] ?? 0;
+  const reqLevel = LEVEL_WEIGHT[requiredLevel] ?? 1;
+
+  return userLevel >= reqLevel;
+}

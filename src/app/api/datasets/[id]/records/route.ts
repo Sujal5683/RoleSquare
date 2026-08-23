@@ -8,7 +8,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { requireOrgContext, AuthError, authErrorResponse } from "@/lib/auth";
+import { verifyDatasetAccess, requireOrgContext, AuthError, authErrorResponse } from "@/lib/auth";
 import { logAudit } from "@/lib/audit";
 import {
   attachFieldsToRecords,
@@ -16,24 +16,14 @@ import {
   serializeDatasetRecord,
 } from "@/lib/serialize";
 
-async function requireDataset(id: string, organizationId: string, userId: string, requireOwnership = false) {
+async function requireDataset(id: string, organizationId: string, userId: string, requiredLevel: "read" | "comment" | "edit" | "owner" = "read") {
   const d = await db.dataset.findUnique({
     where: { id },
     include: { schema: { include: { fields: { orderBy: { position: "asc" } } } } },
   });
   if (!d) return null;
-  if (d.organizationId !== organizationId) {
-    if (requireOwnership) return null;
-    const access = await db.datasetAccess.findFirst({
-      where: {
-        datasetId: id,
-        status: "active",
-        OR: [{ granteeOrgId: organizationId }, { granteeUserId: userId }]
-      }
-    });
-    if (!access) return null;
-  }
-  return d;
+  const hasAccess = await verifyDatasetAccess(d, organizationId, userId, requiredLevel);
+  return hasAccess ? d : null;
 }
 
 export async function GET(
@@ -42,8 +32,8 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
-    const { organizationId } = await requireOrgContext(req);
-    const dataset = await requireDataset(id, organizationId);
+    const { user, organizationId } = await requireOrgContext(req);
+    const dataset = await requireDataset(id, organizationId, user.id);
     if (!dataset) {
       return NextResponse.json(
         { error: "Dataset not found" },
@@ -97,7 +87,7 @@ export async function POST(
   try {
     const { id } = await params;
     const { user, organizationId } = await requireOrgContext(req);
-    const dataset = await requireDataset(id, organizationId);
+    const dataset = await requireDataset(id, organizationId, user.id, "edit");
     if (!dataset) {
       return NextResponse.json(
         { error: "Dataset not found" },

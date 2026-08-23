@@ -7,7 +7,9 @@ import { requireOrgContext, AuthError, authErrorResponse } from "@/lib/auth";
 import { logAudit } from "@/lib/audit";
 import { serializeDataset } from "@/lib/serialize";
 
-async function requireDataset(id: string, organizationId: string, userId: string, requireOwnership = false) {
+import { verifyDatasetAccess } from "@/lib/auth";
+
+async function requireDataset(id: string, organizationId: string, userId: string, requiredLevel: "read" | "comment" | "edit" | "owner" = "read") {
   const d = await db.dataset.findUnique({
     where: { id },
     include: {
@@ -16,23 +18,8 @@ async function requireDataset(id: string, organizationId: string, userId: string
     },
   });
   if (!d) return null;
-  
-  if (d.organizationId !== organizationId) {
-    if (requireOwnership) return null;
-    // Check if it's shared with the user/org
-    const access = await db.datasetAccess.findFirst({
-      where: {
-        datasetId: id,
-        status: "active",
-        OR: [
-          { granteeOrgId: organizationId },
-          { granteeUserId: userId }
-        ]
-      }
-    });
-    if (!access) return null;
-  }
-  return d;
+  const hasAccess = await verifyDatasetAccess(d, organizationId, userId, requiredLevel);
+  return hasAccess ? d : null;
 }
 
 export async function GET(
@@ -66,7 +53,7 @@ export async function DELETE(
   try {
     const { id } = await params;
     const { user, organizationId } = await requireOrgContext(req);
-    const before = await requireDataset(id, organizationId, user.id, true);
+    const before = await requireDataset(id, organizationId, user.id, "owner");
     if (!before) {
       return NextResponse.json(
         { error: "Dataset not found" },
