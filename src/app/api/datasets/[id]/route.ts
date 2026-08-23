@@ -7,7 +7,7 @@ import { requireOrgContext, AuthError, authErrorResponse } from "@/lib/auth";
 import { logAudit } from "@/lib/audit";
 import { serializeDataset } from "@/lib/serialize";
 
-async function requireDataset(id: string, organizationId: string) {
+async function requireDataset(id: string, organizationId: string, userId: string, requireOwnership = false) {
   const d = await db.dataset.findUnique({
     where: { id },
     include: {
@@ -15,7 +15,23 @@ async function requireDataset(id: string, organizationId: string) {
       sources: { select: { id: true } },
     },
   });
-  if (!d || d.organizationId !== organizationId) return null;
+  if (!d) return null;
+  
+  if (d.organizationId !== organizationId) {
+    if (requireOwnership) return null;
+    // Check if it's shared with the user/org
+    const access = await db.datasetAccess.findFirst({
+      where: {
+        datasetId: id,
+        status: "active",
+        OR: [
+          { granteeOrgId: organizationId },
+          { granteeUserId: userId }
+        ]
+      }
+    });
+    if (!access) return null;
+  }
   return d;
 }
 
@@ -25,8 +41,8 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
-    const { organizationId } = await requireOrgContext(req);
-    const dataset = await requireDataset(id, organizationId);
+    const { user, organizationId } = await requireOrgContext(req);
+    const dataset = await requireDataset(id, organizationId, user.id);
     if (!dataset) {
       return NextResponse.json(
         { error: "Dataset not found" },
@@ -50,7 +66,7 @@ export async function DELETE(
   try {
     const { id } = await params;
     const { user, organizationId } = await requireOrgContext(req);
-    const before = await requireDataset(id, organizationId);
+    const before = await requireDataset(id, organizationId, user.id, true);
     if (!before) {
       return NextResponse.json(
         { error: "Dataset not found" },

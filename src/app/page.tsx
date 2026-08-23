@@ -13,7 +13,7 @@ import { AiStudioView } from "@/components/views/ai-studio-view";
 import { UsageView } from "@/components/views/usage-view";
 import { OrganizationsView } from "@/components/views/organizations-view";
 import { MembersView } from "@/components/views/members-view";
-import { SharingView } from "@/components/views/sharing-view";
+import { SharingView } from "@/components/views/sharing/sharing-view";
 import { AuditView } from "@/components/views/audit-view";
 import { SettingsView } from "@/components/views/settings-view";
 import { InvitationsView } from "@/components/views/invitations-view";

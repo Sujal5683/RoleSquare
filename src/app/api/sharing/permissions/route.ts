@@ -154,10 +154,18 @@ export async function DELETE(req: NextRequest) {
     }
 
     const existing = await db.datasetAccess.findUnique({ where: { id } });
-    if (!existing || existing.ownerOrgId !== organizationId) {
+    
+    if (!existing) {
       return NextResponse.json({ error: "Permission not found" }, { status: 404 });
     }
 
+    const isOwner = existing.ownerOrgId === organizationId;
+    const isGranteeOrg = existing.granteeOrgId === organizationId;
+    const isGranteeUser = existing.granteeUserId === user.id;
+
+    if (!isOwner && !isGranteeOrg && !isGranteeUser) {
+      return NextResponse.json({ error: "Permission not found or unauthorized" }, { status: 403 });
+    }
     // Soft-delete: mark as revoked rather than hard delete (preserves audit trail)
     await db.datasetAccess.update({
       where: { id },

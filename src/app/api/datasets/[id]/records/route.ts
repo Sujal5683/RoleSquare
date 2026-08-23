@@ -16,12 +16,23 @@ import {
   serializeDatasetRecord,
 } from "@/lib/serialize";
 
-async function requireDataset(id: string, organizationId: string) {
+async function requireDataset(id: string, organizationId: string, userId: string, requireOwnership = false) {
   const d = await db.dataset.findUnique({
     where: { id },
     include: { schema: { include: { fields: { orderBy: { position: "asc" } } } } },
   });
-  if (!d || d.organizationId !== organizationId) return null;
+  if (!d) return null;
+  if (d.organizationId !== organizationId) {
+    if (requireOwnership) return null;
+    const access = await db.datasetAccess.findFirst({
+      where: {
+        datasetId: id,
+        status: "active",
+        OR: [{ granteeOrgId: organizationId }, { granteeUserId: userId }]
+      }
+    });
+    if (!access) return null;
+  }
   return d;
 }
 

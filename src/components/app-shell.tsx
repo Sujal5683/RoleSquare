@@ -56,7 +56,7 @@ import { DatasetsView } from "./views/datasets-view";
 import { SchemaBuilderView } from "./views/schema-builder-view";
 import { AiStudioView } from "./views/ai-studio-view";
 import { MembersView } from "./views/members-view";
-import { SharingView } from "./views/sharing-view";
+// This view is imported centrally from page.tsx, so we might not even need it here if it's unused.
 import { AuditView } from "./views/audit-view";
 import { SettingsView } from "./views/settings-view";
 import { UsageView } from "./views/usage-view";

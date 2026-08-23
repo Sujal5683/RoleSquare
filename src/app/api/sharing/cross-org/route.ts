@@ -60,8 +60,16 @@ export async function POST(req: NextRequest) {
     if (datasetId) {
       const dataset = await db.dataset.findUnique({ where: { id: datasetId }, select: { id: true, organizationId: true } })
       if (!dataset) return NextResponse.json({ error: 'Dataset not found' }, { status: 404 })
-      if (shareType === 'grant' && dataset.organizationId !== organizationId)
-        return NextResponse.json({ error: 'You can only grant access to your own datasets' }, { status: 403 })
+      
+      if (shareType === 'grant') {
+         const dsMembership = await db.organizationMember.findUnique({
+            where: { organizationId_userId: { organizationId: dataset.organizationId, userId: user.id } }
+         });
+         const ROLE_LEVEL: Record<string, number> = { owner: 5, admin: 4, manager: 3, member: 2, viewer: 1 };
+         if (!dsMembership || (ROLE_LEVEL[dsMembership.role] ?? 0) < ROLE_LEVEL.manager) {
+            return NextResponse.json({ error: 'You do not have permission to share this dataset. Requires manager, admin, or owner role in the parent organization.' }, { status: 403 })
+         }
+      }
     }
 
     if (targetOrganizationId) {
