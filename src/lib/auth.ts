@@ -163,6 +163,9 @@ async function getOrCreateUser(
     return user;
   });
 
+  const { ensureOrgDefaultDataset } = await import("@/lib/dataset-provisioner");
+  await ensureOrgDefaultDataset(orgId, userId);
+
   // Reload with full relations
   return db.user.findFirstOrThrow({
     where: { id: newUser.id },

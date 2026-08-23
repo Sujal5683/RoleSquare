@@ -81,6 +81,10 @@ export async function getGmailClient(connectionId: string): Promise<gmail_v1.Gma
     process.env.GOOGLE_CLIENT_SECRET
   );
   auth.setCredentials({ access_token: accessToken });
+  google.options({ 
+    timeout: 20000, 
+    headers: { "Connection": "close" } // Disable keep-alive to prevent hangs on dropped idle TCP connections
+  });
   return google.gmail({ version: "v1", auth });
 }
 

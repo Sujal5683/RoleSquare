@@ -642,8 +642,8 @@ export function DatasetDetailView() {
                 Import
               </Button>
 
-              {/* AI Extract button — only shown for Default Datasets */}
-              {dataset?.isDefault && (
+              {/* AI Extract button — only shown for Default Datasets with a linked source */}
+              {dataset?.isDefault && dataset.sourceId && (
                 <Button
                   size="sm"
                   className="gap-1.5 bg-gradient-to-r from-violet-600 to-indigo-600 text-white hover:from-violet-700 hover:to-indigo-700 shadow-sm"
@@ -1620,4 +1620,88 @@ function parseForEdit(raw: string, type: FieldType): unknown {
     return /^(true|yes|1|y)$/i.test(trimmed);
   }
   return trimmed;
+}
+
+// ── AI Extract Dialog ───────────────────────────────────────────────────
+
+function AiExtractDialog({
+  open,
+  datasetName,
+  schemas,
+  schemaId,
+  onSchemaChange,
+  newDatasetName,
+  onDatasetNameChange,
+  onConfirm,
+  loading,
+  onClose,
+}: {
+  open: boolean;
+  datasetName: string;
+  schemas: SchemaDTO[];
+  schemaId: string;
+  onSchemaChange: (v: string) => void;
+  newDatasetName: string;
+  onDatasetNameChange: (v: string) => void;
+  onConfirm: () => void;
+  loading: boolean;
+  onClose: () => void;
+}) {
+  return (
+    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Zap className="h-4 w-4 text-violet-500" />
+            Extract Custom Fields
+          </DialogTitle>
+          <DialogDescription>
+            Run an AI pipeline over the evidence in <strong>{datasetName}</strong> to extract specific fields defined in a schema.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4 py-2">
+          <div className="space-y-1.5">
+            <Label htmlFor="extract-schema">Target schema *</Label>
+            <Select value={schemaId} onValueChange={onSchemaChange}>
+              <SelectTrigger id="extract-schema">
+                <SelectValue placeholder="Select a schema to extract" />
+              </SelectTrigger>
+              <SelectContent>
+                {schemas.map((s) => (
+                  <SelectItem key={s.id} value={s.id}>
+                    {s.name} ({s.fields.length} fields)
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="extract-ds-name">New dataset name (optional)</Label>
+            <Input
+              id="extract-ds-name"
+              placeholder="Leave blank to auto-generate"
+              value={newDatasetName}
+              onChange={(e) => onDatasetNameChange(e.target.value)}
+            />
+            <p className="text-xs text-muted-foreground">
+              A new dataset will be created for the extracted records.
+            </p>
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose} disabled={loading}>
+            Cancel
+          </Button>
+          <Button onClick={onConfirm} disabled={!schemaId || loading}>
+            {loading ? (
+              <RefreshCw className="mr-2 h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <Sparkles className="mr-2 h-3.5 w-3.5" />
+            )}
+            Run Extraction
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
 }

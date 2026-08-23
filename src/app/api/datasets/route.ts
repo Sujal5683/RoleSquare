@@ -14,7 +14,10 @@ export async function GET(req: NextRequest) {
     const { organizationId } = await requireOrgContext(req);
     const datasets = await db.dataset.findMany({
       where: { organizationId },
-      include: { schema: { include: { fields: true } } },
+      include: {
+        schema: { include: { fields: true } },
+        sources: { select: { id: true } },
+      },
       orderBy: { createdAt: "desc" },
     });
     return NextResponse.json(datasets.map(serializeDataset));
@@ -47,7 +50,10 @@ export async function POST(req: NextRequest) {
         description: body?.description ?? null,
         recordCount: 0,
       },
-      include: { schema: { include: { fields: true } } },
+      include: {
+        schema: { include: { fields: true } },
+        sources: { select: { id: true } },
+      },
     });
 
     await logAudit({

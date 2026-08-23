@@ -139,6 +139,7 @@ export function serializeSchema(s: any): SchemaDTO {
     fields: Array.isArray(s.fields) ? s.fields.map(serializeSchemaField) : [],
     createdAt:
       s.createdAt instanceof Date ? s.createdAt.toISOString() : s.createdAt,
+    isDefault: !!s.isDefault,
   };
 }
 
@@ -255,6 +256,8 @@ export function serializeDataset(d: any): DatasetDTO {
     recordCount: d.recordCount,
     createdAt:
       d.createdAt instanceof Date ? d.createdAt.toISOString() : d.createdAt,
+    isDefault: !!d.isDefault,
+    sourceId: d.sources?.[0]?.id ?? null,
   };
 }
 

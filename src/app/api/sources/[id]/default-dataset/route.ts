@@ -4,11 +4,11 @@ import { requireOrgContext, AuthError, authErrorResponse } from "@/lib/auth";
 
 export async function GET(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const { organizationId } = await requireOrgContext(req);
-    const sourceId = params.id;
+    const { id: sourceId } = await params;
 
     // Verify source exists and belongs to org
     const source = await db.source.findUnique({

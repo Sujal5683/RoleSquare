@@ -114,6 +114,7 @@ export interface SchemaDTO {
   description: string | null;
   version: number;
   promptTemplate: string | null;
+  isDefault: boolean;
   fields: SchemaFieldDTO[];
   createdAt: string;
 }
@@ -198,7 +199,9 @@ export interface DatasetDTO {
   name: string;
   description: string | null;
   recordCount: number;
+  isDefault: boolean;
   createdAt: string;
+  sourceId?: string | null;
 }
 
 export interface AiJobDTO {

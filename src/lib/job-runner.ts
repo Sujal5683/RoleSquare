@@ -75,7 +75,7 @@ async function processStaleJobs() {
       status: "running",
       startedAt: { lt: cutoff },
     },
-    select: { id: true, organizationId: true },
+    select: { id: true, organizationId: true, payload: true },
   });
 
   for (const job of staleJobs) {
@@ -87,6 +87,26 @@ async function processStaleJobs() {
         finishedAt: new Date(),
       },
     });
+
+    try {
+      if (job.payload) {
+        const parsed = JSON.parse(job.payload);
+        if (parsed.runId) {
+          await db.sourceRun.updateMany({
+            where: { id: parsed.runId },
+            data: { status: "failed", errorMessage: "Job timed out (stale)" },
+          });
+        }
+        if (parsed.sourceId) {
+          await db.source.updateMany({
+            where: { id: parsed.sourceId },
+            data: { runState: "idle" },
+          });
+        }
+      }
+    } catch (e) {
+      // ignore
+    }
     await logAudit({
       organizationId: job.organizationId,
       actorType: "system",
@@ -180,10 +200,12 @@ async function processJob(job: {
     // Dead-letter if too many attempts
     const shouldDlq = job.attempts >= MAX_ATTEMPTS;
 
+    const finalStatus = shouldDlq ? "dlq" : isRetryable ? "queued" : "failed";
+
     await db.aiJob.update({
       where: { id: job.id },
       data: {
-        status: shouldDlq ? "dlq" : isRetryable ? "queued" : "failed",
+        status: finalStatus,
         errorMessage: shouldDlq
           ? `Dead-lettered after ${MAX_ATTEMPTS} attempts: ${errorMessage}`
           : errorMessage,
@@ -192,6 +214,26 @@ async function processJob(job: {
       },
     });
 
+    if (finalStatus !== "queued") {
+      try {
+        const parsed = JSON.parse(job.payload || "{}");
+        if (parsed.runId) {
+          await db.sourceRun.updateMany({
+            where: { id: parsed.runId, status: "running" },
+            data: { status: "failed", errorMessage },
+          });
+        }
+        if (parsed.sourceId) {
+          await db.source.updateMany({
+            where: { id: parsed.sourceId },
+            data: { runState: "idle" },
+          });
+        }
+      } catch (e) {
+        // ignore
+      }
+    }
+
     await logAudit({
       organizationId: job.organizationId,
       actorType: "system",
@@ -199,7 +241,7 @@ async function processJob(job: {
       entity: "job",
       entityId: job.id,
       after: {
-        status: shouldDlq ? "dlq" : isRetryable ? "queued" : "failed",
+        status: finalStatus,
         error: errorMessage,
         attempts: job.attempts,
       },
@@ -214,7 +256,14 @@ function isRetryableError(err: unknown): boolean {
   if (err instanceof Error) {
     const msg = err.message.toLowerCase();
     // Network errors, timeouts, and rate limits are retryable
-    if (msg.includes("timeout") || msg.includes("rate limit") || msg.includes("network")) {
+    if (
+      msg.includes("timeout") || 
+      msg.includes("rate limit") || 
+      msg.includes("network") ||
+      msg.includes("econnreset") ||
+      msg.includes("forcibly closed") ||
+      msg.includes("wsarecv")
+    ) {
       return true;
     }
     // Prisma transaction conflicts are retryable
@@ -303,106 +352,111 @@ async function processGmailScan(
   let driveLinksDiscovered = 0;
   const total = messageRefs.length;
 
-  // Fetch and parse each message
-  for (let i = 0; i < total; i++) {
-    const ref = messageRefs[i];
-    if (!ref.id) continue;
-
-    // Update progress incrementally
+  // Process messages in chunks of 10 to avoid sequential blocking and speed up scanning
+  const chunkSize = 10;
+  for (let i = 0; i < total; i += chunkSize) {
+    const chunk = messageRefs.slice(i, i + chunkSize);
+    
+    // Update progress
     const pct = 35 + Math.floor(((i + 1) / Math.max(total, 1)) * 45);
-    if (i % 5 === 0) await updateRunProgress(runId, pct, "parsing");
+    await updateRunProgress(runId, pct, "parsing");
 
-    // Fetch full message
-    const msgResp = await gmail.users.messages.get({
-      userId: "me",
-      id: ref.id,
-      format: "full",
-    });
-    const msg = msgResp.data;
-    const headers = msg.payload?.headers ?? [];
-
-    const fromAddress = getHeader(headers, "from");
-    const toAddress = getHeader(headers, "to");
-    const ccAddresses = getHeader(headers, "cc") || null;
-    const subject = getHeader(headers, "subject");
-    const dateStr = getHeader(headers, "date");
-    const receivedAt = dateStr ? new Date(dateStr) : new Date();
-    const snippet = msg.snippet ?? "";
-
-    const { text: bodyText, html: bodyHtml } = extractEmailBody(msg.payload);
-
-    // Dedup hash: sha256 of messageId
-    const dedupHash = crypto.createHash("sha256").update(ref.id).digest("hex");
-
-    // Upsert email (idempotent on googleMessageId)
-    const email = await db.email.upsert({
-      where: { sourceId_googleMessageId: { sourceId, googleMessageId: ref.id } },
-      create: {
-        sourceId,
-        googleMessageId: ref.id,
-        threadId: msg.threadId ?? null,
-        fromAddress,
-        toAddress,
-        ccAddresses,
-        subject,
-        snippet,
-        bodyText: bodyText || null,
-        bodyHtml: bodyHtml || null,
-        receivedAt,
-        dedupHash,
-        processingStatus: "matched",
-      },
-      update: {
-        fromAddress,
-        toAddress,
-        subject,
-        snippet,
-        bodyText: bodyText || null,
-        bodyHtml: bodyHtml || null,
-        receivedAt,
-        processingStatus: "matched",
-      },
-    });
-    emailsMatched++;
-
-    // Discover attachments
-    const attachments = extractAttachments(msg.payload);
-    for (const att of attachments) {
-      await db.emailAttachment.upsert({
-        where: { id: `${email.id}-${att.attachmentId}` },
-        create: {
-          id: `${email.id}-${att.attachmentId}`,
-          emailId: email.id,
-          filename: att.filename,
-          mimeType: att.mimeType,
-          size: att.size,
-          status: "discovered",
-        },
-        update: { filename: att.filename, mimeType: att.mimeType, size: att.size },
-      });
-      attachmentsFound++;
-    }
-
-    // Discover Drive links
-    const fullText = bodyText + " " + bodyHtml;
-    const driveLinks = extractDriveLinks(fullText);
-    for (const url of driveLinks) {
-      const resourceType = url.includes("docs.google.com/document") ? "docs"
-        : url.includes("docs.google.com/spreadsheets") ? "sheets"
-        : url.includes("docs.google.com/forms") ? "forms"
-        : url.includes("drive.google.com") ? "drive"
-        : "external";
-      // Check if link already stored
-      const existingLink = await db.emailLink.findFirst({
-        where: { emailId: email.id, url },
-      });
-      if (!existingLink) {
-        await db.emailLink.create({
-          data: { emailId: email.id, url, resourceType },
+    await Promise.all(chunk.map(async (ref) => {
+      if (!ref.id) return;
+      try {
+        // Fetch full message
+        const msgResp = await gmail.users.messages.get({
+          userId: "me",
+          id: ref.id,
+          format: "full",
         });
-        driveLinksDiscovered++;
+        const msg = msgResp.data;
+        const headers = msg.payload?.headers ?? [];
+
+        const fromAddress = getHeader(headers, "from");
+        const toAddress = getHeader(headers, "to");
+        const ccAddresses = getHeader(headers, "cc") || null;
+        const subject = getHeader(headers, "subject");
+        const dateStr = getHeader(headers, "date");
+        const receivedAt = dateStr ? new Date(dateStr) : new Date();
+        const snippet = msg.snippet ?? "";
+
+        const { text: bodyText, html: bodyHtml } = extractEmailBody(msg.payload);
+
+        // Dedup hash: sha256 of messageId
+        const dedupHash = crypto.createHash("sha256").update(ref.id).digest("hex");
+
+        const email = await db.email.upsert({
+          where: { sourceId_googleMessageId: { sourceId, googleMessageId: ref.id } },
+          create: {
+            sourceId,
+            googleMessageId: ref.id,
+            threadId: msg.threadId ?? null,
+            fromAddress,
+            toAddress,
+            ccAddresses,
+            subject,
+            snippet,
+            bodyText: bodyText || null,
+            bodyHtml: bodyHtml || null,
+            receivedAt,
+            dedupHash,
+            processingStatus: "matched",
+          },
+          update: {
+            fromAddress,
+            toAddress,
+            subject,
+            snippet,
+            bodyText: bodyText || null,
+            bodyHtml: bodyHtml || null,
+            receivedAt,
+            processingStatus: "matched",
+          },
+        });
+        emailsMatched++;
+
+        // Discover attachments
+        const attachments = extractAttachments(msg.payload);
+        for (const att of attachments) {
+          await db.emailAttachment.upsert({
+            where: { id: `${email.id}-${att.attachmentId}` },
+            create: {
+              id: `${email.id}-${att.attachmentId}`,
+              emailId: email.id,
+              filename: att.filename,
+              mimeType: att.mimeType,
+              size: att.size,
+              status: "discovered",
+            },
+            update: { filename: att.filename, mimeType: att.mimeType, size: att.size },
+          });
+          attachmentsFound++;
+        }
+
+        // Discover Drive links
+        const fullText = bodyText + " " + bodyHtml;
+        const driveLinks = extractDriveLinks(fullText);
+        for (const url of driveLinks) {
+          const resourceType = url.includes("docs.google.com/document") ? "docs"
+            : url.includes("docs.google.com/spreadsheets") ? "sheets"
+            : url.includes("docs.google.com/forms") ? "forms"
+            : url.includes("drive.google.com") ? "drive"
+            : "external";
+          const existingLink = await db.emailLink.findFirst({
+            where: { emailId: email.id, url },
+          });
+          if (!existingLink) {
+            await db.emailLink.create({
+              data: { emailId: email.id, url, resourceType },
+            });
+            driveLinksDiscovered++;
+          }
+        }
+      } catch (err) {
+        console.warn(`[job-runner] Failed to process email ${ref.id}:`, err instanceof Error ? err.message : err);
       }
-    }
+    }));
   }
 
   await updateRunProgress(runId, 95, "finalizing");

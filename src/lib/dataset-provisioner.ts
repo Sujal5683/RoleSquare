@@ -13,6 +13,35 @@ import type { ParsedEmailFields } from "@/lib/email-parser";
 const DEFAULT_DATASET_SUFFIX = "(Default)";
 
 /**
+ * Ensures an organization has the default dataset (and schema) created immediately.
+ * Idempotent — safe to call on organization creation.
+ */
+export async function ensureOrgDefaultDataset(organizationId: string, createdBy: string): Promise<string> {
+  const { id: schemaId } = await ensureDefaultSchema(organizationId);
+
+  const existing = await db.dataset.findFirst({
+    where: { organizationId, isDefault: true },
+    select: { id: true },
+  });
+
+  if (existing) return existing.id;
+
+  const ds = await db.dataset.create({
+    data: {
+      organizationId,
+      schemaId,
+      createdBy,
+      name: "Default Email Dataset",
+      description: "Auto-created default dataset for deterministic email extraction",
+      isDefault: true,
+      datasetType: "default",
+    },
+  });
+
+  return ds.id;
+}
+
+/**
  * Returns the existing default dataset for a source, or creates one.
  * Links the default schema to the source if not already linked.
  * Idempotent — safe to call on every scan.

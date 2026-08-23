@@ -65,6 +65,9 @@ export async function POST(req: NextRequest) {
       include: { _count: { select: { members: true } } },
     });
 
+    const { ensureOrgDefaultDataset } = await import("@/lib/dataset-provisioner");
+    await ensureOrgDefaultDataset(org.id, user.id);
+
     await logAudit({
       organizationId: org.id,
       actorId: user.id,

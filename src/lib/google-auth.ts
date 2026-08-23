@@ -144,7 +144,10 @@ export async function exchangeCodeForTokens(code: string): Promise<TokenSet> {
 
   const res = await fetch(GOOGLE_TOKEN_URL, {
     method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    headers: { 
+      "Content-Type": "application/x-www-form-urlencoded",
+      "Connection": "close"
+    },
     body: new URLSearchParams({
       code,
       client_id: clientId,
@@ -152,6 +155,7 @@ export async function exchangeCodeForTokens(code: string): Promise<TokenSet> {
       redirect_uri: redirectUri,
       grant_type: "authorization_code",
     }),
+    signal: AbortSignal.timeout(10000),
   });
 
   const data = await res.json();
@@ -168,7 +172,11 @@ export async function exchangeCodeForTokens(code: string): Promise<TokenSet> {
 
   // Fetch the user's Google email
   const userinfoRes = await fetch(GOOGLE_USERINFO_URL, {
-    headers: { Authorization: `Bearer ${access_token}` },
+    headers: { 
+      Authorization: `Bearer ${access_token}`,
+      "Connection": "close"
+    },
+    signal: AbortSignal.timeout(10000),
   });
   const userinfo = await userinfoRes.json();
   const googleEmail: string = userinfo.email || "";
@@ -203,6 +211,7 @@ export async function refreshAccessToken(encryptedRefreshToken: string): Promise
       client_secret: clientSecret,
       grant_type: "refresh_token",
     }),
+    signal: AbortSignal.timeout(10000),
   });
 
   const data = await res.json();
