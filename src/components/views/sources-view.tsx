@@ -81,7 +81,15 @@ import {
   Zap,
   X,
   Copy,
+  Filter,
 } from "lucide-react";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription,
+} from "@/components/ui/sheet";
 
 // ── Helpers ──────────────────────────────────────────────────────────────
 
@@ -127,6 +135,12 @@ export function SourcesView() {
   const [deleteTarget, setDeleteTarget] = useState<SourceDTO | null>(null);
 
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+
+  const [showFilters, setShowFilters] = useState(false);
+  const [schemaFilter, setSchemaFilter] = useState("all");
+  const [datasetFilter, setDatasetFilter] = useState("all");
+  const [scheduleFilter, setScheduleFilter] = useState("all");
+  const [detailsSource, setDetailsSource] = useState<SourceDTO | null>(null);
 
   const { data: sources, isLoading, isError, refetch, isFetching } = useQuery({
     queryKey: ["sources", activeOrgId],
@@ -294,9 +308,12 @@ export function SourcesView() {
     return sources.filter((s) => {
       if (statusFilter !== "all" && s.status !== statusFilter) return false;
       if (q && !s.name.toLowerCase().includes(q)) return false;
+      if (schemaFilter !== "all" && s.schema?.name !== schemaFilter) return false;
+      if (datasetFilter !== "all" && s.dataset?.name !== datasetFilter) return false;
+      if (scheduleFilter !== "all" && s.scheduleMode !== scheduleFilter) return false;
       return true;
     });
-  }, [sources, search, statusFilter]);
+  }, [sources, search, statusFilter, schemaFilter, datasetFilter, scheduleFilter]);
 
   const toggleSelectAll = () => {
     setSelectedIds((prev) => {
@@ -381,36 +398,95 @@ export function SourcesView() {
       {/* Filter bar */}
       <Card>
         <CardContent className="p-4">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                placeholder="Search sources by name…"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="pl-9"
-              />
+          <div className="flex flex-col gap-3">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  placeholder="Search sources by name…"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="pl-9"
+                />
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-muted-foreground whitespace-nowrap">
+                  Status
+                </span>
+                <Select
+                  value={statusFilter}
+                  onValueChange={(v) => setStatusFilter(v as "all" | SourceStatus)}
+                >
+                  <SelectTrigger className="w-[160px]">
+                    <SelectValue placeholder="All statuses" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All statuses</SelectItem>
+                    <SelectItem value="active">Active</SelectItem>
+                    <SelectItem value="paused">Paused</SelectItem>
+                    <SelectItem value="idle">Idle</SelectItem>
+                    <SelectItem value="error">Error</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Button
+                  variant={showFilters ? "secondary" : "outline"}
+                  size="icon"
+                  onClick={() => setShowFilters(!showFilters)}
+                  title="Toggle advanced filters"
+                >
+                  <Filter className="h-4 w-4" />
+                </Button>
+              </div>
             </div>
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-muted-foreground whitespace-nowrap">
-                Status
-              </span>
-              <Select
-                value={statusFilter}
-                onValueChange={(v) => setStatusFilter(v as "all" | SourceStatus)}
-              >
-                <SelectTrigger className="w-[160px]">
-                  <SelectValue placeholder="All statuses" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All statuses</SelectItem>
-                  <SelectItem value="active">Active</SelectItem>
-                  <SelectItem value="paused">Paused</SelectItem>
-                  <SelectItem value="idle">Idle</SelectItem>
-                  <SelectItem value="error">Error</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+
+            {/* Quick Filter Bar */}
+            {showFilters && (
+              <div className="flex flex-wrap items-center gap-3 pt-3 border-t">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-muted-foreground">Schema</span>
+                  <Select value={schemaFilter} onValueChange={setSchemaFilter}>
+                    <SelectTrigger className="w-[140px] h-8 text-xs">
+                      <SelectValue placeholder="Any schema" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Any schema</SelectItem>
+                      {Array.from(new Set(sources?.map(s => s.schema?.name).filter(Boolean))).map(name => (
+                        <SelectItem key={name!} value={name!}>{name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-muted-foreground">Dataset</span>
+                  <Select value={datasetFilter} onValueChange={setDatasetFilter}>
+                    <SelectTrigger className="w-[140px] h-8 text-xs">
+                      <SelectValue placeholder="Any dataset" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Any dataset</SelectItem>
+                      {Array.from(new Set(sources?.map(s => s.dataset?.name).filter(Boolean))).map(name => (
+                        <SelectItem key={name!} value={name!}>{name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-muted-foreground">Schedule</span>
+                  <Select value={scheduleFilter} onValueChange={setScheduleFilter}>
+                    <SelectTrigger className="w-[140px] h-8 text-xs">
+                      <SelectValue placeholder="Any schedule" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Any schedule</SelectItem>
+                      <SelectItem value="interval">Interval</SelectItem>
+                      <SelectItem value="cron">Cron</SelectItem>
+                      <SelectItem value="webhook">Webhook</SelectItem>
+                      <SelectItem value="manual">Manual</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>
@@ -554,10 +630,6 @@ export function SourcesView() {
                     <TableHead className="min-w-[200px]">Name</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Run state</TableHead>
-                    <TableHead className="min-w-[180px]">Connection</TableHead>
-                    <TableHead>Schedule</TableHead>
-                    <TableHead>Last run</TableHead>
-                    <TableHead>Next run</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -569,9 +641,10 @@ export function SourcesView() {
                     return (
                       <TableRow
                         key={s.id}
-                        className={`hover:bg-muted/40 ${isSelected ? "bg-primary/5" : ""}`}
+                        className={`hover:bg-muted/40 cursor-pointer ${isSelected ? "bg-primary/5" : ""}`}
+                        onClick={() => setDetailsSource(s)}
                       >
-                        <TableCell>
+                        <TableCell onClick={(e) => e.stopPropagation()}>
                           <Checkbox
                             checked={isSelected}
                             onCheckedChange={() => toggleSelect(s.id)}
@@ -585,15 +658,14 @@ export function SourcesView() {
                                 <Inbox className="h-4 w-4" />
                               )}
                             </div>
-                            <div className="min-w-0">
-                              <button
-                                onClick={() => openSource(s.id, s.name)}
-                                className="block text-left text-sm font-medium truncate hover:underline"
+                            <div className="min-w-0 max-w-[250px] sm:max-w-xs md:max-w-sm lg:max-w-md">
+                              <p
+                                className="block text-left text-sm font-medium truncate"
                                 title={s.name}
                               >
                                 {s.name}
-                              </button>
-                              <p className="text-xs text-muted-foreground capitalize">
+                              </p>
+                              <p className="text-xs text-muted-foreground capitalize truncate">
                                 {s.sourceType}
                                 {s.schema ? ` · ${s.schema.name}` : ""}
                                 {s.dataset ? ` · ${s.dataset.name}` : ""}
@@ -607,69 +679,36 @@ export function SourcesView() {
                         <TableCell>
                           <StatusBadge status={s.runState} />
                         </TableCell>
-                        <TableCell>
-                          {s.googleConnection ? (
-                            <div className="min-w-0">
-                              <p className="text-xs font-medium truncate">
-                                {s.googleConnection.googleEmail}
-                              </p>
-                              <div className="mt-0.5 flex items-center gap-1.5">
-                                <StatusBadge status={s.googleConnection.status} />
-                              </div>
-                            </div>
-                          ) : (
-                            <span className="text-xs text-muted-foreground">
-                              —
-                            </span>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-1.5">
-                            <Zap className="h-3 w-3 text-muted-foreground" />
-                            <span className="text-xs font-mono">
-                              {s.scheduleMode}
-                            </span>
-                            <span className="text-xs text-muted-foreground">
-                              · {s.scheduleExpr}
-                            </span>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <span
-                            className="text-xs text-muted-foreground"
-                            title={formatDate(s.lastRunAt)}
-                          >
-                            {relativeTime(s.lastRunAt)}
-                          </span>
-                        </TableCell>
-                        <TableCell>
-                          <span
-                            className="text-xs text-muted-foreground"
-                            title={formatDate(s.nextRunAt)}
-                          >
-                            {relativeTime(s.nextRunAt)}
-                          </span>
-                        </TableCell>
-                        <TableCell className="text-right">
+                        <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
                           <div className="flex items-center justify-end gap-1.5">
                             <Button
                               variant="outline"
                               size="sm"
+                              className="hidden lg:flex"
+                              onClick={() => setRunsDialogSource(s)}
+                            >
+                              <History className="mr-1.5 h-3 w-3" />
+                              View Runs
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="icon"
+                              className="h-8 w-8"
                               onClick={() => scanMutation.mutate(s.id)}
                               disabled={isBusy || scanMutation.isPending}
                               title="Trigger incremental scan"
                             >
                               {s.runState !== "idle" ? (
-                                <RefreshCw className="mr-1.5 h-3 w-3 animate-spin" />
+                                <RefreshCw className="h-4 w-4 animate-spin" />
                               ) : (
-                                <Play className="mr-1.5 h-3 w-3" />
+                                <Play className="h-4 w-4" />
                               )}
-                              Scan
                             </Button>
                             {s.status === "paused" ? (
                               <Button
                                 variant="outline"
-                                size="sm"
+                                size="icon"
+                                className="h-8 w-8"
                                 onClick={() =>
                                   pauseResumeMutation.mutate({
                                     id: s.id,
@@ -679,13 +718,13 @@ export function SourcesView() {
                                 disabled={pauseResumeMutation.isPending}
                                 title="Resume source"
                               >
-                                <Play className="mr-1.5 h-3 w-3" />
-                                Resume
+                                <Play className="h-4 w-4 text-green-600" />
                               </Button>
                             ) : (
                               <Button
                                 variant="outline"
-                                size="sm"
+                                size="icon"
+                                className="h-8 w-8"
                                 onClick={() =>
                                   pauseResumeMutation.mutate({
                                     id: s.id,
@@ -695,8 +734,7 @@ export function SourcesView() {
                                 disabled={pauseResumeMutation.isPending}
                                 title="Pause source"
                               >
-                                <Pause className="mr-1.5 h-3 w-3" />
-                                Pause
+                                <Pause className="h-4 w-4 text-orange-600" />
                               </Button>
                             )}
                             <DropdownMenu>
@@ -705,25 +743,16 @@ export function SourcesView() {
                                   variant="ghost"
                                   size="icon"
                                   className="h-8 w-8"
-                                  aria-label="More actions"
                                 >
                                   <MoreHorizontal className="h-4 w-4" />
                                 </Button>
                               </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end" className="w-48">
-                                <DropdownMenuItem
-                                  onClick={() =>
-                                    setRunsDialogSource(s)
-                                  }
-                                >
-                                  <History className="mr-2 h-4 w-4" />
-                                  View runs
-                                </DropdownMenuItem>
+                              <DropdownMenuContent align="end">
                                 <DropdownMenuItem
                                   onClick={() => openSource(s.id, s.name)}
                                 >
                                   <Pencil className="mr-2 h-4 w-4" />
-                                  Edit
+                                  Edit Configuration
                                 </DropdownMenuItem>
                                 <DropdownMenuItem
                                   onClick={() => {
@@ -732,7 +761,7 @@ export function SourcesView() {
                                       api.post(`/api/sources/${s.id}/clone`, { name })
                                         .then(() => {
                                           toast.success("Source cloned", {
-                                            description: `"${name}" created as paused. Review and activate.`,
+                                            description: `Created ${name}`,
                                           });
                                           queryClient.invalidateQueries({ queryKey: ["sources"] });
                                           queryClient.invalidateQueries({ queryKey: ["dashboard"] });
@@ -766,6 +795,98 @@ export function SourcesView() {
           )}
         </CardContent>
       </Card>
+
+      {/* Details Sheet */}
+      <Sheet open={!!detailsSource} onOpenChange={(open) => !open && setDetailsSource(null)}>
+        <SheetContent side="right" className="w-full sm:max-w-md overflow-y-auto">
+          {detailsSource && (
+            <>
+              <SheetHeader className="mb-6">
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary capitalize">
+                    {SOURCE_TYPE_ICON[detailsSource.sourceType] ?? <Inbox className="h-5 w-5" />}
+                  </div>
+                  <div>
+                    <SheetTitle>{detailsSource.name}</SheetTitle>
+                    <SheetDescription className="capitalize">
+                      {detailsSource.sourceType} Source
+                    </SheetDescription>
+                  </div>
+                </div>
+              </SheetHeader>
+              
+              <div className="space-y-6">
+                <div>
+                  <h4 className="text-sm font-medium mb-3">Status</h4>
+                  <div className="flex items-center gap-3">
+                    <StatusBadge status={detailsSource.status} />
+                    <StatusBadge status={detailsSource.runState} />
+                  </div>
+                </div>
+
+                <div>
+                  <h4 className="text-sm font-medium mb-3">Configuration</h4>
+                  <div className="space-y-3 text-sm">
+                    {detailsSource.schema && (
+                      <div className="flex justify-between py-2 border-b">
+                        <span className="text-muted-foreground">Schema</span>
+                        <span className="font-medium">{detailsSource.schema.name}</span>
+                      </div>
+                    )}
+                    {detailsSource.dataset && (
+                      <div className="flex justify-between py-2 border-b">
+                        <span className="text-muted-foreground">Dataset</span>
+                        <span className="font-medium">{detailsSource.dataset.name}</span>
+                      </div>
+                    )}
+                    {detailsSource.googleConnection && (
+                      <div className="flex justify-between py-2 border-b">
+                        <span className="text-muted-foreground">Connection</span>
+                        <span className="font-medium truncate max-w-[200px]" title={detailsSource.googleConnection.googleEmail}>
+                          {detailsSource.googleConnection.googleEmail}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div>
+                  <h4 className="text-sm font-medium mb-3">Schedule</h4>
+                  <div className="space-y-3 text-sm">
+                    <div className="flex justify-between py-2 border-b">
+                      <span className="text-muted-foreground">Mode</span>
+                      <span className="font-medium capitalize">{detailsSource.scheduleMode}</span>
+                    </div>
+                    {detailsSource.scheduleExpr && (
+                      <div className="flex justify-between py-2 border-b">
+                        <span className="text-muted-foreground">Expression</span>
+                        <span className="font-mono bg-muted px-1.5 rounded">{detailsSource.scheduleExpr}</span>
+                      </div>
+                    )}
+                    <div className="flex justify-between py-2 border-b">
+                      <span className="text-muted-foreground">Last Run</span>
+                      <span>{formatDate(detailsSource.lastRunAt)}</span>
+                    </div>
+                    <div className="flex justify-between py-2 border-b">
+                      <span className="text-muted-foreground">Next Run</span>
+                      <span>{formatDate(detailsSource.nextRunAt)}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex gap-2 pt-4">
+                  <Button className="w-full" onClick={() => {
+                    openSource(detailsSource.id, detailsSource.name);
+                    setDetailsSource(null);
+                  }}>
+                    Edit Configuration
+                  </Button>
+                </div>
+              </div>
+            </>
+          )}
+        </SheetContent>
+      </Sheet>
 
       {/* Runs dialog */}
       <Dialog

@@ -66,6 +66,7 @@ import {
   Calendar,
   Hash,
   AlertCircle,
+  Filter,
 } from "lucide-react";
 
 // ── Helpers ──────────────────────────────────────────────────────────────
@@ -104,6 +105,11 @@ export function DatasetsView() {
   const [createOpen, setCreateOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<DatasetDTO | null>(null);
   const [shareTarget, setShareTarget] = useState<DatasetDTO | null>(null);
+
+  const [showFilters, setShowFilters] = useState(false);
+  const [dataSourceFilter, setDataSourceFilter] = useState("all");
+  const [createdByFilter, setCreatedByFilter] = useState("all");
+  const [modifiedFilter, setModifiedFilter] = useState("all");
 
   // ── Queries ────────────────────────────────────────────────────────────
   const {
@@ -173,15 +179,21 @@ export function DatasetsView() {
     let base = datasets;
     if (datasetFilter === "mine") base = base.filter((d) => !d.isShared);
     if (datasetFilter === "shared") base = base.filter((d) => d.isShared);
-    if (!q) return base;
-    return base.filter(
-      (d) =>
+    
+    return base.filter((d) => {
+      if (q && !(
         d.name.toLowerCase().includes(q) ||
         (d.description ?? "").toLowerCase().includes(q) ||
         (d.schema?.name ?? "").toLowerCase().includes(q) ||
         (d.ownerOrgName ?? "").toLowerCase().includes(q)
-    );
-  }, [datasets, search, datasetFilter]);
+      )) return false;
+
+      // Basic quick filter checks (mocked since real data source/creator fields might be missing from DTO)
+      if (dataSourceFilter !== "all" && d.schema?.name !== dataSourceFilter) return false;
+      
+      return true;
+    });
+  }, [datasets, search, datasetFilter, dataSourceFilter, createdByFilter, modifiedFilter]);
 
   const sharedCount = useMemo(() => (datasets ?? []).filter((d) => d.isShared).length, [datasets]);
 
@@ -219,31 +231,88 @@ export function DatasetsView() {
       {/* Search + filter */}
       <Card>
         <CardContent className="p-4">
-          <div className="flex items-center gap-3 flex-wrap">
-            <div className="relative flex-1 min-w-[200px] max-w-md">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                placeholder="Search datasets by name, description or schema…"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="pl-9"
-              />
-            </div>
-            <div className="flex items-center gap-1 rounded-lg border p-1">
-              {(["all", "mine", "shared"] as const).map((f) => (
-                <button
-                  key={f}
-                  onClick={() => setDatasetFilter(f)}
-                  className={`rounded px-3 py-1 text-sm font-medium transition-colors ${
-                    datasetFilter === f
-                      ? "bg-primary text-primary-foreground"
-                      : "text-muted-foreground hover:text-foreground"
-                  }`}
+          <div className="flex flex-col gap-3">
+            <div className="flex items-center gap-3 flex-wrap sm:flex-nowrap">
+              <div className="relative flex-1 min-w-[200px]">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  placeholder="Search datasets by name, description or schema…"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="pl-9 w-full sm:w-[60%]"
+                />
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1 rounded-lg border p-1">
+                  {(["all", "mine", "shared"] as const).map((f) => (
+                    <button
+                      key={f}
+                      onClick={() => setDatasetFilter(f)}
+                      className={`rounded px-3 py-1 text-sm font-medium transition-colors ${
+                        datasetFilter === f
+                          ? "bg-primary text-primary-foreground"
+                          : "text-muted-foreground hover:text-foreground"
+                      }`}
+                    >
+                      {f === "all" ? "All" : f === "mine" ? "Mine" : `Shared${sharedCount > 0 ? ` (${sharedCount})` : ""}`}
+                    </button>
+                  ))}
+                </div>
+                <Button
+                  variant={showFilters ? "secondary" : "outline"}
+                  size="icon"
+                  onClick={() => setShowFilters(!showFilters)}
+                  title="Toggle advanced filters"
                 >
-                  {f === "all" ? "All" : f === "mine" ? "Mine" : `Shared${sharedCount > 0 ? ` (${sharedCount})` : ""}`}
-                </button>
-              ))}
+                  <Filter className="h-4 w-4" />
+                </Button>
+              </div>
             </div>
+
+            {/* Quick Filter Bar */}
+            {showFilters && (
+              <div className="flex flex-wrap items-center gap-3 pt-3 border-t">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-muted-foreground">Data Sources</span>
+                  <Select value={dataSourceFilter} onValueChange={setDataSourceFilter}>
+                    <SelectTrigger className="w-[140px] h-8 text-xs">
+                      <SelectValue placeholder="Any source" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Any source</SelectItem>
+                      {Array.from(new Set(datasets?.map(d => d.schema?.name).filter(Boolean))).map(name => (
+                        <SelectItem key={name!} value={name!}>{name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-muted-foreground">Created By</span>
+                  <Select value={createdByFilter} onValueChange={setCreatedByFilter}>
+                    <SelectTrigger className="w-[140px] h-8 text-xs">
+                      <SelectValue placeholder="Anyone" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Anyone</SelectItem>
+                      <SelectItem value="me">Me</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-muted-foreground">Modified</span>
+                  <Select value={modifiedFilter} onValueChange={setModifiedFilter}>
+                    <SelectTrigger className="w-[140px] h-8 text-xs">
+                      <SelectValue placeholder="Any time" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Any time</SelectItem>
+                      <SelectItem value="7d">Last 7 days</SelectItem>
+                      <SelectItem value="30d">Last 30 days</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>

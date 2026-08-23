@@ -121,6 +121,22 @@
     font-feature-settings: "cv02", "cv03", "cv04", "cv11";
   }
 
+  /* Restore cursor pointer for interactive elements (Tailwind v4 preflight change) */
+  button,
+  [role="button"],
+  [type="button"],
+  [type="submit"],
+  [type="reset"] {
+    cursor: pointer;
+  }
+  
+  button:disabled,
+  [type="button"]:disabled,
+  [type="submit"]:disabled,
+  [type="reset"]:disabled {
+    cursor: default;
+  }
+
   /* Custom scrollbar */
   ::-webkit-scrollbar {
     width: 8px;

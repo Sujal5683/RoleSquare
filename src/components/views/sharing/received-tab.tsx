@@ -86,6 +86,31 @@ export function ReceivedTab({ onRowClick }: ReceivedTabProps) {
 
   return (
     <Card>
+      {selectedIds.size > 0 && (
+        <div className="bg-muted/50 border-b px-4 py-2 flex items-center justify-between">
+          <span className="text-sm font-medium">
+            {selectedIds.size} selected
+          </span>
+          <Button
+            variant="destructive"
+            size="sm"
+            onClick={() => {
+              if (window.confirm(`Revoke ${selectedIds.size} datasets?`)) {
+                Promise.all(Array.from(selectedIds).map(id => api.delete("/api/sharing/permissions", { id })))
+                  .then(() => {
+                    toast.success("Datasets revoked");
+                    queryClient.invalidateQueries({ queryKey: ["sharing-permissions"] });
+                    setSelectedIds(new Set());
+                  })
+                  .catch(() => toast.error("Failed to revoke some datasets"));
+              }
+            }}
+          >
+            <Trash2 className="mr-2 h-3.5 w-3.5" />
+            Revoke Access
+          </Button>
+        </div>
+      )}
       <Table>
         <TableHeader>
           <TableRow>

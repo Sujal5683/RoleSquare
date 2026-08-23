@@ -64,6 +64,7 @@ import {
   Calendar,
   Search,
 } from "lucide-react";
+import { BulkSheetLinkWizard } from "@/components/google-sheets/bulk-sheet-link-wizard";
 
 // ── Helpers ──────────────────────────────────────────────────────────────
 
@@ -108,6 +109,31 @@ const PLAN_OPTIONS: { value: Plan; label: string }[] = [
   { value: "enterprise", label: "Enterprise" },
 ];
 
+const COLORS = [
+  "bg-red-500/15 text-red-700 dark:text-red-400",
+  "bg-orange-500/15 text-orange-700 dark:text-orange-400",
+  "bg-amber-500/15 text-amber-700 dark:text-amber-400",
+  "bg-green-500/15 text-green-700 dark:text-green-400",
+  "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400",
+  "bg-teal-500/15 text-teal-700 dark:text-teal-400",
+  "bg-cyan-500/15 text-cyan-700 dark:text-cyan-400",
+  "bg-blue-500/15 text-blue-700 dark:text-blue-400",
+  "bg-indigo-500/15 text-indigo-700 dark:text-indigo-400",
+  "bg-violet-500/15 text-violet-700 dark:text-violet-400",
+  "bg-purple-500/15 text-purple-700 dark:text-purple-400",
+  "bg-fuchsia-500/15 text-fuchsia-700 dark:text-fuchsia-400",
+  "bg-pink-500/15 text-pink-700 dark:text-pink-400",
+  "bg-rose-500/15 text-rose-700 dark:text-rose-400",
+];
+
+function getAvatarColor(str: string) {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    hash = str.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  return COLORS[Math.abs(hash) % COLORS.length];
+}
+
 // ── Main component ───────────────────────────────────────────────────────
 
 export function OrganizationsView() {
@@ -120,6 +146,7 @@ export function OrganizationsView() {
   const [createOpen, setCreateOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<OrganizationDTO | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<OrganizationDTO | null>(null);
+  const [bulkLinkTarget, setBulkLinkTarget] = useState<OrganizationDTO | null>(null);
   const [filterRole, setFilterRole] = useState("all");
   const [filterPlan, setFilterPlan] = useState("all");
 
@@ -393,6 +420,10 @@ export function OrganizationsView() {
                           <Users className="mr-2 h-4 w-4" />
                           Members
                         </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => setBulkLinkTarget(org)}>
+                          <RefreshCw className="mr-2 h-4 w-4" />
+                          Link Sheets
+                        </DropdownMenuItem>
                         <DropdownMenuSeparator />
                         <DropdownMenuItem
                           className="text-destructive focus:text-destructive"
@@ -419,9 +450,10 @@ export function OrganizationsView() {
                         {firstThree.map((m) => (
                           <Avatar
                             key={m.id}
-                            className="h-7 w-7 border-2 border-background"
+                            className="relative h-7 w-7 border-2 border-background ring-1 ring-border/50 transition-transform hover:z-10 hover:scale-110"
+                            title={m.user.name ?? m.user.email}
                           >
-                            <AvatarFallback className="text-[10px] font-medium">
+                            <AvatarFallback className={`text-[10px] font-medium ${getAvatarColor(m.user.name ?? m.user.email)}`}>
                               {initials(m.user.name ?? m.user.email)}
                             </AvatarFallback>
                           </Avatar>
@@ -499,6 +531,25 @@ export function OrganizationsView() {
         target={editTarget}
         onClose={() => setEditTarget(null)}
       />
+
+      {/* Bulk Link Sheets Dialog */}
+      <Dialog open={!!bulkLinkTarget} onOpenChange={(open) => !open && setBulkLinkTarget(null)}>
+        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Bulk Link Google Sheets</DialogTitle>
+            <DialogDescription>
+              Select a spreadsheet to automatically create and map datasets for each tab.
+            </DialogDescription>
+          </DialogHeader>
+          {bulkLinkTarget && (
+            <BulkSheetLinkWizard 
+              organizationId={bulkLinkTarget.id} 
+              onComplete={() => setBulkLinkTarget(null)}
+              onCancel={() => setBulkLinkTarget(null)}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
 
       {/* Delete confirmation */}
       <AlertDialog

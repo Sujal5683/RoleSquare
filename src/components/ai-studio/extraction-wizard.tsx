@@ -105,36 +105,31 @@ export function ExtractionWizard() {
 
   return (
     <div className="mx-auto max-w-4xl space-y-6">
-      {/* Wizard Header Progress */}
+      {/* Compact Wizard Header Progress */}
       {step < 5 && (
-        <div className="relative mb-8 px-4">
-          <div className="absolute left-0 top-1/2 -z-10 h-0.5 w-full -translate-y-1/2 bg-border"></div>
-          <div className="absolute left-0 top-1/2 -z-10 h-0.5 -translate-y-1/2 bg-primary transition-all duration-300" style={{ width: `${((step - 1) / 3) * 100}%` }}></div>
-          <div className="flex items-center justify-between">
-            {[
-              { num: 1, label: "Source" },
-              { num: 2, label: "Schema" },
-              { num: 3, label: "Configure" },
-              { num: 4, label: "Review" },
-            ].map((s) => (
-              <div key={s.num} className="flex flex-col items-center gap-2 bg-background px-2">
-                <div
-                  className={`flex h-8 w-8 items-center justify-center rounded-full border-2 text-sm font-bold transition-colors ${
-                    step === s.num
-                      ? "border-primary bg-primary text-primary-foreground"
-                      : step > s.num
-                      ? "border-primary bg-primary/20 text-primary"
-                      : "border-muted bg-background text-muted-foreground"
-                  }`}
-                >
-                  {step > s.num ? <CheckCircle2 className="h-5 w-5" /> : s.num}
-                </div>
-                <span className={`text-xs font-medium ${step >= s.num ? "text-foreground" : "text-muted-foreground"}`}>
-                  {s.label}
-                </span>
+        <div className="flex items-center justify-center gap-2 mb-6">
+          {[
+            { num: 1, label: "Source" },
+            { num: 2, label: "Schema" },
+            { num: 3, label: "Configure" },
+            { num: 4, label: "Review" },
+          ].map((s, i) => (
+            <div key={s.num} className="flex items-center gap-2">
+              <div
+                className={`flex h-6 items-center rounded-full px-3 text-xs font-medium transition-colors ${
+                  step === s.num
+                    ? "bg-primary text-primary-foreground"
+                    : step > s.num
+                    ? "bg-primary/10 text-primary"
+                    : "bg-muted text-muted-foreground"
+                }`}
+              >
+                <span className="mr-1.5">{step > s.num ? <CheckCircle2 className="h-3.5 w-3.5" /> : s.num + "."}</span>
+                {s.label}
               </div>
-            ))}
-          </div>
+              {i < 3 && <div className="h-px w-4 bg-border" />}
+            </div>
+          ))}
         </div>
       )}
 

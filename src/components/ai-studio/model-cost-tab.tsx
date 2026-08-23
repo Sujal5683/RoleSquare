@@ -125,17 +125,17 @@ export function ModelCostTab() {
             <CardTitle className="text-sm">Daily Cost</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="flex items-end gap-1 h-20">
+            <div className="flex items-end gap-1 h-24 mt-2">
               {aiCost.dailyCost.map((d) => {
                 const pct = (d.costUsd / maxDailyCost) * 100;
                 return (
                   <div
                     key={d.date}
-                    className="flex-1 flex flex-col items-center gap-1 group"
+                    className="flex-1 flex flex-col justify-end group h-full relative"
                     title={`${d.date}: ${formatCost(d.costUsd)}`}
                   >
                     <div
-                      className="w-full rounded-t bg-primary/60 group-hover:bg-primary transition-colors"
+                      className="w-full rounded-t bg-primary/40 group-hover:bg-primary transition-colors"
                       style={{ height: `${Math.max(2, pct)}%` }}
                     />
                   </div>

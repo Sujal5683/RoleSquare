@@ -96,7 +96,7 @@ export function DashboardView() {
         actions={
           <div className="flex items-center gap-2">
             <Select value={dateRange} onValueChange={setDateRange}>
-              <SelectTrigger className="w-[140px] h-9">
+              <SelectTrigger className="w-auto min-w-[140px] h-9">
                 <Calendar className="mr-2 h-4 w-4 text-muted-foreground" />
                 <SelectValue placeholder="Select range" />
               </SelectTrigger>
@@ -127,12 +127,14 @@ export function DashboardView() {
               value={data.kpis.connectedAccounts}
               icon={<Mail className="h-4 w-4" />}
               hint="Google accounts"
+              onClick={() => setView("settings")}
             />
             <StatCard
               label="Active Sources"
               value={data.kpis.activeSources}
               icon={<Inbox className="h-4 w-4" />}
               hint="Ingestion rules"
+              onClick={() => setView("sources")}
             />
             <StatCard
               label="Records Extracted"
@@ -140,6 +142,7 @@ export function DashboardView() {
               icon={<Database className="h-4 w-4" />}
               hint="This month"
               trend={{ value: "12%", positive: true }}
+              onClick={() => setView("datasets")}
             />
             <StatCard
               label="Review Queue"
@@ -462,20 +465,20 @@ export function DashboardView() {
             </Card>
 
             {/* Usage */}
-            <Card className="lg:col-span-2">
+            <Card className="lg:col-span-1">
               <CardHeader className="pb-3">
                 <CardTitle className="text-base flex items-center gap-2">
                   <TrendingUp className="h-4 w-4" /> Usage this month
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+                <div className="flex flex-col gap-3">
                   {data.usageMetrics.map((m) => (
-                    <div key={m.id} className="rounded-lg border bg-muted/30 p-3">
-                      <p className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                    <div key={m.id} className="rounded-lg border bg-muted/30 p-3 flex justify-between items-center">
+                      <p className="text-xs uppercase tracking-wide text-muted-foreground">
                         {m.metricType.replace(/_/g, " ")}
                       </p>
-                      <p className="mt-1 text-xl font-semibold tabular-nums">
+                      <p className="text-base font-semibold tabular-nums">
                         {m.value.toLocaleString()}
                       </p>
                     </div>
@@ -485,7 +488,7 @@ export function DashboardView() {
             </Card>
 
             {/* Recent datasets */}
-            <Card>
+            <Card className="lg:col-span-1">
               <CardHeader className="flex flex-row items-center justify-between pb-3">
                 <CardTitle className="text-base flex items-center gap-2">
                   <Database className="h-4 w-4" /> Recent datasets

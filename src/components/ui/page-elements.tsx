@@ -18,7 +18,7 @@ export function PageHeader({
     <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between border-b pb-4">
       <div className="flex items-start gap-3">
         {icon && (
-          <div className="mt-0.5 flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-primary">
+          <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
             {icon}
           </div>
         )}
@@ -107,6 +107,7 @@ export function StatCard({
   icon,
   trend,
   className,
+  onClick,
 }: {
   label: string;
   value: string | number;
@@ -114,11 +115,15 @@ export function StatCard({
   icon?: React.ReactNode;
   trend?: { value: string; positive: boolean };
   className?: string;
+  onClick?: () => void;
 }) {
+  const Comp = onClick ? "button" : "div";
   return (
-    <div
+    <Comp
+      onClick={onClick}
       className={cn(
-        "rounded-xl border bg-card p-4 shadow-sm transition-shadow hover:shadow-md",
+        "rounded-xl border bg-card p-4 shadow-sm transition-all hover:shadow-md text-left w-full",
+        onClick && "cursor-pointer hover:bg-muted/50 hover:border-primary/30",
         className
       )}
     >
@@ -146,6 +151,6 @@ export function StatCard({
         )}
         {hint && <p className="text-xs text-muted-foreground">{hint}</p>}
       </div>
-    </div>
+    </Comp>
   );
 }

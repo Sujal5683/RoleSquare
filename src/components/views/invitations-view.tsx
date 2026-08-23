@@ -18,6 +18,13 @@ import {
   LoadingState,
   ErrorState,
 } from "@/components/ui/page-elements";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -44,50 +51,14 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 
+import { InviteMemberDialog } from "./invite-member-dialog";
+import { UserPlus } from "lucide-react";
+
 export function InvitationsView() {
-  const [tab, setTab] = useState<"incoming" | "outgoing">("incoming");
-
-  return (
-    <div className="space-y-4">
-      <PageHeader
-        title="Invitations"
-        description="Accept or decline invitations to join organizations, and manage invitations you've sent."
-        icon={<MailOpen className="h-5 w-5" />}
-      />
-
-      <Tabs value={tab} onValueChange={(v) => setTab(v as any)} className="space-y-4">
-        <TabsList>
-          <TabsTrigger value="incoming">
-            <MailOpen className="mr-2 h-4 w-4" />
-            Incoming
-          </TabsTrigger>
-          <TabsTrigger value="outgoing">
-            <SendHorizonal className="mr-2 h-4 w-4" />
-            Outgoing
-          </TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="incoming">
-          <IncomingInvites />
-        </TabsContent>
-
-        <TabsContent value="outgoing">
-          <OutgoingInvites />
-        </TabsContent>
-      </Tabs>
-    </div>
-  );
-}
-
-// ── Incoming ─────────────────────────────────────────────────────────────
-
-function IncomingInvites() {
   const queryClient = useQueryClient();
-
-  const { data: invitations, isLoading, isError, refetch } = useQuery({
-    queryKey: ["invitations", "incoming"],
-    queryFn: () => api.get<InvitationDTO[]>("/api/invitations"),
-  });
+  const [tab, setTab] = useState<"incoming" | "outgoing">("incoming");
+  const [inviteOpen, setInviteOpen] = useState(false);
+  const [selectedInvite, setSelectedInvite] = useState<InvitationDTO | null>(null);
 
   const acceptMutation = useMutation({
     mutationFn: (token: string) =>
@@ -97,7 +68,7 @@ function IncomingInvites() {
       queryClient.invalidateQueries({ queryKey: ["invitations"] });
       queryClient.invalidateQueries({ queryKey: ["organizations"] });
       queryClient.invalidateQueries({ queryKey: ["session"] });
-      // Reload page so new org context is available
+      setSelectedInvite(null);
       setTimeout(() => window.location.reload(), 800);
     },
     onError: (err: unknown) => {
@@ -112,11 +83,82 @@ function IncomingInvites() {
     onSuccess: () => {
       toast.success("Invitation declined.");
       queryClient.invalidateQueries({ queryKey: ["invitations"] });
+      setSelectedInvite(null);
     },
     onError: (err: unknown) => {
       const msg = err instanceof Error ? err.message : "Failed to decline invitation";
       toast.error("Error", { description: msg });
     },
+  });
+
+  return (
+    <div className="space-y-4">
+      <PageHeader
+        title="Invitations"
+        description="Accept or decline invitations to join organizations, and manage invitations you've sent."
+        icon={<MailOpen className="h-5 w-5" />}
+        actions={
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                queryClient.invalidateQueries({ queryKey: ["invitations"] });
+              }}
+            >
+              <RefreshCw className="mr-2 h-3.5 w-3.5" />
+              Refresh
+            </Button>
+            <Button size="sm" onClick={() => setInviteOpen(true)}>
+              <UserPlus className="mr-2 h-4 w-4" />
+              Invite Member
+            </Button>
+          </div>
+        }
+      />
+
+      <InviteMemberDialog open={inviteOpen} onClose={() => setInviteOpen(false)} />
+
+      <Tabs value={tab} onValueChange={(v) => setTab(v as any)} className="space-y-4">
+        <TabsList>
+          <TabsTrigger value="incoming">
+            <MailOpen className="mr-2 h-4 w-4" />
+            Incoming
+          </TabsTrigger>
+          <TabsTrigger value="outgoing">
+            <SendHorizonal className="mr-2 h-4 w-4" />
+            Outgoing
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="incoming">
+          <IncomingInvites onSelect={setSelectedInvite} />
+        </TabsContent>
+
+        <TabsContent value="outgoing">
+          <OutgoingInvites onSelect={setSelectedInvite} />
+        </TabsContent>
+      </Tabs>
+
+      <InvitationDetailsSheet
+        invitation={selectedInvite}
+        open={!!selectedInvite}
+        onOpenChange={(o) => { if (!o) setSelectedInvite(null); }}
+        onAccept={(token) => acceptMutation.mutate(token)}
+        onDecline={(token) => declineMutation.mutate(token)}
+      />
+    </div>
+  );
+}
+
+// ── Incoming ─────────────────────────────────────────────────────────────
+
+function IncomingInvites({ onSelect }: { onSelect: (inv: InvitationDTO) => void }) {
+  const queryClient = useQueryClient();
+
+  const { data: invitations, isLoading, isError, refetch } = useQuery({
+    queryKey: ["invitations", "incoming"],
+    queryFn: () => api.get<InvitationDTO[]>("/api/invitations"),
   });
 
   if (isLoading) return <LoadingState rows={3} />;
@@ -139,7 +181,11 @@ function IncomingInvites() {
       {pendingInvites.map((invite) => {
         const expired = isPast(new Date(invite.expiresAt));
         return (
-          <Card key={invite.id} className="flex flex-col gap-3 p-4 transition-shadow hover:shadow-md">
+          <Card
+            key={invite.id}
+            className="flex flex-col gap-3 p-4 transition-shadow hover:shadow-md cursor-pointer hover:border-primary/50"
+            onClick={() => onSelect(invite)}
+          >
             <div className="flex items-start justify-between gap-2">
               <div className="flex min-w-0 items-start gap-3">
                 <div className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
@@ -169,33 +215,11 @@ function IncomingInvites() {
             </div>
 
             {!expired && (
-              <div className="flex items-center gap-1 text-xs text-muted-foreground">
+              <div className="flex items-center gap-1 text-xs text-muted-foreground mt-auto pt-2">
                 <Clock className="h-3 w-3" />
                 Expires {formatDistanceToNow(new Date(invite.expiresAt), { addSuffix: true })}
               </div>
             )}
-
-            <div className="mt-auto flex items-center gap-2 border-t pt-3">
-              <Button
-                className="flex-1"
-                variant="outline"
-                size="sm"
-                disabled={declineMutation.isPending || acceptMutation.isPending || expired}
-                onClick={() => declineMutation.mutate(invite.token)}
-              >
-                <X className="mr-2 h-4 w-4" />
-                Decline
-              </Button>
-              <Button
-                className="flex-1"
-                size="sm"
-                disabled={declineMutation.isPending || acceptMutation.isPending || expired}
-                onClick={() => acceptMutation.mutate(invite.token)}
-              >
-                <Check className="mr-2 h-4 w-4" />
-                Accept
-              </Button>
-            </div>
           </Card>
         );
       })}
@@ -205,7 +229,7 @@ function IncomingInvites() {
 
 // ── Outgoing ─────────────────────────────────────────────────────────────
 
-function OutgoingInvites() {
+function OutgoingInvites({ onSelect }: { onSelect: (inv: InvitationDTO) => void }) {
   const queryClient = useQueryClient();
   const activeOrgId = useActiveOrg();
 
@@ -283,7 +307,11 @@ function OutgoingInvites() {
           {pending.map((inv) => {
             const expired = isPast(new Date(inv.expiresAt));
             return (
-              <TableRow key={inv.id}>
+              <TableRow
+                key={inv.id}
+                className="cursor-pointer hover:bg-accent/50"
+                onClick={() => onSelect(inv)}
+              >
                 <TableCell>
                   <div className="flex items-center gap-3">
                     <div className="flex h-8 w-8 items-center justify-center rounded bg-primary/10 text-primary">
@@ -303,14 +331,8 @@ function OutgoingInvites() {
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <div className="flex items-center gap-1">
-                          {expired ? (
-                            <Badge variant="destructive" className="text-xs">Expired</Badge>
-                          ) : (
-                            <>
-                              <Clock className="h-3 w-3" />
-                              {formatDistanceToNow(new Date(inv.expiresAt), { addSuffix: true })}
-                            </>
-                          )}
+                          <Clock className="h-3 w-3" />
+                          {formatDistanceToNow(new Date(inv.expiresAt), { addSuffix: true })}
                         </div>
                       </TooltipTrigger>
                       <TooltipContent>
@@ -323,36 +345,38 @@ function OutgoingInvites() {
                   {formatDistanceToNow(new Date(inv.createdAt), { addSuffix: true })}
                 </TableCell>
                 <TableCell>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon" className="h-8 w-8">
-                        <MoreHorizontal className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem
-                        onClick={() =>
-                          resendMutation.mutate({
-                            orgId: activeOrgId,
-                            email: inv.email,
-                            role: inv.role,
-                          })
-                        }
-                        disabled={resendMutation.isPending}
-                      >
-                        <RefreshCw className="mr-2 h-4 w-4" />
-                        Resend Invite
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        className="text-destructive focus:text-destructive"
-                        onClick={() => cancelMutation.mutate(inv.token)}
-                        disabled={cancelMutation.isPending}
-                      >
-                        <X className="mr-2 h-4 w-4" />
-                        Cancel Invite
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
+                  <div onClick={(e) => e.stopPropagation()}>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-8 w-8">
+                          <MoreHorizontal className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem
+                          onClick={() =>
+                            resendMutation.mutate({
+                              orgId: activeOrgId,
+                              email: inv.email,
+                              role: inv.role,
+                            })
+                          }
+                          disabled={resendMutation.isPending}
+                        >
+                          <RefreshCw className="mr-2 h-4 w-4" />
+                          Resend Invite
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          className="text-destructive focus:text-destructive"
+                          onClick={() => cancelMutation.mutate(inv.token)}
+                          disabled={cancelMutation.isPending}
+                        >
+                          <X className="mr-2 h-4 w-4" />
+                          Cancel Invite
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
                 </TableCell>
               </TableRow>
             );
@@ -360,5 +384,90 @@ function OutgoingInvites() {
         </TableBody>
       </Table>
     </Card>
+  );
+}
+
+function InvitationDetailsSheet({
+  invitation,
+  open,
+  onOpenChange,
+  onAccept,
+  onDecline,
+}: {
+  invitation: InvitationDTO | null;
+  open: boolean;
+  onOpenChange: (o: boolean) => void;
+  onAccept?: (token: string) => void;
+  onDecline?: (token: string) => void;
+}) {
+  if (!invitation) return null;
+  
+  const expired = isPast(new Date(invitation.expiresAt));
+
+  return (
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent className="w-full sm:max-w-md overflow-y-auto">
+        <SheetHeader>
+          <SheetTitle>Invitation Details</SheetTitle>
+          <SheetDescription>
+            Detailed information about this invitation.
+          </SheetDescription>
+        </SheetHeader>
+        <div className="mt-6 space-y-6 flex-1">
+          <div className="space-y-1">
+            <h4 className="text-sm font-medium text-muted-foreground">Recipient Email</h4>
+            <p className="text-sm font-medium">{invitation.email}</p>
+          </div>
+          <div className="space-y-1">
+            <h4 className="text-sm font-medium text-muted-foreground">Organization</h4>
+            <p className="text-sm font-medium">{invitation.organizationName ?? invitation.organizationId}</p>
+          </div>
+          <div className="space-y-1">
+            <h4 className="text-sm font-medium text-muted-foreground">Role</h4>
+            <Badge variant="outline" className="capitalize">{invitation.role}</Badge>
+          </div>
+          <div className="space-y-1">
+            <h4 className="text-sm font-medium text-muted-foreground">Status</h4>
+            <Badge variant={invitation.status === "pending" ? "default" : "secondary"} className="capitalize">
+              {invitation.status}
+            </Badge>
+          </div>
+          <div className="space-y-1">
+            <h4 className="text-sm font-medium text-muted-foreground">Sent By</h4>
+            <p className="text-sm font-medium">{invitation.inviterName ?? invitation.invitedBy}</p>
+          </div>
+          <div className="space-y-1">
+            <h4 className="text-sm font-medium text-muted-foreground">Created At</h4>
+            <p className="text-sm font-medium">{new Date(invitation.createdAt).toLocaleString()}</p>
+          </div>
+          <div className="space-y-1">
+            <h4 className="text-sm font-medium text-muted-foreground">Expires At</h4>
+            <p className="text-sm font-medium text-destructive">{new Date(invitation.expiresAt).toLocaleString()}</p>
+          </div>
+        </div>
+
+        {invitation.status === "pending" && onAccept && onDecline && (
+          <div className="mt-8 flex items-center gap-2 border-t pt-4">
+            <Button
+              className="flex-1"
+              variant="outline"
+              disabled={expired}
+              onClick={() => onDecline(invitation.token)}
+            >
+              <X className="mr-2 h-4 w-4" />
+              Decline
+            </Button>
+            <Button
+              className="flex-1"
+              disabled={expired}
+              onClick={() => onAccept(invitation.token)}
+            >
+              <Check className="mr-2 h-4 w-4" />
+              Accept
+            </Button>
+          </div>
+        )}
+      </SheetContent>
+    </Sheet>
   );
 }

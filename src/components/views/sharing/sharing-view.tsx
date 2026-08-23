@@ -31,9 +31,15 @@ export function SharingView() {
     setSheetOpen(true);
   };
 
-  const handleRefresh = () => {
-    queryClient.invalidateQueries({ queryKey: ["sharing-permissions"] });
-    queryClient.invalidateQueries({ queryKey: ["cross-org-shares"] });
+  const [isRefetching, setIsRefetching] = useState(false);
+
+  const handleRefresh = async () => {
+    setIsRefetching(true);
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ["sharing-permissions"] }),
+      queryClient.invalidateQueries({ queryKey: ["cross-org-shares"] })
+    ]);
+    setTimeout(() => setIsRefetching(false), 500);
   };
 
   return (
@@ -45,8 +51,8 @@ export function SharingView() {
           icon={<Share2 className="h-5 w-5" />}
         />
         <div className="flex items-center gap-2">
-          <Button variant="outline" onClick={handleRefresh}>
-            <RefreshCw className="h-4 w-4 mr-2" />
+          <Button variant="outline" size="sm" onClick={handleRefresh} disabled={isRefetching}>
+            <RefreshCw className={`h-4 w-4 mr-2 ${isRefetching ? 'animate-spin' : ''}`} />
             Refresh
           </Button>
           <Button onClick={() => setShareDialogOpen(true)}>

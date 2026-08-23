@@ -87,6 +87,31 @@ export function OwnedTab({ onRowClick }: OwnedTabProps) {
 
   return (
     <Card>
+      {selectedIds.size > 0 && (
+        <div className="bg-muted/50 border-b px-4 py-2 flex items-center justify-between">
+          <span className="text-sm font-medium">
+            {selectedIds.size} selected
+          </span>
+          <Button
+            variant="destructive"
+            size="sm"
+            onClick={() => {
+              if (window.confirm(`Revoke ${selectedIds.size} permissions?`)) {
+                Promise.all(Array.from(selectedIds).map(id => api.delete("/api/sharing/permissions", { id })))
+                  .then(() => {
+                    toast.success("Access revoked");
+                    queryClient.invalidateQueries({ queryKey: ["sharing-permissions"] });
+                    setSelectedIds(new Set());
+                  })
+                  .catch(() => toast.error("Failed to revoke some permissions"));
+              }
+            }}
+          >
+            <Trash2 className="mr-2 h-3.5 w-3.5" />
+            Revoke Access
+          </Button>
+        </div>
+      )}
       <Table>
         <TableHeader>
           <TableRow>

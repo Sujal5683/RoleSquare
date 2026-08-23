@@ -179,36 +179,41 @@ export function UsageView() {
             </Badge>
           </CardTitle>
         </CardHeader>
-        <CardContent className="space-y-6">
+        <CardContent className="space-y-3">
           {data.quotas?.map(q => (
-            <div key={q.id} className="space-y-2">
-              <div className="flex items-center justify-between text-sm">
+            <div key={q.id} className="space-y-1.5">
+              <div className="flex items-center justify-between text-xs">
                 <span className="font-medium text-foreground">{q.name}</span>
-                <span className="text-muted-foreground">
-                  {fmt(q.used)} / {fmt(q.limit)}
-                </span>
+                <div className="flex items-center gap-2">
+                  <span className="text-muted-foreground">
+                    {fmt(q.used)} / {fmt(q.limit)}
+                  </span>
+                  <span>
+                    {q.percent < 60 ? (
+                      <span className="text-emerald-600">(Healthy)</span>
+                    ) : q.percent < 85 ? (
+                      <span className="text-amber-600">(Approaching limit)</span>
+                    ) : (
+                      <span className="text-destructive">(Near limit)</span>
+                    )}
+                  </span>
+                </div>
               </div>
               <Progress
                 value={q.percent}
-                className="h-2"
+                className="h-1.5"
               />
-              <div className="flex items-center justify-between text-[10px] text-muted-foreground">
-                <span>{fmt(q.remaining)} remaining</span>
-                <span>
-                  {q.percent < 60 ? (
-                    <span className="text-emerald-600">Healthy</span>
-                  ) : q.percent < 85 ? (
-                    <span className="text-amber-600">Approaching limit</span>
-                  ) : (
-                    <span className="text-destructive">Near limit</span>
-                  )}
-                </span>
-              </div>
             </div>
           ))}
-          <div className="flex justify-end">
+          <div className="flex justify-end items-center gap-3 pt-2">
             <button
-              className="text-sm text-primary hover:underline"
+              className="text-xs text-muted-foreground hover:text-foreground hover:underline"
+              onClick={() => alert("Request Credits demo")}
+            >
+              Request credits
+            </button>
+            <button
+              className="text-xs text-primary hover:underline font-medium"
               onClick={() => setView("settings")}
             >
               Upgrade plan →

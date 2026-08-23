@@ -6,6 +6,7 @@ import { formatDistanceToNow, format } from "date-fns";
 import { toast } from "sonner";
 import { api } from "@/lib/api-client";
 import { useAppStore } from "@/lib/store";
+import { InviteMemberDialog } from "./invite-member-dialog";
 import type {
   MemberDTO,
   Role,
@@ -86,7 +87,9 @@ import {
   X,
   Crown,
   ChevronRight,
+  ChevronDown,
   Building2,
+  Plus,
 } from "lucide-react";
 
 // ── Helpers ──────────────────────────────────────────────────────────────
@@ -107,6 +110,31 @@ function formatDate(iso: string | null | undefined): string {
   } catch {
     return "—";
   }
+}
+
+const COLORS = [
+  "bg-red-500/15 text-red-700 dark:text-red-400",
+  "bg-orange-500/15 text-orange-700 dark:text-orange-400",
+  "bg-amber-500/15 text-amber-700 dark:text-amber-400",
+  "bg-green-500/15 text-green-700 dark:text-green-400",
+  "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400",
+  "bg-teal-500/15 text-teal-700 dark:text-teal-400",
+  "bg-cyan-500/15 text-cyan-700 dark:text-cyan-400",
+  "bg-blue-500/15 text-blue-700 dark:text-blue-400",
+  "bg-indigo-500/15 text-indigo-700 dark:text-indigo-400",
+  "bg-violet-500/15 text-violet-700 dark:text-violet-400",
+  "bg-purple-500/15 text-purple-700 dark:text-purple-400",
+  "bg-fuchsia-500/15 text-fuchsia-700 dark:text-fuchsia-400",
+  "bg-pink-500/15 text-pink-700 dark:text-pink-400",
+  "bg-rose-500/15 text-rose-700 dark:text-rose-400",
+];
+
+function getAvatarColor(str: string) {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    hash = str.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  return COLORS[Math.abs(hash) % COLORS.length];
 }
 
 function initials(name: string | null | undefined): string {
@@ -187,6 +215,7 @@ export function MembersView() {
   const queryClient = useQueryClient();
   const selectedOrgId = useAppStore((s) => s.selectedOrganizationId);
   const setView = useAppStore((s) => s.setView);
+  const setOrganization = useAppStore((s) => s.setOrganization);
 
   // Fetch session to discover orgs (fallback to first org when none selected)
   const { data: session } = useQuery({
@@ -247,8 +276,9 @@ export function MembersView() {
       });
     },
     onError: (err: unknown) => {
-      const msg = err instanceof Error ? err.message : "Failed to update role";
-      toast.error("Update failed", { description: msg });
+      toast.error("Failed to change role", {
+        description: err instanceof Error ? err.message : undefined,
+      });
     },
   });
 
@@ -260,16 +290,16 @@ export function MembersView() {
       queryClient.invalidateQueries({
         queryKey: ["organizations", activeOrgId, "members"],
       });
-      queryClient.invalidateQueries({ queryKey: ["organizations"] });
       setRemoveTarget(null);
     },
     onError: (err: unknown) => {
-      const msg =
-        err instanceof Error ? err.message : "Failed to remove member";
-      toast.error("Remove failed", { description: msg });
+      toast.error("Failed to remove member", {
+        description: err instanceof Error ? err.message : undefined,
+      });
     },
   });
 
+  // ── State ──────────────────────────────────────────────────────────────
   const [inviteOpen, setInviteOpen] = useState(false);
   const [rbacOpen, setRbacOpen] = useState(false);
   const [removeTarget, setRemoveTarget] = useState<MemberDTO | null>(null);
@@ -277,12 +307,8 @@ export function MembersView() {
   return (
     <div className="space-y-4">
       <PageHeader
-        title="Members"
-        description={
-          activeOrg
-            ? `Manage members and their roles for ${activeOrg.name}. Use the permission matrix below as a reference for what each role can do.`
-            : "Select an organization to manage its members."
-        }
+        title="Members & Roles"
+        description="Manage organization members, send invitations, and configure role-based access control."
         icon={<Users className="h-5 w-5" />}
         actions={
           <div className="flex items-center gap-2">
@@ -329,19 +355,38 @@ export function MembersView() {
               <code className="text-xs text-muted-foreground">{activeOrg.slug}</code>
             </div>
             <div className="ml-auto flex items-center gap-2">
-              <PlanBadge plan={activeOrg.plan} />
+              <PlanBadge plan={activeOrg.plan as any} />
               <span className="text-xs text-muted-foreground">
                 Your role:{" "}
-                <RoleBadge role={activeOrg.role} />
+                <RoleBadge role={activeOrg.role as any} />
               </span>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setView("organizations")}
-              >
-                Switch org
-                <ChevronRight className="ml-1.5 h-3.5 w-3.5" />
-              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="sm">
+                    Switch org
+                    <ChevronDown className="ml-1.5 h-3.5 w-3.5" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuLabel>Organizations</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  {session?.organizations?.map((o) => (
+                    <DropdownMenuItem
+                      key={o.id}
+                      onClick={() => setOrganization(o.id)}
+                    >
+                      <Building2 className="mr-2 h-4 w-4" />
+                      {o.name}
+                      {o.id === activeOrgId && <Check className="ml-auto h-4 w-4" />}
+                    </DropdownMenuItem>
+                  ))}
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => setView("organizations")}>
+                    <Plus className="mr-2 h-4 w-4" />
+                    Manage Organizations
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
           </CardContent>
         </Card>
@@ -416,7 +461,7 @@ export function MembersView() {
                       <TableCell>
                         <div className="flex items-center gap-3">
                           <Avatar className="h-9 w-9">
-                            <AvatarFallback className="text-xs font-medium">
+                            <AvatarFallback className={`text-xs font-medium ${getAvatarColor(m.user.name ?? m.user.email)}`}>
                               {initials(m.user.name ?? m.user.email)}
                             </AvatarFallback>
                           </Avatar>
@@ -517,12 +562,10 @@ export function MembersView() {
         </CardContent>
       </Card>
 
-      {/* Pending Invitations */}
-      <PendingInvitationsCard orgId={activeOrgId} onInvite={() => setInviteOpen(true)} />
 
       {/* Invite dialog */}
       <InviteMemberDialog
-        orgId={activeOrgId}
+        fixedOrgId={activeOrgId}
         open={inviteOpen}
         onClose={() => setInviteOpen(false)}
       />
@@ -565,143 +608,6 @@ export function MembersView() {
         </AlertDialogContent>
       </AlertDialog>
     </div>
-  );
-}
-
-// ── Pending Invitations card ─────────────────────────────────────────────
-
-function PendingInvitationsCard({
-  orgId,
-  onInvite,
-}: {
-  orgId: string | null;
-  onInvite: () => void;
-}) {
-  const queryClient = useQueryClient();
-
-  const { data: invitations, isLoading } = useQuery({
-    queryKey: ["invitations", "outgoing", orgId],
-    queryFn: () =>
-      api.get<InvitationDTO[]>(`/api/organizations/${orgId}/invitations`),
-    enabled: !!orgId,
-  });
-
-  const resendMutation = useMutation({
-    mutationFn: ({ email, role }: { email: string; role: string }) =>
-      api.post(`/api/organizations/${orgId}/invitations`, { email, role }),
-    onSuccess: () => {
-      toast.success("Invitation resent");
-      queryClient.invalidateQueries({ queryKey: ["invitations", "outgoing", orgId] });
-    },
-    onError: (err: unknown) => {
-      toast.error("Failed to resend", { description: err instanceof Error ? err.message : undefined });
-    },
-  });
-
-  const cancelMutation = useMutation({
-    mutationFn: (token: string) =>
-      api.post("/api/invitations/decline", { token }),
-    onSuccess: () => {
-      toast.success("Invitation cancelled");
-      queryClient.invalidateQueries({ queryKey: ["invitations", "outgoing", orgId] });
-    },
-    onError: (err: unknown) => {
-      toast.error("Failed to cancel", { description: err instanceof Error ? err.message : undefined });
-    },
-  });
-
-  const pending = (invitations ?? []).filter((i) => i.status === "pending");
-
-  if (!orgId || (!isLoading && pending.length === 0)) return null;
-
-  return (
-    <Card>
-      <CardHeader className="pb-2">
-        <div className="flex items-center justify-between">
-          <CardTitle className="text-base flex items-center gap-2">
-            Pending Invitations
-            {pending.length > 0 && (
-              <span className="inline-flex items-center justify-center rounded-full bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 text-xs font-semibold px-2 py-0.5">
-                {pending.length}
-              </span>
-            )}
-          </CardTitle>
-          <Button variant="outline" size="sm" onClick={onInvite}>
-            <UserPlus className="mr-2 h-3.5 w-3.5" />
-            Invite
-          </Button>
-        </div>
-        <CardDescription>
-          These people have been invited but haven&apos;t accepted yet. They won&apos;t see any data until they accept.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="p-0">
-        {isLoading ? (
-          <div className="px-4 pb-4"><LoadingState rows={2} /></div>
-        ) : (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Email</TableHead>
-                <TableHead>Role</TableHead>
-                <TableHead>Invited</TableHead>
-                <TableHead>Expires</TableHead>
-                <TableHead className="w-12"></TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {pending.map((inv) => (
-                <TableRow key={inv.id}>
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                      <div className="flex h-7 w-7 items-center justify-center rounded bg-muted text-muted-foreground text-xs font-medium">
-                        {inv.email[0]?.toUpperCase()}
-                      </div>
-                      <span className="text-sm">{inv.email}</span>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <RoleBadge role={inv.role as Role} />
-                  </TableCell>
-                  <TableCell className="text-sm text-muted-foreground">
-                    {relativeTime(inv.createdAt)}
-                  </TableCell>
-                  <TableCell className="text-sm text-muted-foreground">
-                    {relativeTime(inv.expiresAt)}
-                  </TableCell>
-                  <TableCell>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-8 w-8">
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem
-                          onClick={() => resendMutation.mutate({ email: inv.email, role: inv.role })}
-                          disabled={resendMutation.isPending}
-                        >
-                          <RefreshCw className="mr-2 h-4 w-4" />
-                          Resend invite
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          className="text-destructive focus:text-destructive"
-                          onClick={() => cancelMutation.mutate(inv.token)}
-                          disabled={cancelMutation.isPending}
-                        >
-                          <X className="mr-2 h-4 w-4" />
-                          Cancel invite
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        )}
-      </CardContent>
-    </Card>
   );
 }
 
@@ -777,133 +683,3 @@ function PermissionMatrixCard({
 
 // ── Invite member dialog ─────────────────────────────────────────────────
 
-function InviteMemberDialog({
-  orgId,
-  open,
-  onClose,
-}: {
-  orgId: string | null;
-  open: boolean;
-  onClose: () => void;
-}) {
-  const queryClient = useQueryClient();
-  const [email, setEmail] = useState("");
-  const [role, setRole] = useState<Role>("member");
-
-  const inviteMutation = useMutation({
-    mutationFn: (payload: { email: string; role: Role }) =>
-      api.post<MemberDTO>(
-        `/api/organizations/${orgId}/members`,
-        payload
-      ),
-    onSuccess: (m) => {
-      toast.success("Invitation sent", {
-        description: `${m.user.email} has been invited as ${m.role}.`,
-      });
-      queryClient.invalidateQueries({
-        queryKey: ["organizations", orgId, "members"],
-      });
-      queryClient.invalidateQueries({ queryKey: ["organizations"] });
-      setEmail("");
-      setRole("member");
-      onClose();
-    },
-    onError: (err: unknown) => {
-      const msg = err instanceof Error ? err.message : "Failed to invite";
-      toast.error("Invite failed", { description: msg });
-    },
-  });
-
-  const handleSubmit = () => {
-    const trimmed = email.trim().toLowerCase();
-    if (!trimmed) {
-      toast.error("Email is required");
-      return;
-    }
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) {
-      toast.error("Please enter a valid email address");
-      return;
-    }
-    inviteMutation.mutate({ email: trimmed, role });
-  };
-
-  return (
-    <Dialog
-      open={open}
-      onOpenChange={(o) => {
-        if (!o) onClose();
-      }}
-    >
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>Invite member</DialogTitle>
-          <DialogDescription>
-            Invite a teammate by email. If they don&apos;t have an account yet,
-            we&apos;ll create one for them. They will start with the{" "}
-            <span className="capitalize font-medium">{role}</span> role.
-          </DialogDescription>
-        </DialogHeader>
-        <div className="space-y-4 py-2">
-          <div className="space-y-1.5">
-            <Label htmlFor="invite-email">
-              Email <span className="text-destructive">*</span>
-            </Label>
-            <Input
-              id="invite-email"
-              type="email"
-              placeholder="teammate@company.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              autoFocus
-              onKeyDown={(e) => {
-                if (e.key === "Enter") handleSubmit();
-              }}
-            />
-          </div>
-          <div className="space-y-1.5">
-            <Label>Role</Label>
-            <Select
-              value={role}
-              onValueChange={(v) => setRole(v as Role)}
-            >
-              <SelectTrigger className="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {ROLES.filter((r) => r !== "owner").map((r) => (
-                  <SelectItem key={r} value={r} className="capitalize">
-                    {r}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <p className="text-xs text-muted-foreground">
-              Owners have full control. See the permission matrix above for
-              what each role can do.
-            </p>
-          </div>
-        </div>
-        <DialogFooter>
-          <Button
-            variant="outline"
-            onClick={onClose}
-            disabled={inviteMutation.isPending}
-          >
-            Cancel
-          </Button>
-          <Button
-            onClick={handleSubmit}
-            disabled={!email.trim() || inviteMutation.isPending}
-          >
-            {inviteMutation.isPending ? (
-              <RefreshCw className="mr-2 h-3.5 w-3.5 animate-spin" />
-            ) : (
-              <UserPlus className="mr-2 h-3.5 w-3.5" />
-            )}
-            Send invite
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-}

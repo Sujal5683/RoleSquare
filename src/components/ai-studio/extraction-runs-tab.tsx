@@ -146,8 +146,8 @@ export function ExtractionRunsTab() {
                 }`}
               >
                 <div className="flex items-center justify-between mb-1.5">
-                  <span className="text-xs font-mono text-muted-foreground truncate max-w-[120px]">
-                    {job.id.slice(0, 8)}…
+                  <span className="text-xs font-semibold truncate max-w-[140px]" title={`Extraction: ${sourceDs?.name ?? 'Unknown'} → ${targetName}`}>
+                    Ext: {sourceDs?.name?.slice(0, 10) ?? 'Src'} → {targetName.slice(0, 10)}
                   </span>
                   <span className={`text-[10px] px-1.5 py-0.5 rounded border font-medium ${statusColor(job.status)}`}>
                     {job.status}

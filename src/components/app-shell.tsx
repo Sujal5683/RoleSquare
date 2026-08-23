@@ -44,6 +44,8 @@ import {
   TrendingUp,
   Command as CommandIcon,
   MailOpen,
+  PanelLeftClose,
+  PanelLeftOpen,
   type LucideIcon,
 } from "lucide-react";
 import type { ViewId } from "@/lib/types";
@@ -81,6 +83,7 @@ const NAV_ITEMS: NavItem[] = [
   { id: "sharing", label: "Sharing Center", icon: Share2, group: "Governance" },
   { id: "organizations", label: "Organizations", icon: Building2, group: "Governance" },
   { id: "members", label: "Members", icon: Users, group: "Governance" },
+  { id: "invitations", label: "Invitations", icon: MailOpen, group: "Governance" },
   { id: "audit", label: "Audit Logs", icon: ShieldCheck, group: "Governance" },
   { id: "settings", label: "Settings", icon: Settings, group: "Account" },
 ];
@@ -95,6 +98,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const openSource = useAppStore((s) => s.openSource);
   const setAssistantOpen = useAppStore((s) => s.setAssistantOpen);
   const clearAssistantUnread = useAppStore((s) => s.clearAssistantUnread);
+  const desktopSidebarOpen = useAppStore((s) => s.desktopSidebarOpen);
+  const setDesktopSidebarOpen = useAppStore((s) => s.setDesktopSidebarOpen);
 
   const router = useRouter();
   const supabase = createClient();
@@ -190,14 +195,32 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const Sidebar = (
     <div className="flex h-full flex-col bg-sidebar">
       {/* Logo */}
-      <div className="flex h-14 items-center gap-2 border-b px-5">
-        <div className="flex h-7 w-7 items-center justify-center rounded-md bg-primary text-primary-foreground">
-          <Zap className="h-4 w-4" />
+      <div className="flex h-14 items-center justify-between border-b px-4">
+        <div className="flex items-center gap-2 overflow-hidden">
+          <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-primary text-primary-foreground">
+            <Zap className="h-4 w-4" />
+          </div>
+          <div className="flex flex-col leading-none truncate">
+            <span className="text-sm font-semibold truncate">Workspace</span>
+            <span className="text-[10px] text-muted-foreground truncate">Intelligence Platform</span>
+          </div>
         </div>
-        <div className="flex flex-col leading-none">
-          <span className="text-sm font-semibold">Workspace</span>
-          <span className="text-[10px] text-muted-foreground">Intelligence Platform</span>
-        </div>
+        <Button 
+          variant="ghost" 
+          size="icon" 
+          className="h-8 w-8 shrink-0 text-muted-foreground hover:text-foreground"
+          onClick={() => {
+            setSidebarOpen(false);
+            setDesktopSidebarOpen(!desktopSidebarOpen);
+          }}
+        >
+          {desktopSidebarOpen ? (
+            <PanelLeftClose className="hidden lg:block h-4 w-4" />
+          ) : (
+            <PanelLeftOpen className="hidden lg:block h-4 w-4" />
+          )}
+          <PanelLeftClose className="block lg:hidden h-4 w-4" />
+        </Button>
       </div>
 
       {/* Nav */}
@@ -210,7 +233,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <div className="space-y-0.5">
               {NAV_ITEMS.filter((i) => i.group === group).map((item) => {
                 const Icon = item.icon;
-                const active = view === item.id;
+                const active = 
+                  view === item.id ||
+                  (item.id === "sources" && view === "source-builder") ||
+                  (item.id === "datasets" && view === "dataset-detail");
                 return (
                   <button
                     key={item.id}
@@ -267,34 +293,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </div>
       </nav>
 
-      {/* Footer */}
-      <div className="border-t p-3 space-y-2">
-        <div className="rounded-lg bg-muted/50 p-3">
-          <div className="flex items-center justify-between">
-            <p className="text-xs font-medium truncate">{activeOrg?.name ?? "Acme Intelligence"}</p>
-            <span className="text-[9px] uppercase font-bold rounded px-1.5 py-0.5 bg-primary/10 text-primary">{activeOrg?.plan ?? "free"}</span>
-          </div>
-          <p className="mt-0.5 text-[10px] text-muted-foreground">
-            {activeOrg?.role ?? "owner"} access
-          </p>
-        </div>
-        <button
-          onClick={() => {
-            window.dispatchEvent(new KeyboardEvent("keydown", { key: "k", metaKey: true }));
-          }}
-          className="flex w-full items-center justify-between rounded-md border border-dashed px-3 py-1.5 text-xs text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
-        >
-          <span className="flex items-center gap-1.5">
-            <Search className="h-3 w-3" /> Command palette
-          </span>
-          <kbd className="font-mono text-[10px]">⌘K</kbd>
-        </button>
-      </div>
     </div>
   );
 
   return (
-    <div className="flex h-screen flex-col overflow-hidden">
+    <div className="flex h-[100dvh] flex-col overflow-hidden">
       <CommandPalette />
       <KeyboardShortcutsDialog />
       {/* AI Assistant — floating button + slide-in panel */}
@@ -310,10 +313,22 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <span className="sr-only">Toggle navigation</span>
             </Button>
           </SheetTrigger>
-          <SheetContent side="left" className="w-72 p-0">
+          <SheetContent side="left" className="w-72 p-0" hideClose>
             {Sidebar}
           </SheetContent>
         </Sheet>
+        
+        {!desktopSidebarOpen && (
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            className="hidden lg:flex" 
+            onClick={() => setDesktopSidebarOpen(true)}
+          >
+            <PanelLeftOpen className="h-5 w-5" />
+            <span className="sr-only">Open sidebar</span>
+          </Button>
+        )}
 
         {/* Org switcher */}
         <DropdownMenu>
@@ -366,9 +381,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </button>
 
         <div className="ml-auto flex items-center gap-1">
-          <Button variant="ghost" size="icon" onClick={toggleTheme} title="Toggle theme (Alt+T)">
-            {theme === "light" ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />}
-          </Button>
           <NotificationsDropdown />
           <Button
             variant="ghost"
@@ -380,14 +392,17 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           >
             <HelpCircle className="h-4 w-4" />
           </Button>
+          <Button variant="ghost" size="icon" onClick={toggleTheme} title="Toggle theme (Alt+T)">
+            {theme === "light" ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />}
+          </Button>
 
           {/* User menu */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <button className="ml-1 flex items-center gap-2 rounded-md p-1 hover:bg-accent">
+              <button className="ml-2 flex items-center gap-2 rounded-md border border-border bg-background p-1 pr-2 hover:bg-accent hover:text-accent-foreground transition-colors">
                 <Avatar className="h-7 w-7">
                   <AvatarImage src={session?.avatarUrl || undefined} />
-                  <AvatarFallback>
+                  <AvatarFallback className="bg-primary/10 text-primary">
                     {session?.name?.charAt(0).toUpperCase() ?? "A"}
                   </AvatarFallback>
                 </Avatar>
@@ -427,7 +442,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       {/* Body: sidebar + main */}
       <div className="flex flex-1 overflow-hidden">
         {/* Desktop sidebar */}
-        <aside className="hidden lg:flex w-64 flex-col border-r bg-sidebar overflow-y-auto">{Sidebar}</aside>
+        <aside 
+          className={cn(
+            "hidden lg:flex flex-col border-r bg-sidebar overflow-x-hidden overflow-y-auto transition-all duration-300",
+            desktopSidebarOpen ? "w-64" : "w-0 border-r-0"
+          )}
+        >
+          <div className="w-64 h-full">{Sidebar}</div>
+        </aside>
 
         {/* Main content */}
         <main className="flex-1 overflow-y-auto">
@@ -437,35 +459,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </main>
       </div>
 
-      {/* Sticky footer */}
-      <footer className="shrink-0 border-t bg-background px-4 py-3">
-        <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-2 text-xs text-muted-foreground sm:flex-row">
-          <div className="flex items-center gap-2">
-            <span className="flex h-4 w-4 items-center justify-center rounded bg-primary text-primary-foreground">
-              <Zap className="h-2.5 w-2.5" />
-            </span>
-            <span className="font-medium text-foreground">Workspace Intelligence Platform</span>
-            <span className="hidden sm:inline">· Evidence-backed AI extraction</span>
-          </div>
-          <div className="flex items-center gap-3">
-            <button
-              className="flex items-center gap-1 hover:text-foreground transition-colors"
-              onClick={() => {
-                window.dispatchEvent(new KeyboardEvent("keydown", { key: "k", metaKey: true }));
-              }}
-            >
-              <kbd className="font-mono text-[10px] rounded border bg-muted px-1 py-0.5">⌘K</kbd>
-              <span className="hidden sm:inline">Command palette</span>
-            </button>
-            <span>·</span>
-            <span className="hidden sm:inline">v1.0 · {activeOrg?.plan ?? "team"} plan</span>
-            <span className="hidden sm:inline">·</span>
-            <a className="hover:text-foreground transition-colors" href="#" onClick={(e) => { e.preventDefault(); setView("landing"); }}>
-              About
-            </a>
-          </div>
-        </div>
-      </footer>
     </div>
   );
 }

@@ -47,6 +47,10 @@ interface AppState {
   sidebarOpen: boolean;
   setSidebarOpen: (open: boolean) => void;
 
+  // Sidebar collapse (desktop)
+  desktopSidebarOpen: boolean;
+  setDesktopSidebarOpen: (open: boolean) => void;
+
   // Theme
   theme: "light" | "dark";
   toggleTheme: () => void;
@@ -136,6 +140,9 @@ export const useAppStore = create<AppState>()(
       sidebarOpen: false,
       setSidebarOpen: (open) => set({ sidebarOpen: open }),
 
+      desktopSidebarOpen: true,
+      setDesktopSidebarOpen: (open) => set({ desktopSidebarOpen: open }),
+
       theme: "light",
       toggleTheme: () =>
         set({ theme: get().theme === "light" ? "dark" : "light" }),
@@ -162,6 +169,7 @@ export const useAppStore = create<AppState>()(
         selectedOrganizationId: s.selectedOrganizationId,
         theme: s.theme,
         recentItems: s.recentItems,
+        desktopSidebarOpen: s.desktopSidebarOpen,
       }),
     }
   )

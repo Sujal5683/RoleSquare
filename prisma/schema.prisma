@@ -63,6 +63,7 @@ model Organization {
   invitations        Invitation[]
   ownedAccesses      DatasetAccess[]      @relation("OwnerOrgAccess")
   granteeOrgAccesses DatasetAccess[]      @relation("GranteeOrgAccess")
+  googleIntegrations GoogleIntegration[]
 }
 
 model ApiKey {
@@ -119,6 +120,7 @@ model GoogleConnection {
   user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
   organization Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
   sources      Source[]
+  googleIntegrations GoogleIntegration[]
 
   @@index([userId])
   @@index([organizationId])
@@ -323,6 +325,7 @@ model SchemaField {
   confidenceThreshold Float  @default(0.7) // min confidence before routing to review (0..1)
 
   schema Schema @relation(fields: [schemaId], references: [id], onDelete: Cascade)
+  columnMappings DatasetColumnMapping[]
 
   @@index([schemaId])
 }
@@ -353,6 +356,9 @@ model Dataset {
   sharingReqs     SharingRequest[]
   crossOrgPerms   CrossOrgPermission[]
   datasetAccesses DatasetAccess[]
+  sheetMappings   SheetMapping[]
+  schemaVersions  DatasetSchemaVersion[]
+  rowExternalIds  DatasetRowExternalId[]
 
   @@index([organizationId])
 }
@@ -368,6 +374,7 @@ model DatasetRecord {
 
   dataset Dataset        @relation(fields: [datasetId], references: [id], onDelete: Cascade)
   values  DatasetValue[]
+  externalIds DatasetRowExternalId[]
 
   @@index([datasetId])
   @@index([status])
@@ -652,4 +659,173 @@ model AgentLog {
   @@index([jobId])
   @@index([organizationId, agentKey])
   @@index([createdAt])
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Google Sheets Integration Architecture
+// ────────────────────────────────────────────────────────────────────────────
+
+model GoogleIntegration {
+  id                 String   @id @default(cuid())
+  organizationId     String
+  googleConnectionId String
+  status             String   @default("active") // active | error | disconnected
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  organization       Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  connection         GoogleConnection     @relation(fields: [googleConnectionId], references: [id], onDelete: Cascade)
+  spreadsheets       SpreadsheetConnection[]
+
+  @@index([organizationId])
+  @@index([googleConnectionId])
+}
+
+model SpreadsheetConnection {
+  id                  String   @id @default(cuid())
+  googleIntegrationId String
+  spreadsheetId       String
+  name                String
+  url                 String?
+  status              String   @default("active") // active | unavailable
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  integration         GoogleIntegration @relation(fields: [googleIntegrationId], references: [id], onDelete: Cascade)
+  sheetMappings       SheetMapping[]
+
+  @@index([googleIntegrationId])
+  @@index([spreadsheetId])
+}
+
+model SheetMapping {
+  id                      String   @id @default(cuid())
+  spreadsheetConnectionId String
+  datasetId               String
+  sheetId                 String   // the internal ID of the tab
+  sheetName               String   // the name of the tab
+  syncEnabled             Boolean  @default(false)
+  syncDirection           String   @default("two_way") // two_way | app_to_sheet | sheet_to_app
+  conflictStrategy        String   @default("manual") // manual | keep_app | keep_sheet
+  status                  String   @default("connected") // connected | warning | mismatch | error
+  lastSyncAt              DateTime?
+  schemaFingerprint       String?  // SHA256 of expected sheet schema
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+
+  spreadsheetConnection   SpreadsheetConnection @relation(fields: [spreadsheetConnectionId], references: [id], onDelete: Cascade)
+  dataset                 Dataset               @relation(fields: [datasetId], references: [id], onDelete: Cascade)
+  syncStates              SyncState[]
+  syncEvents              SyncEvent[]
+  syncConflicts           SyncConflict[]
+  columnMappings          DatasetColumnMapping[]
+
+  @@unique([spreadsheetConnectionId, sheetId])
+  @@index([datasetId])
+}
+
+model SyncState {
+  id             String   @id @default(cuid())
+  sheetMappingId String
+  checkpoint     String?  // high-water mark or page token for syncing
+  stats          String   @default("{}") // JSON for total synced rows, errors
+  lastAttemptAt  DateTime?
+  lastSuccessAt  DateTime?
+  errorMessage   String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  sheetMapping   SheetMapping @relation(fields: [sheetMappingId], references: [id], onDelete: Cascade)
+
+  @@index([sheetMappingId])
+}
+
+model SyncEvent {
+  id             String   @id @default(cuid())
+  sheetMappingId String
+  status         String   // success | failed | partial | conflict
+  rowsAdded      Int      @default(0)
+  rowsUpdated    Int      @default(0)
+  rowsDeleted    Int      @default(0)
+  conflictsFound Int      @default(0)
+  errors         Int      @default(0)
+  details        String?  // JSON
+  startedAt      DateTime
+  finishedAt     DateTime?
+
+  sheetMapping   SheetMapping @relation(fields: [sheetMappingId], references: [id], onDelete: Cascade)
+
+  @@index([sheetMappingId])
+  @@index([startedAt])
+}
+
+model SyncConflict {
+  id             String   @id @default(cuid())
+  sheetMappingId String
+  recordId       String?  // The app dataset record ID
+  sheetRowId     String?  // The sheet row identifier
+  status         String   @default("pending") // pending | resolved_app | resolved_sheet | ignored
+  appData        String   // JSON of app state
+  sheetData      String   // JSON of sheet state
+  resolutionData String?  // JSON of final chosen state
+  resolvedBy     String?  
+  resolvedAt     DateTime?
+  createdAt      DateTime @default(now())
+
+  sheetMapping   SheetMapping @relation(fields: [sheetMappingId], references: [id], onDelete: Cascade)
+
+  @@index([sheetMappingId])
+  @@index([status])
+}
+
+model DatasetSchemaVersion {
+  id             String   @id @default(cuid())
+  datasetId      String
+  version        Int
+  schemaDef      String   // JSON representation of the schema fields
+  changedColumns String?  // JSON tracking what changed (renamed, added, removed)
+  impactRows     Int      @default(0)
+  source         String   @default("app") // app | google_sheets | import
+  approvedBy     String?
+  createdAt      DateTime @default(now())
+
+  dataset        Dataset  @relation(fields: [datasetId], references: [id], onDelete: Cascade)
+
+  @@index([datasetId, version])
+}
+
+model DatasetColumnMapping {
+  id             String   @id @default(cuid())
+  sheetMappingId String
+  fieldId        String
+  sheetColumnId  String?  // Google sheets column letter/index or ID
+  sheetColumnName String  // The header text
+  confidence     Float    @default(1.0)
+  isConfirmed    Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  sheetMapping   SheetMapping @relation(fields: [sheetMappingId], references: [id], onDelete: Cascade)
+  field          SchemaField  @relation(fields: [fieldId], references: [id], onDelete: Cascade)
+
+  @@unique([sheetMappingId, fieldId])
+  @@unique([sheetMappingId, sheetColumnName])
+  @@index([sheetMappingId])
+}
+
+model DatasetRowExternalId {
+  id             String   @id @default(cuid())
+  datasetId      String
+  recordId       String
+  system         String   @default("google_sheets")
+  externalRowId  String   // A permanent unique ID assigned to the row in the sheet
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  dataset        Dataset       @relation(fields: [datasetId], references: [id], onDelete: Cascade)
+  record         DatasetRecord @relation(fields: [recordId], references: [id], onDelete: Cascade)
+
+  @@unique([datasetId, recordId, system])
+  @@unique([datasetId, externalRowId, system])
+  @@index([datasetId])
 }

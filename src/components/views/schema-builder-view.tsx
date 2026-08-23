@@ -207,6 +207,7 @@ export function SchemaBuilderView() {
     "From: recruiter@techcorp.com\nSubject: Software Engineer Internship - Summer 2025\n\nHi,\n\nTechCorp is hiring Software Engineer interns for Summer 2025. Location: San Francisco (remote-friendly). CTC: 25 LPA. Eligibility: CS/IT students with 7.5+ CGPA. Apply by March 15, 2025."
   );
   const [testResult, setTestResult] = useState<ExtractionResult | null>(null);
+  const [isEditingMetadata, setIsEditingMetadata] = useState(false);
 
   // ── Queries ────────────────────────────────────────────────────────────
   const { data: schemas, isLoading: listLoading } = useQuery({
@@ -492,24 +493,72 @@ export function SchemaBuilderView() {
                 New schema
               </Button>
               {activeSchemaId && (
-                <>
+                <></>
+              )}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {listLoading ? (
+        <LoadingState rows={3} />
+      ) : !activeSchemaId ? (
+        <Card>
+          <CardContent className="p-4">
+            <EmptyState
+              icon={<FileJson className="h-5 w-5" />}
+              title="No schema selected"
+              description="Choose an existing schema from the dropdown above, or create a new one to start defining extraction fields."
+              action={
+                <Button size="sm" onClick={() => setCreateOpen(true)}>
+                  <Plus className="mr-2 h-3.5 w-3.5" />
+                  Create schema
+                </Button>
+              }
+            />
+          </CardContent>
+        </Card>
+      ) : schemaLoading ? (
+        <LoadingState rows={4} />
+      ) : !activeSchema ? (
+        <ErrorState message="Schema not found" />
+      ) : (
+        <div className="grid gap-4 lg:grid-cols-3">
+          {/* Left: schema metadata + fields */}
+          <div className="lg:col-span-2 space-y-4">
+            {/* Metadata */}
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between pb-3">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <FileText className="h-4 w-4" />
+                  Schema metadata
+                </CardTitle>
+                <div className="flex items-center gap-1">
+                  <Button
+                    variant={isEditingMetadata ? "secondary" : "ghost"}
+                    size="icon"
+                    className="h-7 w-7"
+                    onClick={() => setIsEditingMetadata(!isEditingMetadata)}
+                    aria-label="Toggle edit mode"
+                  >
+                    <Pencil className="h-3.5 w-3.5" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                    onClick={() => setDeleteOpen(true)}
+                    aria-label="Delete schema"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <Button variant="outline" size="sm" className="h-8 w-8 p-0">
-                        <MoreHorizontal className="h-4 w-4" />
+                      <Button variant="ghost" size="icon" className="h-7 w-7">
+                        <MoreHorizontal className="h-3.5 w-3.5" />
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" className="w-48">
-                      <DropdownMenuItem
-                        onClick={() => {
-                          setNewName(activeSchema?.name || "");
-                          setNewDescription(activeSchema?.description || "");
-                          setEditOpen(true);
-                        }}
-                      >
-                        <Settings2 className="mr-2 h-4 w-4" />
-                        Edit details
-                      </DropdownMenuItem>
                       <DropdownMenuItem
                         onClick={() => {
                           const name = window.prompt(
@@ -597,107 +646,89 @@ export function SchemaBuilderView() {
                         <Upload className="mr-2 h-4 w-4" />
                         Import JSON
                       </DropdownMenuItem>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem
-                        className="text-destructive focus:bg-destructive focus:text-destructive-foreground"
-                        onClick={() => setDeleteOpen(true)}
-                      >
-                        <Trash2 className="mr-2 h-4 w-4" />
-                        Delete schema
-                      </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
-                </>
-              )}
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {listLoading ? (
-        <LoadingState rows={3} />
-      ) : !activeSchemaId ? (
-        <Card>
-          <CardContent className="p-4">
-            <EmptyState
-              icon={<FileJson className="h-5 w-5" />}
-              title="No schema selected"
-              description="Choose an existing schema from the dropdown above, or create a new one to start defining extraction fields."
-              action={
-                <Button size="sm" onClick={() => setCreateOpen(true)}>
-                  <Plus className="mr-2 h-3.5 w-3.5" />
-                  Create schema
-                </Button>
-              }
-            />
-          </CardContent>
-        </Card>
-      ) : schemaLoading ? (
-        <LoadingState rows={4} />
-      ) : !activeSchema ? (
-        <ErrorState message="Schema not found" />
-      ) : (
-        <div className="grid gap-4 lg:grid-cols-3">
-          {/* Left: schema metadata + fields */}
-          <div className="lg:col-span-2 space-y-4">
-            {/* Metadata */}
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-base flex items-center gap-2">
-                  <FileText className="h-4 w-4" />
-                  Schema metadata
-                </CardTitle>
+                </div>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <div className="space-y-2">
-                    <Label htmlFor="schema-name">Name</Label>
-                    <Input
-                      id="schema-name"
-                      value={draftMetadata.name}
-                      onChange={(e) =>
-                        handleUpdateSchema({ name: e.target.value })
-                      }
-                      placeholder="Schema name"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Version</Label>
-                    <div className="flex h-9 items-center rounded-md border bg-muted/30 px-3 text-sm font-mono">
-                      v{activeSchema.version}
+                {isEditingMetadata ? (
+                  <>
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <div className="space-y-2">
+                        <Label htmlFor="schema-name">Name</Label>
+                        <Input
+                          id="schema-name"
+                          value={draftMetadata.name}
+                          onChange={(e) =>
+                            handleUpdateSchema({ name: e.target.value })
+                          }
+                          placeholder="Schema name"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Version</Label>
+                        <div className="flex h-9 items-center rounded-md border bg-muted/30 px-3 text-sm font-mono">
+                          v{activeSchema.version}
+                        </div>
+                      </div>
                     </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="schema-desc">Description</Label>
+                      <Input
+                        id="schema-desc"
+                        value={draftMetadata.description}
+                        onChange={(e) =>
+                          handleUpdateSchema({
+                            description: e.target.value,
+                          })
+                        }
+                        placeholder="What this schema extracts"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="schema-prompt">Prompt template (override)</Label>
+                      <Textarea
+                        id="schema-prompt"
+                        rows={3}
+                        value={draftMetadata.promptTemplate}
+                        onChange={(e) =>
+                          handleUpdateSchema({
+                            promptTemplate: e.target.value,
+                          })
+                        }
+                        placeholder="Optional system-prompt override sent to the LLM."
+                      />
+                      <p className="text-[10px] text-muted-foreground">
+                        Auto-saves and bumps version.
+                      </p>
+                    </div>
+                  </>
+                ) : (
+                  <div className="space-y-4 text-sm">
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <div>
+                        <h4 className="text-muted-foreground mb-1 text-xs font-medium">Name</h4>
+                        <p className="font-medium">{draftMetadata.name || "—"}</p>
+                      </div>
+                      <div>
+                        <h4 className="text-muted-foreground mb-1 text-xs font-medium">Version</h4>
+                        <p className="font-mono">v{activeSchema.version}</p>
+                      </div>
+                    </div>
+                    <div>
+                      <h4 className="text-muted-foreground mb-1 text-xs font-medium">Description</h4>
+                      <p>{draftMetadata.description || "—"}</p>
+                    </div>
+                    {draftMetadata.promptTemplate && (
+                      <div>
+                        <h4 className="text-muted-foreground mb-1 text-xs font-medium">Prompt template</h4>
+                        <pre className="text-xs p-2 bg-muted/30 rounded border whitespace-pre-wrap font-mono">
+                          {draftMetadata.promptTemplate}
+                        </pre>
+                      </div>
+                    )}
                   </div>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="schema-desc">Description</Label>
-                  <Input
-                    id="schema-desc"
-                    value={draftMetadata.description}
-                    onChange={(e) =>
-                      handleUpdateSchema({
-                        description: e.target.value,
-                      })
-                    }
-                    placeholder="What this schema extracts"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="schema-prompt">Prompt template (override)</Label>
-                  <Textarea
-                    id="schema-prompt"
-                    rows={3}
-                    value={draftMetadata.promptTemplate}
-                    onChange={(e) =>
-                      handleUpdateSchema({
-                        promptTemplate: e.target.value,
-                      })
-                    }
-                    placeholder="Optional system-prompt override sent to the LLM."
-                  />
-                  <p className="text-[10px] text-muted-foreground">
-                    Auto-saves and bumps version.
-                  </p>
-                </div>
+                )}
               </CardContent>
             </Card>
 
