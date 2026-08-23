@@ -40,16 +40,23 @@ export async function POST(req: NextRequest) {
     const user = await getCurrentUser();
     const body = await req.json().catch(() => ({}));
     const name = String(body?.name ?? "").trim();
-    const slug =
+    const baseSlug =
       String(body?.slug ?? "").trim() ||
       name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
     const plan = String(body?.plan ?? "free");
 
-    if (!name || !slug) {
+    if (!name || !baseSlug) {
       return NextResponse.json(
         { error: "name and slug are required" },
         { status: 400 }
       );
+    }
+
+    let slug = baseSlug;
+    let attempt = 0;
+    while (await db.organization.findUnique({ where: { slug } })) {
+      attempt++;
+      slug = `${baseSlug}-${attempt}`;
     }
 
     const org = await db.organization.create({

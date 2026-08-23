@@ -26,7 +26,7 @@ import type { DashboardData } from "@/lib/types";
 
 export async function GET(req: NextRequest) {
   try {
-    const { organizationId } = await requireOrgContext(req);
+    const { user, organizationId } = await requireOrgContext(req);
 
     const [
       connectedAccounts,
@@ -40,6 +40,7 @@ export async function GET(req: NextRequest) {
       queueHealthRaw,
       usageRaw,
       connectionAlertsRaw,
+      pendingRequestsRaw,
     ] = await Promise.all([
       db.googleConnection.count({ where: { organizationId } }),
       db.source.count({ where: { organizationId, status: "active" } }),
@@ -88,6 +89,17 @@ export async function GET(req: NextRequest) {
           ],
         },
       }),
+      db.sharingRequest.findMany({
+        where: {
+          status: "pending",
+          OR: [
+            { targetOrganizationId: organizationId },
+            { targetUserId: user.id },
+            { targetEmail: user.email }
+          ]
+        },
+        include: { dataset: { select: { id: true, name: true } }, requester: { select: { id: true, name: true, email: true } } }
+      })
     ]);
 
     // recordsExtracted: total count of dataset records across the org.
@@ -103,6 +115,9 @@ export async function GET(req: NextRequest) {
     });
     const fieldsMap = fieldsByIdMap(schemaFields);
     const reviewQueueEnriched = attachFieldsToRecords(reviewQueueRaw, fieldsMap);
+
+    // Import serializeSharingRequest
+    const { serializeSharingRequest } = await import("@/lib/serialize");
 
     const data: DashboardData = {
       kpis: {
@@ -129,6 +144,7 @@ export async function GET(req: NextRequest) {
       })),
       usageMetrics: usageRaw.map(serializeUsageMetric),
       connectionAlerts: connectionAlertsRaw.map(serializeGoogleConnection),
+      pendingSharingRequests: pendingRequestsRaw.map(serializeSharingRequest),
     };
 
     return NextResponse.json(data);

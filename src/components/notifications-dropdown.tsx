@@ -120,6 +120,25 @@ export function NotificationsDropdown() {
     });
   }
 
+  // Sharing Requests
+  if (data?.pendingSharingRequests) {
+    for (const req of data.pendingSharingRequests) {
+      const isGrant = req.shareType === "grant";
+      notifications.push({
+        id: `share-${req.id}`,
+        type: "info",
+        icon: Inbox,
+        title: isGrant ? "Dataset Shared with You" : "Data Request",
+        description: isGrant
+          ? `${req.requesterName || req.requestedBy} shared "${req.datasetName || 'a dataset'}"`
+          : `${req.requesterName || req.requestedBy} is requesting access to data.`,
+        timestamp: req.createdAt,
+        action: { label: "View request", view: "sharing" },
+        read: false,
+      });
+    }
+  }
+
   // No notifications
   if (notifications.length === 0) {
     notifications.push({

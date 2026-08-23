@@ -355,6 +355,7 @@ export interface DashboardData {
   queueHealth: { type: string; count: number; status: string }[];
   usageMetrics: UsageMetricDTO[];
   connectionAlerts: GoogleConnectionDTO[];
+  pendingSharingRequests?: SharingRequestDTO[];
 }
 
 // ── AI Extraction Contract ──────────────────────────────────────────────

@@ -110,3 +110,44 @@ export async function PATCH(
     );
   }
 }
+
+export async function DELETE(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id } = await params;
+    const access = await verifyOrgAccess(id, "owner");
+    if (access.error || !access.user) return access.error;
+    const { user } = access;
+
+    // Prevent deleting the user's only organization
+    const activeOrgs = user.memberships.filter((m) => m.status === "active");
+    if (activeOrgs.length <= 1) {
+      return NextResponse.json(
+        { error: "You cannot delete your only active organization." },
+        { status: 400 }
+      );
+    }
+
+    const before = await db.organization.findUnique({ where: { id } });
+    if (!before) {
+      return NextResponse.json(
+        { error: "Organization not found" },
+        { status: 404 }
+      );
+    }
+
+    await db.organization.delete({
+      where: { id },
+    });
+
+    return NextResponse.json({ success: true }, { status: 200 });
+  } catch (err) {
+    if (err instanceof AuthError) return authErrorResponse(err);
+    return NextResponse.json(
+      { error: err instanceof Error ? err.message : "Failed to delete org" },
+      { status: 500 }
+    );
+  }
+}

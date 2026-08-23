@@ -13,15 +13,28 @@ export async function POST(
 ) {
   try {
     const { id } = await params;
-    const { user, organizationId } = await requireOrgContext(req);
+    const { user, organizationId, membership } = await requireOrgContext(req);
+    const ROLE_LEVEL: Record<string, number> = { owner: 5, admin: 4, manager: 3, member: 2, viewer: 1 };
+
     const existing = await db.sharingRequest.findUnique({
       where: { id },
     });
-    if (!existing || existing.organizationId !== organizationId) {
-      return NextResponse.json(
-        { error: "Sharing request not found" },
-        { status: 404 }
-      );
+    
+    if (!existing) {
+      return NextResponse.json({ error: "Sharing request not found" }, { status: 404 });
+    }
+
+    const isTargetOrg = existing.targetOrganizationId === organizationId;
+    const isTargetUser = existing.targetUserId === user.id || existing.targetEmail === user.email;
+
+    if (!isTargetOrg && !isTargetUser) {
+      return NextResponse.json({ error: "Not authorized to reject this request" }, { status: 403 });
+    }
+
+    if (isTargetOrg) {
+      if ((ROLE_LEVEL[membership.role] ?? 0) < ROLE_LEVEL.manager) {
+        return NextResponse.json({ error: `Rejecting requests requires manager role or higher. You are a ${membership.role}.` }, { status: 403 });
+      }
     }
 
     const updated = await db.sharingRequest.update({

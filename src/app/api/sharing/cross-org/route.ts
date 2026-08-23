@@ -1,4 +1,4 @@
-﻿// GET  /api/sharing/cross-org — returns outgoing + incoming sharing requests
+// GET  /api/sharing/cross-org — returns outgoing + incoming sharing requests
 // POST /api/sharing/cross-org — create a share request or immediate grant
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
@@ -8,7 +8,7 @@ import { serializeSharingRequest } from '@/lib/serialize'
 
 export async function GET(req: NextRequest) {
   try {
-    const { organizationId } = await requireOrgContext(req)
+    const { user, organizationId } = await requireOrgContext(req)
     const [outgoing, incoming] = await Promise.all([
       db.sharingRequest.findMany({
         where: { organizationId, direction: 'outgoing' },
@@ -16,7 +16,13 @@ export async function GET(req: NextRequest) {
         orderBy: { createdAt: 'desc' }, take: 100,
       }),
       db.sharingRequest.findMany({
-        where: { targetOrganizationId: organizationId },
+        where: { 
+          OR: [
+            { targetOrganizationId: organizationId },
+            { targetUserId: user.id },
+            { targetEmail: user.email }
+          ]
+        },
         include: { dataset: { select: { id: true, name: true } }, requester: { select: { id: true, name: true, email: true } }, decider: { select: { id: true, name: true } } },
         orderBy: { createdAt: 'desc' }, take: 100,
       }),
@@ -41,7 +47,7 @@ export async function POST(req: NextRequest) {
     const level = String(body?.level ?? 'read')
     const reason = String(body?.reason ?? '').trim() || null
 
-    if (!datasetId) return NextResponse.json({ error: 'datasetId is required' }, { status: 400 })
+    if (!datasetId && shareType === 'grant') return NextResponse.json({ error: 'datasetId is required' }, { status: 400 })
     if (!targetOrganizationId && !targetEmail && !targetUserId)
       return NextResponse.json({ error: 'targetOrganizationId or targetEmail is required' }, { status: 400 })
 
@@ -51,10 +57,12 @@ export async function POST(req: NextRequest) {
       targetUserId = tu.id
     }
 
-    const dataset = await db.dataset.findUnique({ where: { id: datasetId }, select: { id: true, organizationId: true } })
-    if (!dataset) return NextResponse.json({ error: 'Dataset not found' }, { status: 404 })
-    if (shareType === 'grant' && dataset.organizationId !== organizationId)
-      return NextResponse.json({ error: 'You can only grant access to your own datasets' }, { status: 403 })
+    if (datasetId) {
+      const dataset = await db.dataset.findUnique({ where: { id: datasetId }, select: { id: true, organizationId: true } })
+      if (!dataset) return NextResponse.json({ error: 'Dataset not found' }, { status: 404 })
+      if (shareType === 'grant' && dataset.organizationId !== organizationId)
+        return NextResponse.json({ error: 'You can only grant access to your own datasets' }, { status: 403 })
+    }
 
     if (targetOrganizationId) {
       const to = await db.organization.findUnique({ where: { id: targetOrganizationId }, select: { id: true } })
@@ -63,21 +71,14 @@ export async function POST(req: NextRequest) {
 
     const shareRequest = await db.sharingRequest.create({
       data: {
-        organizationId, datasetId, requestedBy: user.id,
-        status: shareType === 'grant' ? 'approved' : 'pending',
+        organizationId, datasetId: datasetId || null, requestedBy: user.id,
+        status: 'pending',
         level, reason, targetOrganizationId, targetUserId, targetEmail, direction, shareType,
-        ...(shareType === 'grant' ? { decidedBy: user.id, decidedAt: new Date() } : {}),
       },
       include: { dataset: { select: { id: true, name: true } }, requester: { select: { id: true, name: true, email: true } } },
     })
 
-    if (shareType === 'grant') {
-      await db.datasetAccess.create({
-        data: { datasetId, ownerOrgId: organizationId, granteeOrgId: targetOrganizationId || null, granteeUserId: targetUserId || null, level, status: 'active', sourceRequestId: shareRequest.id },
-      })
-    }
-
-    await logAudit({ organizationId, actorId: user.id, action: 'share', entity: 'dataset', entityId: datasetId, after: { direction, shareType, level, targetOrganizationId, targetUserId, targetEmail } })
+    await logAudit({ organizationId, actorId: user.id, action: 'share', entity: 'dataset', entityId: datasetId || undefined, after: { direction, shareType, level, targetOrganizationId, targetUserId, targetEmail } })
     return NextResponse.json(serializeSharingRequest(shareRequest), { status: 201 })
   } catch (err) {
     if (err instanceof AuthError) return authErrorResponse(err)

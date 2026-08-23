@@ -31,6 +31,24 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { NewShareRequestDialog } from "@/components/sharing/new-share-request-dialog";
 
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
+
+
 // ── Types ────────────────────────────────────────────────────────────────
 
 interface PermissionsResponse {
@@ -311,11 +329,14 @@ function RequestsTab() {
     enabled: !!activeOrgId,
   });
 
+  const [approvingRequest, setApprovingRequest] = useState<SharingRequestDTO | null>(null);
+
   const approveMutation = useMutation({
-    mutationFn: (id: string) =>
-      api.post(`/api/sharing/requests/${id}/approve`, {}),
+    mutationFn: ({ id, datasetId }: { id: string, datasetId?: string }) =>
+      api.post(`/api/sharing/requests/${id}/approve`, datasetId ? { datasetId } : {}),
     onSuccess: () => {
       toast.success("Request approved");
+      setApprovingRequest(null);
       queryClient.invalidateQueries({ queryKey: ["cross-org-shares"] });
       queryClient.invalidateQueries({ queryKey: ["sharing-permissions"] });
     },
@@ -335,6 +356,14 @@ function RequestsTab() {
       toast.error("Failed to reject", { description: err instanceof Error ? err.message : undefined });
     },
   });
+
+  const handleApprove = (r: SharingRequestDTO) => {
+    if (r.shareType === "request" && !r.datasetId) {
+      setApprovingRequest(r);
+    } else {
+      approveMutation.mutate({ id: r.id });
+    }
+  };
 
   if (!activeOrgId) return <EmptyState icon={<Building2 className="h-5 w-5" />} title="No organization selected" description="" />;
   if (isLoading) return <LoadingState rows={3} />;
@@ -374,6 +403,7 @@ function RequestsTab() {
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead>Type</TableHead>
                   <TableHead>Dataset</TableHead>
                   <TableHead>From</TableHead>
                   <TableHead>Access</TableHead>
@@ -384,7 +414,12 @@ function RequestsTab() {
               <TableBody>
                 {pendingIncoming.map((r) => (
                   <TableRow key={r.id}>
-                    <TableCell className="font-medium">{r.datasetName ?? r.datasetId}</TableCell>
+                    <TableCell>
+                      <Badge variant="outline" className={r.shareType === "grant" ? "border-violet-200 text-violet-700 bg-violet-50" : "border-blue-200 text-blue-700 bg-blue-50"}>
+                        {r.shareType === "grant" ? "Offered Data" : "Data Request"}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="font-medium">{r.datasetName ?? r.datasetId ?? "—"}</TableCell>
                     <TableCell>
                       <div className="text-sm">{r.requesterName ?? r.requestedBy}</div>
                       {r.requesterEmail && (
@@ -401,11 +436,11 @@ function RequestsTab() {
                           size="sm"
                           variant="outline"
                           className="text-emerald-600 border-emerald-300 hover:bg-emerald-50"
-                          onClick={() => approveMutation.mutate(r.id)}
+                          onClick={() => handleApprove(r)}
                           disabled={approveMutation.isPending}
                         >
                           <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" />
-                          Approve
+                          {r.shareType === "grant" ? "Accept" : "Approve"}
                         </Button>
                         <Button
                           size="sm"
@@ -436,6 +471,7 @@ function RequestsTab() {
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead>Type</TableHead>
                   <TableHead>Dataset</TableHead>
                   <TableHead>Shared with</TableHead>
                   <TableHead>Access</TableHead>
@@ -446,7 +482,12 @@ function RequestsTab() {
               <TableBody>
                 {outgoing.map((r) => (
                   <TableRow key={r.id}>
-                    <TableCell className="font-medium">{r.datasetName ?? r.datasetId}</TableCell>
+                    <TableCell>
+                      <Badge variant="outline" className={r.shareType === "grant" ? "border-violet-200 text-violet-700 bg-violet-50" : "border-blue-200 text-blue-700 bg-blue-50"}>
+                        {r.shareType === "grant" ? "Offered Data" : "Data Request"}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="font-medium">{r.datasetName ?? r.datasetId ?? "—"}</TableCell>
                     <TableCell>
                       <div className="text-sm">
                         {r.targetOrganizationName ?? r.targetOrganizationId ?? r.targetEmail ?? r.targetUserId ?? "—"}
@@ -464,6 +505,83 @@ function RequestsTab() {
           </Card>
         </div>
       )}
+
+      {approvingRequest && (
+        <ApproveRequestDialog
+          request={approvingRequest}
+          onClose={() => setApprovingRequest(null)}
+          onApprove={(datasetId) => approveMutation.mutate({ id: approvingRequest.id, datasetId })}
+          isPending={approveMutation.isPending}
+        />
+      )}
     </div>
+  );
+}
+
+
+// ── Dialog: Approve Data Request ─────────────────────────────────────────
+
+function ApproveRequestDialog({
+  request,
+  onClose,
+  onApprove,
+  isPending,
+}: {
+  request: SharingRequestDTO;
+  onClose: () => void;
+  onApprove: (datasetId: string) => void;
+  isPending: boolean;
+}) {
+  const activeOrgId = useActiveOrg();
+  const [selectedDatasetId, setSelectedDatasetId] = useState<string>("");
+
+  const { data: datasets } = useQuery({
+    queryKey: ["datasets", activeOrgId],
+    queryFn: () => api.get<DatasetDTO[]>(`/api/datasets?organizationId=${activeOrgId}`),
+    enabled: !!activeOrgId,
+  });
+
+  return (
+    <Dialog open={true} onOpenChange={onClose}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Approve Data Request</DialogTitle>
+          <DialogDescription>
+            {request.requesterName || request.requestedBy} has requested data access. Select a dataset to share.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="grid gap-4 py-4">
+          <div className="grid gap-2">
+            <Label htmlFor="dataset">Dataset</Label>
+            <Select value={selectedDatasetId} onValueChange={setSelectedDatasetId}>
+              <SelectTrigger id="dataset">
+                <SelectValue placeholder="Select a dataset..." />
+              </SelectTrigger>
+              <SelectContent>
+                {datasets?.map((ds) => (
+                  <SelectItem key={ds.id} value={ds.id}>
+                    {ds.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose} disabled={isPending}>
+            Cancel
+          </Button>
+          <Button
+            onClick={() => onApprove(selectedDatasetId)}
+            disabled={!selectedDatasetId || isPending}
+          >
+            {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            Approve & Share
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

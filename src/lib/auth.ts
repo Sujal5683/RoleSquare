@@ -173,7 +173,6 @@ async function getOrCreateUser(
   });
 }
 
-
 /**
  * Resolves the active organization for the request, VERIFYING that the
  * current user is an ACTIVE member of that organization.
@@ -212,78 +211,18 @@ export async function getCurrentOrgId(
       ),
     };
   }
-  return { organizationId: 
- * Resolution order:
- *   1. `organizationId` query param — IF the user is an active member.
- *   2. The user's first active organization (fallback).
- *
- * If the user passes `?organizationId=<org_they_dont_belong_to>`, this
- * returns a 403 Forbidden response instead of leaking data.
- */
-export async function getCurrentOrgId(
-  req: NextRequest
-): Promise<{ organizationId: string; error?: NextResponse }> {
-  const user = await getCurrentUser();
-  const url = new URL(req.url);
-  const explicit = url.searchParams.get("organizationId") || req.headers.get("x-organization-id");
-
-  if (explicit) {
-    const membership = user.memberships.find(
-      (m) => m.organizationId === explicit && m.status === "active"
-    );
-    if (membership) {
-      return { organizationId: explicit };
-    }
-    // If explicit is invalid/stale, we just fall through to the fallback below.
-  }
-
-  const firstActive = user.organizations[0];
-  if (!firstActive) {
-    return {
-      organizationId: "",
-      error: NextResponse.json(
-        { error: "You are not an active member of any organization" },
-        { status: 403 }
-      ),
-    };
-  }
-  return { organizationId: 
- * Resolution order:
- *   1. `organizationId` query param — IF the user is an active member.
- *   2. The user's first active organization (fallback).
- *
- * If the user passes `?organizationId=<org_they_dont_belong_to>`, this
- * returns a 403 Forbidden response instead of leaking data.
- */
-export async function getCurrentOrgId(
-  req: NextRequest
-): Promise<{ organizationId: string; error?: NextResponse }> {
-  const user = await getCurrentUser();
-  const url = new URL(req.url);
-  const explicit = url.searchParams.get("organizationId") || req.headers.get("x-organization-id");
-
-  if (explicit) {
-    const membership = user.memberships.find(
-      (m) => m.organizationId === explicit && m.status === "active"
-    );
-    if (membership) {
-      return { organizationId: explicit };
-    }
-    // If explicit is invalid/stale, we just fall through to the fallback below.
-  }
-
-  const firstActive = user.organizations[0];
-  if (!firstActive) {
-    return {
-      organizationId: "",
-      error: NextResponse.json(
-        { error: "You are not an active member of any organization" },
-        { status: 403 }
-      ),
-    };
-  }
   return { organizationId: firstActive.id };
-}\n\nexport interface OrgContext {\n  user: SessionUser;\n  organizationId: string;\n  membership: OrgMembership;\n}\n\n/**\n * Resolves the active organization for the request, VERIFYING that the\n * current user is an ACTIVE member of that organization.
+}
+
+export interface OrgContext {
+  user: SessionUser;
+  organizationId: string;
+  membership: OrgMembership;
+}
+
+/**
+ * Resolves the active organization for the request, VERIFYING that the
+ * current user is an ACTIVE member of that organization.
  *
  * Resolution order:
  *   1. `organizationId` query param — STRICT: if provided and user is not an

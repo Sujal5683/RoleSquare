@@ -22,22 +22,32 @@ export async function POST(
     const { id } = await params;
     const { user, organizationId, membership } = await requireOrgContext(req);
 
-    // Role check: only admin+ can approve sharing requests
-    if ((ROLE_LEVEL[membership.role] ?? 0) < ROLE_LEVEL.admin) {
-      return NextResponse.json(
-        { error: `Approving sharing requests requires admin role or higher. You are a ${membership.role}.` },
-        { status: 403 }
-      );
-    }
-
     const existing = await db.sharingRequest.findUnique({
       where: { id },
     });
-    if (!existing || existing.organizationId !== organizationId) {
-      return NextResponse.json(
-        { error: "Sharing request not found" },
-        { status: 404 }
-      );
+    
+    if (!existing) {
+      return NextResponse.json({ error: "Sharing request not found" }, { status: 404 });
+    }
+
+    const isTargetOrg = existing.targetOrganizationId === organizationId;
+    const isTargetUser = existing.targetUserId === user.id || existing.targetEmail === user.email;
+
+    if (!isTargetOrg && !isTargetUser) {
+      return NextResponse.json({ error: "Not authorized to approve this request" }, { status: 403 });
+    }
+
+    if (isTargetOrg) {
+      if ((ROLE_LEVEL[membership.role] ?? 0) < ROLE_LEVEL.manager) {
+        return NextResponse.json({ error: `Approving requests requires manager role or higher. You are a ${membership.role}.` }, { status: 403 });
+      }
+    }
+
+    const body = await req.json().catch(() => ({}));
+    const datasetId = body.datasetId || existing.datasetId;
+
+    if (!datasetId) {
+      return NextResponse.json({ error: "A dataset must be selected to approve this request." }, { status: 400 });
     }
 
     const now = new Date();
@@ -48,25 +58,28 @@ export async function POST(
           status: "approved",
           decidedBy: user.id,
           decidedAt: now,
+          datasetId: datasetId,
         },
         include: { dataset: true, requester: true },
       });
-      if (req2.datasetId) {
-        // Write to the unified DatasetAccess table (replaces old SharingPermission)
-        await tx.datasetAccess.create({
-          data: {
-            datasetId: req2.datasetId,
-            ownerOrgId: organizationId,
-            granteeOrgId: req2.targetOrganizationId ?? null,
-            granteeUserId: req2.targetUserId ?? null,
-            level: req2.level,
-            fieldScope: req2.fieldScope,
-            rowFilter: req2.rowFilter,
-            status: "active",
-            sourceRequestId: req2.id,
-          },
-        });
-      }
+
+      const ownerOrgId = existing.shareType === 'request' ? organizationId : existing.organizationId;
+      const granteeOrgId = existing.shareType === 'request' ? existing.organizationId : existing.targetOrganizationId;
+      const granteeUserId = existing.shareType === 'request' ? null : existing.targetUserId;
+
+      await tx.datasetAccess.create({
+        data: {
+          datasetId: req2.datasetId!,
+          ownerOrgId,
+          granteeOrgId: granteeOrgId || null,
+          granteeUserId: granteeUserId || null,
+          level: req2.level,
+          fieldScope: req2.fieldScope,
+          rowFilter: req2.rowFilter,
+          status: "active",
+          sourceRequestId: req2.id,
+        },
+      });
       return req2;
     });
 

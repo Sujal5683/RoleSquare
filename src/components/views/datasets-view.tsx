@@ -89,6 +89,7 @@ function formatDate(iso: string | null | undefined): string {
 }
 
 import { useActiveOrg } from "@/hooks/use-active-org";
+import { NewShareRequestDialog } from "@/components/sharing/new-share-request-dialog";
 
 // ── Component ────────────────────────────────────────────────────────────
 
@@ -102,6 +103,7 @@ export function DatasetsView() {
   const [datasetFilter, setDatasetFilter] = useState<"all" | "mine" | "shared">("all");
   const [createOpen, setCreateOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<DatasetDTO | null>(null);
+  const [shareTarget, setShareTarget] = useState<DatasetDTO | null>(null);
 
   // ── Queries ────────────────────────────────────────────────────────────
   const {
@@ -184,10 +186,7 @@ export function DatasetsView() {
   const sharedCount = useMemo(() => (datasets ?? []).filter((d) => d.isShared).length, [datasets]);
 
   const handleShare = (d: DatasetDTO) => {
-    toast.info("Share link copied", {
-      description: `Dataset "${d.name}" — open the Sharing Center to invite organizations.`,
-    });
-    setView("sharing");
+    setShareTarget(d);
   };
 
   return (
@@ -327,50 +326,61 @@ export function DatasetsView() {
                     )}
                   </div>
                 </div>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8 shrink-0"
-                      aria-label="Dataset actions"
-                    >
-                      <MoreHorizontal className="h-4 w-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-48">
-                    <DropdownMenuItem
-                      onClick={() =>
-                        exportMutation.mutate({ id: d.id, format: "csv" })
-                      }
-                      disabled={exportMutation.isPending}
-                    >
-                      <FileDown className="mr-2 h-4 w-4" />
-                      Export CSV
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      onClick={() =>
-                        exportMutation.mutate({ id: d.id, format: "json" })
-                      }
-                      disabled={exportMutation.isPending}
-                    >
-                      <FileJson className="mr-2 h-4 w-4" />
-                      Export JSON
-                    </DropdownMenuItem>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={() => handleShare(d)}>
-                      <Share2 className="mr-2 h-4 w-4" />
-                      Share
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      className="text-destructive focus:text-destructive"
-                      onClick={() => setDeleteTarget(d)}
-                    >
-                      <Trash2 className="mr-2 h-4 w-4" />
-                      Delete
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
+                <div className="flex items-center gap-1">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 shrink-0"
+                    aria-label="Share dataset"
+                    onClick={() => handleShare(d)}
+                  >
+                    <Share2 className="h-4 w-4" />
+                  </Button>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 shrink-0"
+                        aria-label="Dataset actions"
+                      >
+                        <MoreHorizontal className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-48">
+                      <DropdownMenuItem
+                        onClick={() =>
+                          exportMutation.mutate({ id: d.id, format: "csv" })
+                        }
+                        disabled={exportMutation.isPending}
+                      >
+                        <FileDown className="mr-2 h-4 w-4" />
+                        Export CSV
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() =>
+                          exportMutation.mutate({ id: d.id, format: "json" })
+                        }
+                        disabled={exportMutation.isPending}
+                      >
+                        <FileJson className="mr-2 h-4 w-4" />
+                        Export JSON
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem onClick={() => handleShare(d)}>
+                        <Share2 className="mr-2 h-4 w-4" />
+                        Share
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        className="text-destructive focus:text-destructive"
+                        onClick={() => setDeleteTarget(d)}
+                      >
+                        <Trash2 className="mr-2 h-4 w-4" />
+                        Delete
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
               </div>
 
               {/* Description */}
@@ -462,6 +472,14 @@ export function DatasetsView() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      
+      <NewShareRequestDialog
+        open={!!shareTarget}
+        onOpenChange={(open) => {
+          if (!open) setShareTarget(null);
+        }}
+        dataset={shareTarget}
+      />
     </div>
   );
 }
