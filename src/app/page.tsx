@@ -34,7 +34,6 @@ export default function Home() {
       {view === "usage" && <UsageView />}
       {view === "organizations" && <OrganizationsView />}
       {view === "members" && <MembersView />}
-      {view === "invitations" && <InvitationsView />}
       {view === "sharing" && <SharingView />}
       {view === "audit" && <AuditView />}
       {view === "settings" && <SettingsView />}

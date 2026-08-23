@@ -72,14 +72,27 @@ export async function PATCH(
     const access = await verifyOrgAccess(id, "admin");
     if (access.error || !access.user) return access.error;
     const { user } = access;
-
+    
     const body = await req.json().catch(() => ({}));
-    const data: { name?: string; plan?: string } = {};
+    const data: { name?: string; plan?: string; slug?: string } = {};
     if (typeof body?.name === "string" && body.name.trim()) {
       data.name = body.name.trim();
     }
     if (typeof body?.plan === "string" && body.plan.trim()) {
       data.plan = body.plan.trim();
+    }
+    if (typeof body?.slug === "string" && body.slug.trim()) {
+      const baseSlug = body.slug.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+      let slug = baseSlug;
+      let attempt = 0;
+      // Ensure the slug isn't taken by another organization
+      while (true) {
+        const existing = await db.organization.findUnique({ where: { slug } });
+        if (!existing || existing.id === id) break;
+        attempt++;
+        slug = `${baseSlug}-${attempt}`;
+      }
+      data.slug = slug;
     }
 
     const before = await db.organization.findUnique({ where: { id } });

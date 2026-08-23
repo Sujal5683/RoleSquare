@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { parseJsonSafely } from "@/lib/utils";
+import { parseJson } from "@/lib/serialize";
 
 export async function POST(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = params;
+    const { id } = await params;
     const { format } = await req.json();
     
     if (format !== "csv" && format !== "json") {
@@ -28,10 +28,10 @@ export async function POST(
 
 export async function GET(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = params;
+    const { id } = await params;
     const { searchParams } = new URL(req.url);
     const format = searchParams.get("format");
 
@@ -61,7 +61,7 @@ export async function GET(
       for (const field of fields) {
         const val = r.values.find((v) => v.fieldId === field.id);
         if (val) {
-          const parsedVal = parseJsonSafely(val.value);
+          const parsedVal = parseJson(val.value as any, null);
           row[field.name] = parsedVal !== null ? parsedVal : val.value;
         } else {
           row[field.name] = null;

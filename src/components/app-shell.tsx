@@ -81,7 +81,6 @@ const NAV_ITEMS: NavItem[] = [
   { id: "sharing", label: "Sharing Center", icon: Share2, group: "Governance" },
   { id: "organizations", label: "Organizations", icon: Building2, group: "Governance" },
   { id: "members", label: "Members", icon: Users, group: "Governance" },
-  { id: "invitations", label: "Invitations", icon: MailOpen, group: "Governance" },
   { id: "audit", label: "Audit Logs", icon: ShieldCheck, group: "Governance" },
   { id: "settings", label: "Settings", icon: Settings, group: "Account" },
 ];
@@ -105,7 +104,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const [orgs, setOrgs] = useState<
     { id: string; name: string; slug: string; plan: string; role: string }[]
   >([]);
-  const [activeOrgId, setActiveOrgId] = useState<string | null>(null);
+  const activeOrgId = useAppStore((s) => s.selectedOrganizationId);
+  const setActiveOrgId = useAppStore((s) => s.setOrganization);
 
   useEffect(() => {
     api
@@ -133,13 +133,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           avatarUrl: data.user.avatarUrl,
         });
         setOrgs(data.organizations);
-        setActiveOrgId(data.organizations[0]?.id ?? null);
+        if (!activeOrgId && data.organizations.length > 0) {
+          setActiveOrgId(data.organizations[0].id);
+        }
       })
       .catch(() => {
         // api-client will handle 401→/login redirect automatically
       })
       .finally(() => setSessionLoading(false));
-  }, []);
+  }, [activeOrgId, setActiveOrgId]);
 
   async function handleSignOut() {
     await supabase.auth.signOut();

@@ -336,7 +336,7 @@ export function CommandPalette() {
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="max-w-2xl p-0 overflow-hidden gap-0">
+      <DialogContent className="max-w-[calc(100%-2rem)] sm:max-w-2xl p-0 overflow-hidden gap-0">
         <DialogHeader className="sr-only">
           <DialogTitle>Command palette</DialogTitle>
         </DialogHeader>
@@ -386,7 +386,7 @@ export function CommandPalette() {
                         key={s.id}
                         value={`source ${s.name} ${s.description || ""}`}
                         onSelect={() => {
-                          openSource(s.id);
+                          openSource(s.id, s.name);
                           setOpen(false);
                         }}
                         className="flex cursor-pointer items-center gap-3 px-3 py-2.5 aria-selected:bg-accent"
@@ -416,7 +416,7 @@ export function CommandPalette() {
                         key={d.id}
                         value={`dataset ${d.name} ${d.description || ""}`}
                         onSelect={() => {
-                          openDataset(d.id);
+                          openDataset(d.id, d.name);
                           setOpen(false);
                         }}
                         className="flex cursor-pointer items-center gap-3 px-3 py-2.5 aria-selected:bg-accent"
@@ -446,7 +446,7 @@ export function CommandPalette() {
                         key={s.id}
                         value={`schema ${s.name} ${s.description || ""}`}
                         onSelect={() => {
-                          openSchema(s.id);
+                          openSchema(s.id, s.name);
                           setOpen(false);
                         }}
                         className="flex cursor-pointer items-center gap-3 px-3 py-2.5 aria-selected:bg-accent"

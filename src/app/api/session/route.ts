@@ -24,3 +24,24 @@ export async function GET() {
     );
   }
 }
+
+export async function PATCH(req: Request) {
+  try {
+    const user = await getCurrentUser();
+    const body = await req.json().catch(() => ({}));
+    if (typeof body.name === "string") {
+      const { db } = await import("@/lib/db");
+      await db.user.update({
+        where: { id: user.id },
+        data: { name: body.name.trim() },
+      });
+      return NextResponse.json({ success: true });
+    }
+    return NextResponse.json({ error: "Invalid name" }, { status: 400 });
+  } catch (err) {
+    return NextResponse.json(
+      { error: err instanceof Error ? err.message : "Failed to update profile" },
+      { status: 500 }
+    );
+  }
+}

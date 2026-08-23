@@ -51,6 +51,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Badge } from "@/components/ui/badge";
 import {
   Building2,
   Plus,
@@ -113,11 +114,14 @@ export function OrganizationsView() {
   const queryClient = useQueryClient();
   const setOrganization = useAppStore((s) => s.setOrganization);
   const setView = useAppStore((s) => s.setView);
+  const selectedOrganizationId = useAppStore((s) => s.selectedOrganizationId);
 
   const [search, setSearch] = useState("");
   const [createOpen, setCreateOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<OrganizationDTO | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<OrganizationDTO | null>(null);
+  const [filterRole, setFilterRole] = useState("all");
+  const [filterPlan, setFilterPlan] = useState("all");
 
   // ── Queries ────────────────────────────────────────────────────────────
   const {
@@ -188,15 +192,27 @@ export function OrganizationsView() {
   // ── Derived ────────────────────────────────────────────────────────────
   const filtered = useMemo(() => {
     if (!orgs) return [];
+    let result = orgs;
+
+    if (filterRole !== "all") {
+      result = result.filter((o) => o.userRole === filterRole);
+    }
+    if (filterPlan !== "all") {
+      result = result.filter((o) => o.plan === filterPlan);
+    }
+
     const q = search.trim().toLowerCase();
-    if (!q) return orgs;
-    return orgs.filter(
-      (o) =>
-        o.name.toLowerCase().includes(q) ||
-        o.slug.toLowerCase().includes(q) ||
-        o.plan.toLowerCase().includes(q)
-    );
-  }, [orgs, search]);
+    if (q) {
+      result = result.filter(
+        (o) =>
+          o.name.toLowerCase().includes(q) ||
+          o.slug.toLowerCase().includes(q) ||
+          o.plan.toLowerCase().includes(q)
+      );
+    }
+
+    return result;
+  }, [orgs, search, filterRole, filterPlan]);
 
   const handleOpen = (org: OrganizationDTO) => {
     setOrganization(org.id);
@@ -232,8 +248,8 @@ export function OrganizationsView() {
 
       {/* Search */}
       <Card>
-        <CardContent className="p-4">
-          <div className="relative max-w-md">
+        <CardContent className="p-4 flex flex-col sm:flex-row gap-4">
+          <div className="relative flex-1 max-w-md">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
               placeholder="Search by name, slug, or plan…"
@@ -241,6 +257,30 @@ export function OrganizationsView() {
               onChange={(e) => setSearch(e.target.value)}
               className="pl-9"
             />
+          </div>
+          <div className="flex flex-row gap-2">
+            <Select value={filterRole} onValueChange={setFilterRole}>
+              <SelectTrigger className="w-[140px]">
+                <SelectValue placeholder="Role" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Roles</SelectItem>
+                <SelectItem value="owner">Owner</SelectItem>
+                <SelectItem value="admin">Admin</SelectItem>
+                <SelectItem value="member">Member</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={filterPlan} onValueChange={setFilterPlan}>
+              <SelectTrigger className="w-[140px]">
+                <SelectValue placeholder="Plan" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Plans</SelectItem>
+                <SelectItem value="free">Free</SelectItem>
+                <SelectItem value="team">Team</SelectItem>
+                <SelectItem value="enterprise">Enterprise</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
         </CardContent>
       </Card>
@@ -284,7 +324,12 @@ export function OrganizationsView() {
             return (
               <Card
                 key={org.id}
-                className="flex flex-col gap-3 p-4 transition-shadow hover:shadow-md"
+                onClick={() => setOrganization(org.id)}
+                className={`flex flex-col gap-3 p-4 transition-all hover:shadow-md cursor-pointer ${
+                  selectedOrganizationId === org.id
+                    ? "border-primary ring-1 ring-primary shadow-sm"
+                    : ""
+                }`}
               >
                 {/* Header */}
                 <div className="flex items-start justify-between gap-2">
@@ -294,19 +339,32 @@ export function OrganizationsView() {
                     </div>
                     <div className="min-w-0 space-y-1">
                       <button
-                        onClick={() => handleOpen(org)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleOpen(org);
+                        }}
                         className="block text-left text-base font-semibold leading-tight truncate hover:underline"
                         title={org.name}
                       >
                         {org.name}
                       </button>
                       <div className="flex items-center gap-2 flex-wrap">
+                        {selectedOrganizationId === org.id && (
+                          <Badge variant="secondary" className="font-normal text-[10px] px-1.5 py-0 h-5 bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
+                            Active
+                          </Badge>
+                        )}
+                        {org.userRole && org.userRole !== "owner" && (
+                          <Badge variant="outline" className="font-normal text-[10px] px-1.5 py-0 h-5 capitalize">
+                            {org.userRole}
+                          </Badge>
+                        )}
                         <PlanBadge plan={org.plan} />
-                        <code className="text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
+                        <code className="text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
                           {org.slug}
                         </code>
                         {org.userStatus === "invited" && (
-                          <span className="text-xs font-medium text-amber-600 bg-amber-100 dark:text-amber-400 dark:bg-amber-900/30 px-1.5 py-0.5 rounded">
+                          <span className="text-[10px] font-medium text-amber-600 bg-amber-100 dark:text-amber-400 dark:bg-amber-900/30 px-1.5 py-0.5 rounded">
                             Pending Invite
                           </span>
                         )}
@@ -314,8 +372,9 @@ export function OrganizationsView() {
                     </div>
                   </div>
                   {org.userStatus !== "invited" && (
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
+                    <div onClick={(e) => e.stopPropagation()}>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
                         <Button
                           variant="ghost"
                           size="icon"
@@ -344,6 +403,7 @@ export function OrganizationsView() {
                         </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
+                    </div>
                   )}
                 </div>
 
@@ -660,10 +720,11 @@ function EditOrgForm({
 }) {
   const queryClient = useQueryClient();
   const [name, setName] = useState(target.name);
+  const [slug, setSlug] = useState(target.slug);
   const [plan, setPlan] = useState<Plan>(target.plan);
 
   const editMutation = useMutation({
-    mutationFn: (payload: { name?: string; plan?: string }) =>
+    mutationFn: (payload: { name?: string; slug?: string; plan?: string }) =>
       api.patch<OrganizationDTO>(`/api/organizations/${target.id}`, payload),
     onSuccess: (o) => {
       toast.success("Organization updated", { description: o.name });
@@ -679,11 +740,16 @@ function EditOrgForm({
 
   const handleSubmit = () => {
     const trimmed = name.trim();
+    const trimmedSlug = slug.trim();
     if (!trimmed) {
       toast.error("Name is required");
       return;
     }
-    editMutation.mutate({ name: trimmed, plan });
+    if (!trimmedSlug) {
+      toast.error("Slug is required");
+      return;
+    }
+    editMutation.mutate({ name: trimmed, slug: trimmedSlug, plan });
   };
 
   return (
@@ -691,7 +757,7 @@ function EditOrgForm({
       <DialogHeader>
         <DialogTitle>Edit organization</DialogTitle>
         <DialogDescription>
-          Update the name or plan for{" "}
+          Update the name, slug, or plan for{" "}
           <span className="font-medium text-foreground">{target.name}</span>.
         </DialogDescription>
       </DialogHeader>
@@ -705,6 +771,17 @@ function EditOrgForm({
             value={name}
             onChange={(e) => setName(e.target.value)}
             autoFocus
+          />
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="edit-org-slug">
+            Slug <span className="text-destructive">*</span>
+          </Label>
+          <Input
+            id="edit-org-slug"
+            value={slug}
+            onChange={(e) => setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ""))}
+            placeholder="e.g. acme-corp"
           />
         </div>
         <div className="space-y-1.5">

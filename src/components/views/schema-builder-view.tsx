@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { api } from "@/lib/api-client";
@@ -39,6 +39,13 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuSeparator,
+} from "@/components/ui/dropdown-menu";
+import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -68,6 +75,8 @@ import {
   Copy,
   Download,
   Upload,
+  MoreHorizontal,
+  Settings2,
 } from "lucide-react";
 
 // ── Constants ────────────────────────────────────────────────────────────
@@ -182,6 +191,8 @@ export function SchemaBuilderView() {
     selectedSchemaId
   );
   const [createOpen, setCreateOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
   const [templatesOpen, setTemplatesOpen] = useState(false);
   const [newName, setNewName] = useState("");
   const [newDescription, setNewDescription] = useState("");
@@ -223,12 +234,27 @@ export function SchemaBuilderView() {
       setNewName("");
       setNewDescription("");
       // Navigate to the new schema via the store so other views stay in sync.
-      openSchema(schema.id);
+      openSchema(schema.id, schema.name);
       setActiveSchemaId(schema.id);
     },
     onError: (err: unknown) => {
       const msg = err instanceof Error ? err.message : "Failed to create schema";
       toast.error("Create failed", { description: msg });
+    },
+  });
+
+  const deleteSchemaMutation = useMutation({
+    mutationFn: () => api.delete(`/api/schemas/${activeSchemaId}`),
+    onSuccess: () => {
+      toast.success("Schema deleted");
+      queryClient.invalidateQueries({ queryKey: ["schemas"] });
+      setDeleteOpen(false);
+      setActiveSchemaId(null);
+      openSchema(null);
+    },
+    onError: (err: unknown) => {
+      const msg = err instanceof Error ? err.message : "Failed to delete schema";
+      toast.error("Delete failed", { description: msg });
     },
   });
 
@@ -384,6 +410,31 @@ export function SchemaBuilderView() {
     }
   };
 
+  // Debounced updates for inline edits
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const [draftMetadata, setDraftMetadata] = useState<{name: string, description: string, promptTemplate: string}>({
+    name: "", description: "", promptTemplate: ""
+  });
+
+  // Sync draft when activeSchema changes (from network)
+  useEffect(() => {
+    if (activeSchema) {
+      setDraftMetadata({
+        name: activeSchema.name || "",
+        description: activeSchema.description || "",
+        promptTemplate: activeSchema.promptTemplate || "",
+      });
+    }
+  }, [activeSchema]);
+
+  const handleUpdateSchema = (updates: Partial<typeof draftMetadata>) => {
+    setDraftMetadata(prev => ({ ...prev, ...updates }));
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    timeoutRef.current = setTimeout(() => {
+      updateSchemaMutation.mutate(updates);
+    }, 1000);
+  };
+
   // ── Render ─────────────────────────────────────────────────────────────
   return (
     <div className="space-y-4">
@@ -442,107 +493,120 @@ export function SchemaBuilderView() {
               </Button>
               {activeSchemaId && (
                 <>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      const name = window.prompt(
-                        "Cloned schema name:",
-                        `${activeSchema?.name ?? "Schema"} (copy)`
-                      );
-                      if (name && activeSchemaId) {
-                        api.post<SchemaDTO>(`/api/schemas/${activeSchemaId}/clone`, { name })
-                          .then((cloned) => {
-                            toast.success("Schema cloned", {
-                              description: `"${name}" created with ${cloned.fields?.length ?? 0} fields.`,
-                            });
-                            queryClient.invalidateQueries({ queryKey: ["schemas"] });
-                            setActiveSchemaId(cloned.id);
-                          })
-                          .catch(() => toast.error("Clone failed"));
-                      }
-                    }}
-                    title="Clone this schema with all its fields"
-                  >
-                    <Copy className="mr-2 h-3.5 w-3.5" />
-                    Clone
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      if (!activeSchema) return;
-                      const json = JSON.stringify(activeSchema, null, 2);
-                      const blob = new Blob([json], { type: "application/json" });
-                      const url = URL.createObjectURL(blob);
-                      const a = document.createElement("a");
-                      a.href = url;
-                      a.download = `schema-${activeSchema.name.toLowerCase().replace(/\s+/g, "-")}.json`;
-                      document.body.appendChild(a);
-                      a.click();
-                      document.body.removeChild(a);
-                      URL.revokeObjectURL(url);
-                    }}
-                    title="Export schema to JSON"
-                  >
-                    <Download className="mr-2 h-3.5 w-3.5" />
-                    Export
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      const input = document.createElement("input");
-                      input.type = "file";
-                      input.accept = ".json";
-                      input.onchange = (e) => {
-                        const file = (e.target as HTMLInputElement).files?.[0];
-                        if (!file) return;
-                        const reader = new FileReader();
-                        reader.onload = async (event) => {
-                          try {
-                            const data = JSON.parse(event.target?.result as string);
-                            // Basic validation
-                            if (!data.name || !Array.isArray(data.fields)) {
-                              throw new Error("Invalid schema JSON format");
-                            }
-                            
-                            // Create schema
-                            const created = await api.post<SchemaDTO>("/api/schemas", {
-                              name: `${data.name} (Imported)`,
-                              description: data.description,
-                            });
-                            
-                            // Add fields sequentially
-                            for (const field of data.fields) {
-                              await api.post(`/api/schemas/${created.id}/fields`, {
-                                name: field.name,
-                                type: field.type,
-                                description: field.description,
-                                instructions: field.instructions,
-                                required: field.required,
-                                options: field.options,
-                                validation: field.validation,
-                                confidenceThreshold: field.confidenceThreshold
-                              });
-                            }
-                            
-                            toast.success("Schema imported successfully");
-                            queryClient.invalidateQueries({ queryKey: ["schemas"] });
-                            setActiveSchemaId(created.id);
-                          } catch (err: any) {
-                            toast.error("Import failed", { description: err.message });
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="outline" size="sm" className="h-8 w-8 p-0">
+                        <MoreHorizontal className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-48">
+                      <DropdownMenuItem
+                        onClick={() => {
+                          setNewName(activeSchema?.name || "");
+                          setNewDescription(activeSchema?.description || "");
+                          setEditOpen(true);
+                        }}
+                      >
+                        <Settings2 className="mr-2 h-4 w-4" />
+                        Edit details
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() => {
+                          const name = window.prompt(
+                            "Cloned schema name:",
+                            `${activeSchema?.name ?? "Schema"} (copy)`
+                          );
+                          if (name && activeSchemaId) {
+                            api.post<SchemaDTO>(`/api/schemas/${activeSchemaId}/clone`, { name })
+                              .then((cloned) => {
+                                toast.success("Schema cloned", {
+                                  description: `"${name}" created with ${cloned.fields?.length ?? 0} fields.`,
+                                });
+                                queryClient.invalidateQueries({ queryKey: ["schemas"] });
+                                setActiveSchemaId(cloned.id);
+                              })
+                              .catch(() => toast.error("Clone failed"));
                           }
-                        };
-                        reader.readAsText(file);
-                      };
-                      input.click();
-                    }}
-                    title="Import schema from JSON"
-                  >
-                    <Upload className="mr-2 h-3.5 w-3.5" />
-                    Import
-                  </Button>
+                        }}
+                      >
+                        <Copy className="mr-2 h-4 w-4" />
+                        Clone schema
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem
+                        onClick={() => {
+                          if (!activeSchema) return;
+                          const json = JSON.stringify(activeSchema, null, 2);
+                          const blob = new Blob([json], { type: "application/json" });
+                          const url = URL.createObjectURL(blob);
+                          const a = document.createElement("a");
+                          a.href = url;
+                          a.download = `schema-${activeSchema.name.toLowerCase().replace(/\s+/g, "-")}.json`;
+                          document.body.appendChild(a);
+                          a.click();
+                          document.body.removeChild(a);
+                          URL.revokeObjectURL(url);
+                        }}
+                      >
+                        <Download className="mr-2 h-4 w-4" />
+                        Export JSON
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() => {
+                          const input = document.createElement("input");
+                          input.type = "file";
+                          input.accept = ".json";
+                          input.onchange = (e) => {
+                            const file = (e.target as HTMLInputElement).files?.[0];
+                            if (!file) return;
+                            const reader = new FileReader();
+                            reader.onload = async (event) => {
+                              try {
+                                const data = JSON.parse(event.target?.result as string);
+                                if (!data.name || !Array.isArray(data.fields)) {
+                                  throw new Error("Invalid schema JSON format");
+                                }
+                                const created = await api.post<SchemaDTO>("/api/schemas", {
+                                  name: `${data.name} (Imported)`,
+                                  description: data.description,
+                                });
+                                for (const field of data.fields) {
+                                  await api.post(`/api/schemas/${created.id}/fields`, {
+                                    name: field.name,
+                                    type: field.type,
+                                    description: field.description,
+                                    instructions: field.instructions,
+                                    required: field.required,
+                                    options: field.options,
+                                    validation: field.validation,
+                                    confidenceThreshold: field.confidenceThreshold
+                                  });
+                                }
+                                toast.success("Schema imported successfully");
+                                queryClient.invalidateQueries({ queryKey: ["schemas"] });
+                                setActiveSchemaId(created.id);
+                              } catch (err: any) {
+                                toast.error("Import failed", { description: err.message });
+                              }
+                            };
+                            reader.readAsText(file);
+                          };
+                          input.click();
+                        }}
+                      >
+                        <Upload className="mr-2 h-4 w-4" />
+                        Import JSON
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem
+                        className="text-destructive focus:bg-destructive focus:text-destructive-foreground"
+                        onClick={() => setDeleteOpen(true)}
+                      >
+                        <Trash2 className="mr-2 h-4 w-4" />
+                        Delete schema
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </>
               )}
             </div>
@@ -590,9 +654,9 @@ export function SchemaBuilderView() {
                     <Label htmlFor="schema-name">Name</Label>
                     <Input
                       id="schema-name"
-                      value={activeSchema.name}
+                      value={draftMetadata.name}
                       onChange={(e) =>
-                        updateSchemaMutation.mutate({ name: e.target.value })
+                        handleUpdateSchema({ name: e.target.value })
                       }
                       placeholder="Schema name"
                     />
@@ -608,9 +672,9 @@ export function SchemaBuilderView() {
                   <Label htmlFor="schema-desc">Description</Label>
                   <Input
                     id="schema-desc"
-                    value={activeSchema.description ?? ""}
+                    value={draftMetadata.description}
                     onChange={(e) =>
-                      updateSchemaMutation.mutate({
+                      handleUpdateSchema({
                         description: e.target.value,
                       })
                     }
@@ -622,16 +686,16 @@ export function SchemaBuilderView() {
                   <Textarea
                     id="schema-prompt"
                     rows={3}
-                    value={activeSchema.promptTemplate ?? ""}
+                    value={draftMetadata.promptTemplate}
                     onChange={(e) =>
-                      updateSchemaMutation.mutate({
+                      handleUpdateSchema({
                         promptTemplate: e.target.value,
                       })
                     }
                     placeholder="Optional system-prompt override sent to the LLM."
                   />
                   <p className="text-[10px] text-muted-foreground">
-                    Saved on blur via PATCH (bumps version).
+                    Auto-saves and bumps version.
                   </p>
                 </div>
               </CardContent>
@@ -913,6 +977,96 @@ export function SchemaBuilderView() {
         </DialogContent>
       </Dialog>
 
+      {/* Edit schema dialog */}
+      <Dialog open={editOpen} onOpenChange={setEditOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Edit schema details</DialogTitle>
+            <DialogDescription>
+              Update the name or description of this schema.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="edit-schema-name">Schema Name</Label>
+              <Input
+                id="edit-schema-name"
+                placeholder="e.g. Invoice Extractions"
+                value={newName}
+                onChange={(e) => setNewName(e.target.value)}
+                autoFocus
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-schema-desc">Description (optional)</Label>
+              <Input
+                id="edit-schema-desc"
+                placeholder="Brief summary of what this schema extracts"
+                value={newDescription}
+                onChange={(e) => setNewDescription(e.target.value)}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setEditOpen(false)}
+              disabled={updateSchemaMutation.isPending}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={() => {
+                updateSchemaMutation.mutate({
+                  name: newName,
+                  description: newDescription || undefined,
+                });
+                setEditOpen(false);
+              }}
+              disabled={!newName.trim() || updateSchemaMutation.isPending}
+            >
+              {updateSchemaMutation.isPending ? (
+                <RefreshCw className="mr-2 h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <Settings2 className="mr-2 h-3.5 w-3.5" />
+              )}
+              Save changes
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete schema confirmation */}
+      <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete schema?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete the schema{" "}
+              <span className="font-medium text-foreground">
+                {activeSchema?.name}
+              </span>
+              . Any datasets using this schema will lose their field definitions.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleteSchemaMutation.isPending}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={deleteSchemaMutation.isPending}
+              onClick={(e) => {
+                e.preventDefault();
+                deleteSchemaMutation.mutate();
+              }}
+            >
+              {deleteSchemaMutation.isPending ? "Deleting…" : "Delete schema"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       {/* Field editor dialog */}
       <FieldEditorDialog
         key={fieldDialogNonce}
@@ -1158,7 +1312,7 @@ function FieldEditorDialog({
                   <Input 
                     type={draft.type === "number" ? "number" : "date"}
                     className="h-8 text-xs" 
-                    value={(draft.validation?.min as string) || ""}
+                    value={draft.validation?.min?.toString() || ""}
                     onChange={(e) => setDraft(d => ({ ...d, validation: { ...d.validation, min: e.target.value ? Number(e.target.value) : undefined } }))} 
                   />
                 </div>
@@ -1167,7 +1321,7 @@ function FieldEditorDialog({
                   <Input 
                     type={draft.type === "number" ? "number" : "date"}
                     className="h-8 text-xs" 
-                    value={(draft.validation?.max as string) || ""}
+                    value={draft.validation?.max?.toString() || ""}
                     onChange={(e) => setDraft(d => ({ ...d, validation: { ...d.validation, max: e.target.value ? Number(e.target.value) : undefined } }))} 
                   />
                 </div>

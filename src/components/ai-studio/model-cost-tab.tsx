@@ -161,7 +161,7 @@ export function ModelCostTab() {
               No AI outputs recorded yet. Run an extraction to see cost data.
             </p>
           ) : (
-            <div className="overflow-x-auto">
+            <div className="max-h-[40vh] overflow-y-auto">
               <table className="w-full text-xs">
                 <thead>
                   <tr className="border-b text-[10px] text-muted-foreground uppercase tracking-wide">

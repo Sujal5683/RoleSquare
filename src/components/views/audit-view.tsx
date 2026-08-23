@@ -467,16 +467,22 @@ export function AuditView() {
                               </p>
                             </div>
                           </div>
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-2 max-w-full">
                             <Badge
                               variant="outline"
-                              className="font-normal capitalize"
+                              className="font-normal capitalize shrink-0"
                             >
                               {log.entity}
                             </Badge>
-                            <code className="text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
-                              {truncateId(log.entityId, 10)}
-                            </code>
+                            {log.entityName ? (
+                              <span className="text-sm font-medium truncate" title={log.entityName}>
+                                {log.entityName}
+                              </span>
+                            ) : (
+                              <code className="text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded truncate">
+                                {truncateId(log.entityId, 10)}
+                              </code>
+                            )}
                           </div>
                         </div>
 

@@ -246,7 +246,7 @@ export function SourceBuilderView() {
         filterType: r.filterType,
         operator: r.operator,
         value: ruleValueToString(r.value),
-        metadata: r.metadata ? JSON.parse(r.metadata) : undefined,
+        metadata: r.metadata ?? undefined,
       })
     );
     let ruleOperator: "AND" | "OR" = "AND";

@@ -102,29 +102,29 @@ export function SharingDetailsSheet({ open, onOpenChange, data, type }: SharingD
             <CardContent className="space-y-4 text-sm">
               {isRequest ? (
                 <>
-                  <div className="grid grid-cols-3 gap-2">
-                    <span className="text-muted-foreground">Requester:</span>
-                    <span className="col-span-2 font-medium">
+                  <div className="flex flex-col sm:flex-row gap-1 sm:gap-4">
+                    <span className="text-muted-foreground sm:w-1/3">Requester:</span>
+                    <span className="font-medium sm:w-2/3 break-words">
                       {req.requesterName || req.requestedBy}
-                      {req.requesterEmail && <span className="block text-xs font-normal text-muted-foreground">{req.requesterEmail}</span>}
+                      {req.requesterEmail && <span className="block text-xs font-normal text-muted-foreground mt-0.5">{req.requesterEmail}</span>}
                     </span>
                   </div>
-                  <div className="grid grid-cols-3 gap-2">
-                    <span className="text-muted-foreground">Target:</span>
-                    <span className="col-span-2 font-medium">
+                  <div className="flex flex-col sm:flex-row gap-1 sm:gap-4">
+                    <span className="text-muted-foreground sm:w-1/3">Target:</span>
+                    <span className="font-medium sm:w-2/3 break-words">
                       {req.targetOrganizationName || req.targetOrganizationId || req.targetEmail || req.targetUserId || "Unknown"}
                     </span>
                   </div>
                 </>
               ) : (
                 <>
-                  <div className="grid grid-cols-3 gap-2">
-                    <span className="text-muted-foreground">Owner Org:</span>
-                    <span className="col-span-2 font-medium">{access.ownerOrgName || access.ownerOrgId}</span>
+                  <div className="flex flex-col sm:flex-row gap-1 sm:gap-4">
+                    <span className="text-muted-foreground sm:w-1/3">Owner Org:</span>
+                    <span className="font-medium sm:w-2/3 break-words">{access.ownerOrgName || access.ownerOrgId}</span>
                   </div>
-                  <div className="grid grid-cols-3 gap-2">
-                    <span className="text-muted-foreground">Grantee:</span>
-                    <span className="col-span-2 font-medium">
+                  <div className="flex flex-col sm:flex-row gap-1 sm:gap-4">
+                    <span className="text-muted-foreground sm:w-1/3">Grantee:</span>
+                    <span className="font-medium sm:w-2/3 break-words">
                       {access.granteeOrgId
                         ? access.granteeOrgName || "Unknown Org"
                         : access.granteeUserName || access.granteeUserEmail || "Unknown User"}

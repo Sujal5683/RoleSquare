@@ -32,13 +32,13 @@ interface AppState {
   setOrganization: (id: string) => void;
 
   selectedSourceId: string | null;
-  openSource: (id: string | null) => void;
+  openSource: (id: string | null, name?: string) => void;
 
   selectedDatasetId: string | null;
-  openDataset: (id: string | null) => void;
+  openDataset: (id: string | null, name?: string) => void;
 
   selectedSchemaId: string | null;
-  openSchema: (id: string | null) => void;
+  openSchema: (id: string | null, name?: string) => void;
 
   selectedRecordId: string | null;
   openRecord: (id: string | null) => void;
@@ -83,7 +83,7 @@ export const useAppStore = create<AppState>()(
       setOrganization: (id) => set({ selectedOrganizationId: id }),
 
       selectedSourceId: null,
-      openSource: (id) =>
+      openSource: (id, name) =>
         set((s) => ({
           selectedSourceId: id,
           view: "source-builder",
@@ -92,14 +92,14 @@ export const useAppStore = create<AppState>()(
                 recentItems: pushRecent(s.recentItems, {
                   id,
                   type: "source" as const,
-                  name: id, // name will be enriched by the component that reads it
+                  name: name || id,
                 }),
               }
             : {}),
         })),
 
       selectedDatasetId: null,
-      openDataset: (id) =>
+      openDataset: (id, name) =>
         set((s) => ({
           selectedDatasetId: id,
           view: "dataset-detail",
@@ -108,14 +108,14 @@ export const useAppStore = create<AppState>()(
                 recentItems: pushRecent(s.recentItems, {
                   id,
                   type: "dataset" as const,
-                  name: id,
+                  name: name || id,
                 }),
               }
             : {}),
         })),
 
       selectedSchemaId: null,
-      openSchema: (id) =>
+      openSchema: (id, name) =>
         set((s) => ({
           selectedSchemaId: id,
           view: "schema-builder",
@@ -124,7 +124,7 @@ export const useAppStore = create<AppState>()(
                 recentItems: pushRecent(s.recentItems, {
                   id,
                   type: "schema" as const,
-                  name: id,
+                  name: name || id,
                 }),
               }
             : {}),

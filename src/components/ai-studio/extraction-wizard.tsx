@@ -146,7 +146,7 @@ export function ExtractionWizard() {
             <CardDescription>Choose the raw dataset containing the text or emails you want to extract structured data from.</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="grid gap-3 sm:grid-cols-2">
+            <div className="grid gap-3 sm:grid-cols-2 max-h-[40vh] overflow-y-auto pr-2">
               {datasets?.map((d) => (
                 <div
                   key={d.id}
@@ -182,7 +182,7 @@ export function ExtractionWizard() {
             <CardDescription>Choose the structure you want the AI to extract into.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
-            <div className="grid gap-3 sm:grid-cols-2">
+            <div className="grid gap-3 sm:grid-cols-2 max-h-[40vh] overflow-y-auto pr-2">
               {schemas?.map((s) => (
                 <div
                   key={s.id}

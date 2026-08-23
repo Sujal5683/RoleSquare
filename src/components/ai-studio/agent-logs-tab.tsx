@@ -169,7 +169,7 @@ export function AgentLogsTab({ jobId }: AgentLogsTabProps) {
       {/* Log terminal */}
       <div
         ref={scrollRef}
-        className="flex-1 overflow-y-auto rounded-lg border bg-neutral-950 dark:bg-neutral-900 p-3 font-mono text-[11px] leading-relaxed space-y-0.5"
+        className="flex-1 overflow-y-auto rounded-lg border bg-muted/40 p-3 font-mono text-[11px] leading-relaxed space-y-0.5"
       >
         {isLoading ? (
           <div className="flex items-center justify-center h-24">
@@ -177,14 +177,14 @@ export function AgentLogsTab({ jobId }: AgentLogsTabProps) {
           </div>
         ) : logs.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-24 gap-2">
-            <Terminal className="h-4 w-4 text-neutral-500" />
-            <p className="text-neutral-500 text-xs">No log entries match the current filters.</p>
+            <Terminal className="h-4 w-4 text-muted-foreground" />
+            <p className="text-muted-foreground text-xs">No log entries match the current filters.</p>
           </div>
         ) : (
           logs.map((log) => (
-            <div key={log.id} className="flex gap-2 hover:bg-white/5 rounded px-1 py-0.5 transition-colors">
+            <div key={log.id} className="flex gap-2 hover:bg-muted/60 rounded px-1 py-0.5 transition-colors">
               {/* Timestamp */}
-              <span className="text-neutral-500 shrink-0 w-20">{formatTime(log.createdAt)}</span>
+              <span className="text-muted-foreground shrink-0 w-20">{formatTime(log.createdAt)}</span>
 
               {/* Agent */}
               <span className={`shrink-0 w-16 font-semibold uppercase text-[10px] tracking-wide ${agentColor(log.agentKey)}`}>
@@ -197,11 +197,11 @@ export function AgentLogsTab({ jobId }: AgentLogsTabProps) {
               </span>
 
               {/* Message */}
-              <span className="text-neutral-100 break-all flex-1">{log.message}</span>
+              <span className="text-foreground break-all flex-1">{log.message}</span>
 
               {/* Metadata */}
               {log.metadata && Object.keys(log.metadata).length > 0 && (
-                <span className="text-neutral-500 break-all max-w-[200px] truncate" title={JSON.stringify(log.metadata)}>
+                <span className="text-muted-foreground break-all max-w-[200px] truncate" title={JSON.stringify(log.metadata)}>
                   {JSON.stringify(log.metadata)}
                 </span>
               )}

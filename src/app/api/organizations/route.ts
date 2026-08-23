@@ -24,6 +24,7 @@ export async function GET() {
         return {
           ...serializeOrganization(o, o._count?.members ?? 0),
           userStatus: mem?.status,
+          userRole: mem?.role,
         };
       })
     );

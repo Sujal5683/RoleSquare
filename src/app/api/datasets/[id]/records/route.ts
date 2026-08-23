@@ -63,7 +63,24 @@ export async function GET(
     ]);
 
     const fieldsMap = fieldsByIdMap(dataset?.schema?.fields ?? []);
-    const enriched = attachFieldsToRecords(records, fieldsMap);
+    let enriched = attachFieldsToRecords(records, fieldsMap);
+
+    const emailIds = enriched.map(r => r.sourceEmailId).filter(Boolean) as string[];
+    if (emailIds.length > 0) {
+      const emails = await db.email.findMany({
+        where: { id: { in: emailIds } },
+        include: { source: { select: { name: true } } },
+      });
+      const emailMap = new Map(emails.map(e => [e.id, { subject: e.subject, sourceName: e.source.name }]));
+      enriched = enriched.map(r => {
+        if (r.sourceEmailId && emailMap.has(r.sourceEmailId)) {
+          const info = emailMap.get(r.sourceEmailId)!;
+          r.sourceName = info.sourceName;
+          r.sourceSubject = info.subject;
+        }
+        return r;
+      });
+    }
 
     return NextResponse.json({
       data: enriched.map(serializeDatasetRecord),

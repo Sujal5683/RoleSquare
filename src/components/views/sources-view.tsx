@@ -587,7 +587,7 @@ export function SourcesView() {
                             </div>
                             <div className="min-w-0">
                               <button
-                                onClick={() => openSource(s.id)}
+                                onClick={() => openSource(s.id, s.name)}
                                 className="block text-left text-sm font-medium truncate hover:underline"
                                 title={s.name}
                               >
@@ -720,7 +720,7 @@ export function SourcesView() {
                                   View runs
                                 </DropdownMenuItem>
                                 <DropdownMenuItem
-                                  onClick={() => openSource(s.id)}
+                                  onClick={() => openSource(s.id, s.name)}
                                 >
                                   <Pencil className="mr-2 h-4 w-4" />
                                   Edit

@@ -243,6 +243,8 @@ export function serializeDatasetRecord(r: any): DatasetRecordDTO {
     id: r.id,
     datasetId: r.datasetId,
     sourceEmailId: r.sourceEmailId ?? null,
+    sourceName: r.sourceName ?? null,
+    sourceSubject: r.sourceSubject ?? null,
     status: r.status,
     confidence: r.confidence,
     createdAt:
@@ -360,21 +362,23 @@ export function serializeSharingPermission(
 }
 
 export function serializeAuditLog(a: any): AuditLogDTO {
+  const beforeObj = a.before ? parseJson<Record<string, unknown> | null>(a.before, null) : null;
+  const afterObj = a.after ? parseJson<Record<string, unknown> | null>(a.after, null) : null;
+  
+  const entityName = (afterObj?.name as string) || (beforeObj?.name as string) || (afterObj?.title as string) || (beforeObj?.title as string) || null;
+
   return {
     id: a.id,
     organizationId: a.organizationId,
     actorType: a.actorType,
     actorId: a.actorId ?? null,
-    actorName: a.actor?.name ?? null,
+    actorName: a.actor?.name || a.actor?.email || null,
     action: a.action,
     entity: a.entity,
     entityId: a.entityId ?? null,
-    before: a.before
-      ? parseJson<Record<string, unknown> | null>(a.before, null)
-      : null,
-    after: a.after
-      ? parseJson<Record<string, unknown> | null>(a.after, null)
-      : null,
+    entityName: entityName,
+    before: beforeObj,
+    after: afterObj,
     reason: a.reason ?? null,
     createdAt:
       a.createdAt instanceof Date ? a.createdAt.toISOString() : a.createdAt,

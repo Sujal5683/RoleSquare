@@ -74,6 +74,7 @@ export interface OrganizationDTO {
   createdAt: string;
   memberCount?: number;
   userStatus?: string;
+  userRole?: string;
 }
 
 export interface MemberDTO {
@@ -147,6 +148,7 @@ export interface SourceDTO {
   scheduleMode: string;
   scheduleExpr: string;
   maxEmailsPerScan: number;
+  config?: string | null;
   lastRunAt: string | null;
   nextRunAt: string | null;
   rules?: SourceRuleDTO[];
@@ -167,6 +169,7 @@ export interface SourceRunDTO {
 
 export interface DatasetValueDTO {
   id: string;
+  recordId?: string;
   fieldId: string;
   fieldName?: string;
   fieldType?: FieldType;
@@ -188,6 +191,8 @@ export interface DatasetRecordDTO {
   id: string;
   datasetId: string;
   sourceEmailId: string | null;
+  sourceName?: string | null;
+  sourceSubject?: string | null;
   status: RecordStatus;
   confidence: number;
   createdAt: string;
@@ -327,6 +332,7 @@ export interface AuditLogDTO {
   action: string;
   entity: string;
   entityId: string | null;
+  entityName?: string | null;
   before: Record<string, unknown> | null;
   after: Record<string, unknown> | null;
   reason: string | null;

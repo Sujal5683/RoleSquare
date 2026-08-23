@@ -7,12 +7,14 @@
 
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { toast } from "sonner";
 import { api } from "@/lib/api-client";
-import type { AiJobDTO, AiOutputDTO } from "@/lib/types";
+import type { AiJobDTO, AiOutputDTO, DatasetDTO, SchemaDTO } from "@/lib/types";
 import { LoadingState, EmptyState } from "@/components/ui/page-elements";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@/components/ui/collapsible";
 import { Separator } from "@/components/ui/separator";
 import {
   ChevronDown,
@@ -86,6 +88,16 @@ export function ExtractionRunsTab() {
     refetchInterval: selectedJobId ? 8000 : false,
   });
 
+  const { data: datasets } = useQuery({
+    queryKey: ["datasets"],
+    queryFn: () => api.get<DatasetDTO[]>("/api/datasets"),
+  });
+  
+  const { data: schemas } = useQuery({
+    queryKey: ["schemas"],
+    queryFn: () => api.get<SchemaDTO[]>("/api/schemas"),
+  });
+
   const selectedJob = jobsResp?.data?.find((j) => j.id === selectedJobId);
   const outputs = outputsResp?.data ?? [];
 
@@ -119,6 +131,9 @@ export function ExtractionRunsTab() {
           jobsResp.data.map((job) => {
             const payload = job.payload as Record<string, unknown>;
             const isSelected = job.id === selectedJobId;
+            const targetDs = datasets?.find(d => d.id === payload?.targetDatasetId);
+            const sourceDs = datasets?.find(d => d.id === payload?.sourceDatasetId);
+            const targetName = payload?.targetDatasetName || targetDs?.name || (payload?.targetDatasetId ? String(payload.targetDatasetId).slice(0, 8) + "…" : "New");
             return (
               <button
                 key={job.id}
@@ -146,9 +161,9 @@ export function ExtractionRunsTab() {
                     />
                   </div>
                 )}
-                <p className="text-[11px] text-muted-foreground truncate">
-                  {payload?.targetDatasetId
-                    ? `→ Dataset: ${String(payload.targetDatasetId).slice(0, 8)}…`
+                <p className="text-[11px] text-muted-foreground truncate" title={sourceDs?.name ? `Source: ${sourceDs.name}` : undefined}>
+                  {payload?.targetDatasetId || payload?.targetDatasetName
+                    ? `→ ${targetName}`
                     : "One-step extraction"}
                 </p>
                 <p className="text-[10px] text-muted-foreground/70 mt-0.5">
@@ -239,31 +254,69 @@ export function ExtractionRunsTab() {
 
                 {/* Payload */}
                 <div>
-                  <div className="flex items-center justify-between mb-1.5">
-                    <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Payload</p>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-6 text-[10px] gap-1"
-                      onClick={() => setShowPayloadIds((v) => !v)}
-                    >
-                      {showPayloadIds ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
-                      {showPayloadIds ? "Hide IDs" : "Show IDs"}
-                    </Button>
+                  <p className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1.5">Payload</p>
+                  <div className="text-[11px] bg-muted/40 rounded-lg p-3 space-y-2">
+                    {/* Source Dataset */}
+                    <Collapsible>
+                      <CollapsibleTrigger className="flex items-center gap-1 font-medium hover:underline [&[data-state=open]>svg]:rotate-90">
+                        <ChevronRight className="h-3 w-3 transition-transform" />
+                        Source Dataset: {datasets?.find(d => d.id === (selectedJob.payload as any).sourceDatasetId)?.name || "Unknown"}
+                      </CollapsibleTrigger>
+                      <CollapsibleContent className="pl-4 pt-1 text-muted-foreground font-mono">
+                        ID: {(selectedJob.payload as any).sourceDatasetId}
+                      </CollapsibleContent>
+                    </Collapsible>
+                    
+                    {/* Target Dataset */}
+                    <Collapsible>
+                      <CollapsibleTrigger className="flex items-center gap-1 font-medium hover:underline [&[data-state=open]>svg]:rotate-90">
+                        <ChevronRight className="h-3 w-3 transition-transform" />
+                        Target Dataset: {(selectedJob.payload as any).targetDatasetName || datasets?.find(d => d.id === (selectedJob.payload as any).targetDatasetId)?.name || "New Dataset"}
+                      </CollapsibleTrigger>
+                      <CollapsibleContent className="pl-4 pt-1 text-muted-foreground font-mono">
+                        ID: {(selectedJob.payload as any).targetDatasetId || "N/A"}
+                      </CollapsibleContent>
+                    </Collapsible>
+
+                    {/* Schema */}
+                    <Collapsible>
+                      <CollapsibleTrigger className="flex items-center gap-1 font-medium hover:underline [&[data-state=open]>svg]:rotate-90">
+                        <ChevronRight className="h-3 w-3 transition-transform" />
+                        Schema: {schemas?.find(s => s.id === (selectedJob.payload as any).schemaId)?.name || "Unknown"}
+                      </CollapsibleTrigger>
+                      <CollapsibleContent className="pl-4 pt-1 space-y-1">
+                        <p className="font-mono text-muted-foreground">ID: {(selectedJob.payload as any).schemaId}</p>
+                        {(() => {
+                           const s = schemas?.find(s => s.id === (selectedJob.payload as any).schemaId);
+                           if (!s) return null;
+                           return (
+                             <div className="mt-2 bg-background/50 p-2 rounded border border-border/50">
+                               <p className="font-semibold mb-1">Fields ({s.fields.length}):</p>
+                               <ul className="list-disc list-inside">
+                                 {s.fields.map((f: any) => (
+                                   <li key={f.name}>{f.name} <span className="text-muted-foreground">({f.type})</span></li>
+                                 ))}
+                               </ul>
+                             </div>
+                           )
+                        })()}
+                      </CollapsibleContent>
+                    </Collapsible>
+
+                    {/* Agents */}
+                    <div>
+                      <span className="font-medium ml-4">Agents: </span>
+                      <span className="text-muted-foreground">{(selectedJob.payload as any).agentKeys?.join(", ")}</span>
+                    </div>
+
+                    {/* Instructions */}
+                    {(selectedJob.payload as any).instructions && (
+                      <div>
+                        <span className="font-medium ml-4">Instructions: </span>
+                        <span className="text-muted-foreground">{(selectedJob.payload as any).instructions}</span>
+                      </div>
+                    )}
                   </div>
-                  <pre className="text-[11px] font-mono bg-muted/40 rounded-lg p-3 overflow-x-auto whitespace-pre-wrap break-words">
-                    {showPayloadIds
-                      ? JSON.stringify(selectedJob.payload, null, 2)
-                      : JSON.stringify(
-                          Object.fromEntries(
-                            Object.entries(selectedJob.payload as Record<string, unknown>).filter(
-                              ([k]) => !k.toLowerCase().endsWith("id")
-                            )
-                          ),
-                          null,
-                          2
-                        )}
-                  </pre>
                 </div>
               </CardContent>
             </Card>
@@ -287,7 +340,7 @@ export function ExtractionRunsTab() {
                     No AI outputs yet — they appear as the job runs.
                   </p>
                 ) : (
-                  <div className="space-y-2">
+                  <div className="space-y-2 max-h-[500px] overflow-y-auto pr-2">
                     {outputs.map((output) => {
                       const isExpanded = expandedOutputId === output.id;
                       let rawParsed: unknown = null;

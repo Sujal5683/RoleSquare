@@ -293,7 +293,7 @@ export function DatasetsView() {
                   </div>
                   <div className="min-w-0 space-y-1">
                     <button
-                      onClick={() => openDataset(d.id)}
+                      onClick={() => openDataset(d.id, d.name)}
                       className="block text-left text-base font-semibold leading-tight truncate hover:underline"
                       title={d.name}
                     >
@@ -414,7 +414,7 @@ export function DatasetsView() {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => openDataset(d.id)}
+                  onClick={() => openDataset(d.id, d.name)}
                 >
                   Open
                   <ChevronRight className="ml-1.5 h-3.5 w-3.5" />

@@ -94,8 +94,8 @@ export function KeyboardShortcutsDialog() {
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogContent className="max-w-lg">
-        <DialogHeader>
+      <DialogContent className="max-w-full sm:max-w-lg max-h-[90vh] overflow-hidden flex flex-col">
+        <DialogHeader className="shrink-0">
           <DialogTitle className="flex items-center gap-2">
             <CommandIcon className="h-4 w-4" />
             Keyboard shortcuts
@@ -106,7 +106,7 @@ export function KeyboardShortcutsDialog() {
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4 py-2">
+        <div className="space-y-4 py-2 overflow-y-auto flex-1">
           {SHORTCUTS.map((section) => (
             <div key={section.group}>
               <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">

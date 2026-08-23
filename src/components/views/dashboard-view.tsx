@@ -443,11 +443,11 @@ export function DashboardView() {
                             <Icon className="h-3.5 w-3.5" />
                           </div>
                           <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium capitalize truncate">
-                              {item.type}
+                            <p className="text-sm font-medium truncate">
+                              {item.name || item.id}
                             </p>
-                            <p className="text-[10px] text-muted-foreground font-mono">
-                              {item.id.slice(0, 16)}…
+                            <p className="text-[10px] text-muted-foreground font-mono capitalize">
+                              {item.type}
                             </p>
                           </div>
                           <span className="text-[10px] text-muted-foreground">
@@ -562,7 +562,7 @@ export function DashboardView() {
                             <p className="text-[10px] text-muted-foreground mt-0.5">
                               {new Date(log.createdAt).toLocaleString()}
                             </p>
-                            {log.metadata && Object.keys(log.metadata).length > 0 && (
+                            {((log.before && Object.keys(log.before).length > 0) || (log.after && Object.keys(log.after).length > 0)) && (
                               <Accordion type="single" collapsible className="w-full mt-2">
                                 <AccordionItem value="payload" className="border-b-0">
                                   <AccordionTrigger className="py-1 px-2 text-[10px] bg-muted/50 rounded-md hover:no-underline">
@@ -570,7 +570,7 @@ export function DashboardView() {
                                   </AccordionTrigger>
                                   <AccordionContent className="pt-2">
                                     <pre className="text-[10px] bg-muted p-2 rounded-md overflow-x-auto text-muted-foreground font-mono">
-                                      {JSON.stringify(log.metadata, null, 2)}
+                                      {JSON.stringify({ before: log.before, after: log.after }, null, 2)}
                                     </pre>
                                   </AccordionContent>
                                 </AccordionItem>

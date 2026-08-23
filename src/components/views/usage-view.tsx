@@ -229,7 +229,7 @@ export function UsageView() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="h-64">
+          <div className="h-40">
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={data.dailyTokens}>
                 <defs>
@@ -297,7 +297,7 @@ export function UsageView() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="h-56">
+            <div className="h-40">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={data.jobTypeData} layout="vertical">
                   <CartesianGrid strokeDasharray="3 3" className="stroke-muted-foreground/20" horizontal={false} />
@@ -339,8 +339,8 @@ export function UsageView() {
               Job status distribution
             </CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="h-56">
+          <CardContent className="pb-0">
+            <div className="h-40">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie
@@ -399,7 +399,7 @@ export function UsageView() {
             </CardTitle>
           </CardHeader>
           <CardContent className="p-0">
-            <div className="divide-y">
+            <div className="divide-y max-h-[30vh] overflow-y-auto">
               {data.modelUsage.length === 0 ? (
                 <div className="p-4">
                   <EmptyState
@@ -415,7 +415,10 @@ export function UsageView() {
                       <Brain className="h-4 w-4" />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium font-mono truncate">{m.model}</p>
+                      <p className="text-sm font-medium truncate">
+                        {m.model.replace(/-/g, " ").replace(/\b\w/g, l => l.toUpperCase())}
+                      </p>
+                      <p className="text-[10px] text-muted-foreground font-mono truncate">{m.model}</p>
                       <p className="text-xs text-muted-foreground">
                         {m.calls} calls ·{" "}
                         <span title="Total tokens">{fmt(m.tokens)} tokens</span>
@@ -444,7 +447,7 @@ export function UsageView() {
             </CardTitle>
           </CardHeader>
           <CardContent className="p-0">
-            <div className="divide-y">
+            <div className="divide-y max-h-[30vh] overflow-y-auto">
               {data.costByMetric.map((m) => (
                 <div key={m.metricType} className="flex items-center gap-3 px-4 py-3">
                   <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300">

@@ -135,10 +135,10 @@ export function SettingsView() {
       <Tabs
         value={tab}
         onValueChange={setTab}
-        className="w-full flex flex-col lg:flex-row gap-4"
+        className="w-full flex flex-col lg:flex-row gap-4 lg:items-start"
       >
         <TabsList
-          className="lg:w-56 lg:h-fit lg:grid lg:grid-cols-1 lg:gap-1 h-auto flex-wrap"
+          className="lg:w-56 lg:h-fit lg:grid lg:grid-cols-1 lg:gap-1 h-auto flex-wrap lg:sticky lg:top-16"
         >
           <TabsTrigger value="profile" className="justify-start">
             <UserIcon className="mr-2 h-3.5 w-3.5" />
@@ -240,18 +240,26 @@ function ProfileSection() {
     setName(serverName);
   }
 
+  const queryClient = useQueryClient();
+  const updateProfileMutation = useMutation({
+    mutationFn: (newName: string) => api.patch("/api/session", { name: newName }),
+    onSuccess: (_, newName) => {
+      setSavedName(newName);
+      toast.success("Profile saved", {
+        description: `Your display name is now "${newName}".`,
+      });
+      queryClient.invalidateQueries({ queryKey: ["session"] });
+    },
+    onError: () => toast.error("Failed to save profile"),
+  });
+
   const handleSave = () => {
     const trimmed = name.trim();
     if (!trimmed) {
       toast.error("Name cannot be empty");
       return;
     }
-    // No user PATCH endpoint exists in the API — show a confirmation toast
-    // so the UI is functional for the demo.
-    setSavedName(trimmed);
-    toast.success("Profile saved", {
-      description: `Your display name is now "${trimmed}".`,
-    });
+    updateProfileMutation.mutate(trimmed);
   };
 
   if (isLoading) return <LoadingState rows={3} />;
@@ -456,7 +464,7 @@ function ConnectedAccountsSection() {
                   <div className="min-w-0 space-y-1">
                     <div className="flex items-center gap-2">
                       <p className="font-medium truncate">{c.googleEmail}</p>
-                      {c.status === "active" && new Date(c.watchExpiresAt) > new Date(Date.now() + 86400000) ? (
+                      {c.status === "active" && c.watchExpiresAt && new Date(c.watchExpiresAt).getTime() > Date.now() + 86400000 ? (
                         <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-400 gap-1 h-5 text-[10px]">
                           <ShieldCheck className="h-3 w-3" /> Healthy
                         </Badge>
@@ -606,7 +614,7 @@ function ConnectAccountDialog({
         if (!o) onClose();
       }}
     >
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="max-w-[calc(100%-2rem)] sm:max-w-md max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Connect Google Account</DialogTitle>
           <DialogDescription>
@@ -786,12 +794,12 @@ function SecuritySection() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="flex items-center justify-between">
-            <div>
+          <div className="flex flex-row items-center justify-between gap-4">
+            <div className="min-w-0 flex-1">
               <p className="text-sm font-medium">
                 {twoFactor ? "Enabled" : "Disabled"}
               </p>
-              <p className="text-xs text-muted-foreground">
+              <p className="text-xs text-muted-foreground mt-1">
                 {twoFactor
                   ? "You will be prompted for a 6-digit code at sign-in."
                   : "Enable 2FA to protect your account from unauthorized access."}
@@ -803,6 +811,7 @@ function SecuritySection() {
                 setTwoFactor(v);
                 toast.success(v ? "2FA enabled" : "2FA disabled");
               }}
+              className="shrink-0"
             />
           </div>
         </CardContent>
@@ -939,16 +948,17 @@ function NotificationsSection() {
         {NOTIFICATION_PREFS.map((p) => (
           <div
             key={p.key}
-            className="flex items-center justify-between rounded-lg border p-3"
+            className="flex flex-row items-center justify-between gap-4 rounded-lg border p-3"
           >
-            <div className="space-y-0.5 pr-4">
-              <p className="text-sm font-medium">{p.label}</p>
-              <p className="text-xs text-muted-foreground">{p.description}</p>
+            <div className="min-w-0 flex-1 space-y-0.5">
+              <p className="text-sm font-medium truncate">{p.label}</p>
+              <p className="text-xs text-muted-foreground break-words">{p.description}</p>
             </div>
             <Switch
               checked={!!prefs[p.key]}
               onCheckedChange={(v) => toggle(p.key, v)}
               aria-label={p.label}
+              className="shrink-0"
             />
           </div>
         ))}

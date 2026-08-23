@@ -60,6 +60,11 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -697,10 +702,8 @@ export function DatasetDetailView() {
 
               <Popover>
               <PopoverTrigger asChild>
-                <Button variant="outline" size="sm" className="shrink-0">
-                  <Columns3 className="mr-2 h-3.5 w-3.5" />
-                  Columns
-                  <ChevronDown className="ml-1 h-3 w-3 opacity-60" />
+                <Button variant="outline" size="sm" className="shrink-0 px-2" title="Show/Hide columns">
+                  <Columns3 className="h-3.5 w-3.5" />
                 </Button>
               </PopoverTrigger>
               <PopoverContent align="end" className="w-64 p-3">
@@ -934,50 +937,38 @@ export function DatasetDetailView() {
                       return (
                         <TableCell
                           key={f.id}
-                          className="border-r last:border-r-0 align-middle group/cell"
+                          className="border-r last:border-r-0 align-middle group/cell max-w-[250px]"
                         >
-                          <div className="flex w-full items-center gap-2">
-                            <button
-                              type="button"
-                              onClick={(e) => {
+                          <div 
+                            className="flex w-full items-center gap-2 cursor-pointer"
+                            onClick={(e) => {
                                 e.stopPropagation();
                                 setSelectedRecordId(r.id);
-                              }}
-                              className="flex flex-1 min-w-0 items-center gap-2 text-left hover:underline-offset-2"
+                            }}
+                            onDoubleClick={(e) => {
+                                e.stopPropagation();
+                                if (v) handleEditClick({ ...v, recordId: r.id });
+                            }}
+                          >
+                            <span
+                              className={`min-w-0 flex-1 truncate text-sm hover:underline-offset-2 ${
+                                f.type === "number"
+                                  ? "tabular-nums"
+                                  : ""
+                              }`}
+                              title={fmt.text}
                             >
-                              <span
-                                className={`min-w-0 flex-1 truncate text-sm ${
-                                  f.type === "number"
-                                    ? "tabular-nums"
-                                    : ""
-                                }`}
-                                title={fmt.text}
-                              >
-                                {fmt.node ?? (
-                                  <span className="text-muted-foreground">
-                                    {fmt.text || "—"}
-                                  </span>
-                                )}
-                              </span>
-                              {v && (
-                                <span
-                                  className={`inline-block h-1.5 w-1.5 shrink-0 rounded-full ${confidenceColor(v.confidence)}`}
-                                  title={`Confidence ${Math.round(v.confidence * 100)}%`}
-                                />
+                              {fmt.node ?? (
+                                <span className={fmt.text ? "text-foreground" : "text-muted-foreground"}>
+                                  {fmt.text || "—"}
+                                </span>
                               )}
-                            </button>
+                            </span>
                             {v && (
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-6 w-6 opacity-0 group-hover/cell:opacity-100 transition-opacity"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleEditClick(v);
-                                }}
-                              >
-                                <Pencil className="h-3 w-3" />
-                              </Button>
+                              <span
+                                className={`inline-block h-1.5 w-1.5 shrink-0 rounded-full ${confidenceColor(v.confidence)}`}
+                                title={`Confidence ${Math.round(v.confidence * 100)}%`}
+                              />
                             )}
                           </div>
                         </TableCell>
@@ -1361,11 +1352,11 @@ function EvidenceDrawer({
                     <Clock className="h-3 w-3" />
                     {relativeTime(record.createdAt)}
                   </span>
-                  {record.sourceEmailId && (
-                    <span className="inline-flex items-center gap-1">
+                  {(record.sourceName || record.sourceSubject || record.sourceEmailId) && (
+                    <span className="inline-flex items-center gap-1" title={record.sourceSubject || record.sourceName || record.sourceEmailId || undefined}>
                       <Mail className="h-3 w-3" />
-                      <span className="font-mono">
-                        {record.sourceEmailId.slice(0, 8)}…
+                      <span className="font-medium truncate max-w-[200px]">
+                        {record.sourceSubject || record.sourceName || (record.sourceEmailId ? record.sourceEmailId.slice(0, 8) + "…" : "")}
                       </span>
                     </span>
                   )}
@@ -1389,7 +1380,7 @@ function EvidenceDrawer({
                     <FieldValueCard
                       key={v.id}
                       value={v}
-                      onEdit={() => onEditClick(v)}
+                      onEdit={() => onEditClick({ ...v, recordId: record.id })}
                     />
                   ))
                 )}
@@ -1467,72 +1458,95 @@ function FieldValueCard({
         )}
       </div>
 
-      {/* Evidence snippet */}
-      {value.evidence && (
-        <blockquote className="mt-3 border-l-2 border-primary/40 bg-muted/30 py-2 pl-3 pr-2">
-          <p className="font-mono text-xs leading-relaxed text-muted-foreground whitespace-pre-wrap">
-            “{value.evidence}”
-          </p>
-        </blockquote>
-      )}
-
-      {/* Original AI value (shown when corrected by a human) */}
-      {value.originalValue != null && value.correctedAt && (
-        <div className="mt-3 rounded-md border border-amber-200 bg-amber-50 p-3 dark:border-amber-900 dark:bg-amber-950/50">
-          <div className="flex items-center justify-between gap-2">
-            <p className="text-[10px] font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-400">
-              Original AI value (preserved)
-            </p>
-            {value.originalConfidence != null && (
-              <Badge variant="outline" className="text-[9px] tabular-nums">
-                {Math.round(value.originalConfidence * 100)}% confidence
-              </Badge>
+      {/* Collapsible Extracted Details */}
+      {(value.evidence || (value.originalValue != null && value.correctedAt)) && (
+        <Collapsible className="mt-4">
+          <CollapsibleTrigger asChild>
+            <Button variant="ghost" size="sm" className="flex w-full items-center justify-between p-0 h-auto font-medium text-xs text-muted-foreground hover:bg-transparent hover:text-foreground">
+              <span>Extracted Details</span>
+              <ChevronDown className="h-3 w-3 transition-transform duration-200" />
+            </Button>
+          </CollapsibleTrigger>
+          <CollapsibleContent className="space-y-3 pt-3">
+            {/* Evidence snippet */}
+            {value.evidence && (
+              <blockquote className="border-l-2 border-primary/40 bg-muted/30 py-2 pl-3 pr-2">
+                <p className="font-mono text-xs leading-relaxed text-muted-foreground whitespace-pre-wrap">
+                  “{value.evidence}”
+                </p>
+              </blockquote>
             )}
-          </div>
-          <p className="mt-1 text-sm text-amber-900 dark:text-amber-200 break-words">
-            {formatValueCompact(value.originalValue, value.fieldType ?? "text").text ||
-             "—"}
-          </p>
-          <p className="mt-1 text-[10px] text-amber-700/80 dark:text-amber-400/80">
-            Corrected {relativeTime(value.correctedAt)}
-            {value.correctedBy ? ` by ${value.correctedBy.slice(0, 8)}…` : ""}
-          </p>
-        </div>
+
+            {/* Original AI value (shown when corrected by a human) */}
+            {value.originalValue != null && value.correctedAt && (
+              <div className="rounded-md border border-amber-200 bg-amber-50 p-3 dark:border-amber-900 dark:bg-amber-950/50">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-[10px] font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-400">
+                    Original AI value (preserved)
+                  </p>
+                  {value.originalConfidence != null && (
+                    <Badge variant="outline" className="text-[9px] tabular-nums">
+                      {Math.round(value.originalConfidence * 100)}% confidence
+                    </Badge>
+                  )}
+                </div>
+                <p className="mt-1 text-sm text-amber-900 dark:text-amber-200 break-words">
+                  {formatValueCompact(value.originalValue, value.fieldType ?? "text").text ||
+                   "—"}
+                </p>
+                <p className="mt-1 text-[10px] text-amber-700/80 dark:text-amber-400/80">
+                  Corrected {relativeTime(value.correctedAt)}
+                  {value.correctedBy ? ` by ${value.correctedBy.slice(0, 8)}…` : ""}
+                </p>
+              </div>
+            )}
+          </CollapsibleContent>
+        </Collapsible>
       )}
 
-      {/* Meta row */}
-      <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-muted-foreground sm:grid-cols-3">
-        {value.sourceFile && (
-          <MetaItem
-            icon={<FileText className="h-3 w-3" />}
-            label="Source"
-            value={value.sourceFile}
-          />
-        )}
-        {value.pageNumber != null && (
-          <MetaItem
-            icon={<Hash className="h-3 w-3" />}
-            label="Page"
-            value={String(value.pageNumber)}
-          />
-        )}
-        <MetaItem
-          icon={<Cpu className="h-3 w-3" />}
-          label="Model"
-          value={value.modelUsed}
-        />
-        <MetaItem
-          icon={<FileText className="h-3 w-3" />}
-          label="Prompt"
-          value={value.promptVersion}
-        />
-        <MetaItem
-          icon={<Clock className="h-3 w-3" />}
-          label="Extracted"
-          value={relativeTime(value.extractedAt)}
-          title={formatDateTime(value.extractedAt)}
-        />
-      </div>
+      {/* Collapsible Source & Model Info */}
+      <Collapsible className="mt-3">
+        <CollapsibleTrigger asChild>
+          <Button variant="ghost" size="sm" className="flex w-full items-center justify-between p-0 h-auto font-medium text-xs text-muted-foreground hover:bg-transparent hover:text-foreground">
+            <span>Source & Model Info</span>
+            <ChevronDown className="h-3 w-3 transition-transform duration-200" />
+          </Button>
+        </CollapsibleTrigger>
+        <CollapsibleContent className="pt-3">
+          <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground sm:grid-cols-3">
+            {value.sourceFile && (
+              <MetaItem
+                icon={<FileText className="h-3 w-3" />}
+                label="Source"
+                value={value.sourceFile}
+              />
+            )}
+            {value.pageNumber != null && (
+              <MetaItem
+                icon={<Hash className="h-3 w-3" />}
+                label="Page"
+                value={String(value.pageNumber)}
+              />
+            )}
+            <MetaItem
+              icon={<Cpu className="h-3 w-3" />}
+              label="Model"
+              value={value.modelUsed}
+            />
+            <MetaItem
+              icon={<FileText className="h-3 w-3" />}
+              label="Prompt"
+              value={value.promptVersion}
+            />
+            <MetaItem
+              icon={<Clock className="h-3 w-3" />}
+              label="Extracted"
+              value={relativeTime(value.extractedAt)}
+              title={formatDateTime(value.extractedAt)}
+            />
+          </div>
+        </CollapsibleContent>
+      </Collapsible>
 
       {/* Edit action */}
       <div className="mt-3 border-t pt-3">

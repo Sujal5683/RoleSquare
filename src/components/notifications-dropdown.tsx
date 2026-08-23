@@ -192,7 +192,7 @@ export function NotificationsDropdown() {
       </PopoverTrigger>
       <PopoverContent
         align="end"
-        className="w-96 p-0"
+        className="w-[90vw] sm:w-96 p-0"
         sideOffset={8}
       >
         <div className="flex items-center justify-between border-b px-4 py-3">

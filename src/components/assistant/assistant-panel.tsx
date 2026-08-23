@@ -91,7 +91,9 @@ export function AssistantPanel() {
             <p className="text-sm font-semibold leading-none">AI Assistant</p>
             <p className="mt-0.5 text-[10px] text-muted-foreground truncate">
               {activeModel ? (
-                <span className="font-mono">{activeModel}</span>
+                <span className="font-mono">
+                  {activeModel.replace(/-/g, " ").replace(/\b\w/g, l => l.toUpperCase())}
+                </span>
               ) : (
                 "Powered by Gemini"
               )}
