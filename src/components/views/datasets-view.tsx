@@ -67,7 +67,10 @@ import {
   Hash,
   AlertCircle,
   Filter,
+  FileSpreadsheet,
 } from "lucide-react";
+import { SyncStatusBadge } from "@/components/google-sheets/sync-status-badge";
+import { GoogleSheetsPanel } from "@/components/google-sheets/google-sheets-panel";
 
 // ── Helpers ──────────────────────────────────────────────────────────────
 
@@ -105,6 +108,7 @@ export function DatasetsView() {
   const [createOpen, setCreateOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<DatasetDTO | null>(null);
   const [shareTarget, setShareTarget] = useState<DatasetDTO | null>(null);
+  const [sheetsPanelDataset, setSheetsPanelDataset] = useState<DatasetDTO | null>(null);
 
   const [showFilters, setShowFilters] = useState(false);
   const [dataSourceFilter, setDataSourceFilter] = useState("all");
@@ -418,6 +422,13 @@ export function DatasetsView() {
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" className="w-48">
                       <DropdownMenuItem
+                        onClick={() => setSheetsPanelDataset(d)}
+                      >
+                        <FileSpreadsheet className="mr-2 h-4 w-4 text-emerald-500" />
+                        Google Sheets
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem
                         onClick={() =>
                           exportMutation.mutate({ id: d.id, format: "csv" })
                         }
@@ -456,6 +467,21 @@ export function DatasetsView() {
               <p className="text-sm text-muted-foreground line-clamp-2 min-h-[2.5rem]">
                 {d.description || "No description provided."}
               </p>
+
+              {/* Google Sheets sync badge */}
+              {(d as any).syncStatus && (d as any).syncStatus !== "unlinked" && (
+                <button
+                  onClick={() => setSheetsPanelDataset(d)}
+                  className="flex items-center gap-1.5 hover:opacity-80 transition-opacity"
+                  id={`sheets-badge-${d.id}`}
+                >
+                  <SyncStatusBadge
+                    status={(d as any).syncStatus}
+                    lastSyncAt={(d as any).lastSyncAt}
+                    conflictCount={(d as any).pendingConflicts}
+                  />
+                </button>
+              )}
 
               {/* Meta row */}
               <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
@@ -549,9 +575,34 @@ export function DatasetsView() {
         }}
         dataset={shareTarget}
       />
+
+      {/* Google Sheets Panel */}
+      {sheetsPanelDataset && (
+        <GoogleSheetsPanel
+          open={!!sheetsPanelDataset}
+          onOpenChange={(open) => { if (!open) setSheetsPanelDataset(null); }}
+          dataset={{
+            id: sheetsPanelDataset.id,
+            name: sheetsPanelDataset.name,
+            recordCount: sheetsPanelDataset.recordCount,
+            sheetMappingId: (sheetsPanelDataset as any).sheetMappingId ?? null,
+            syncStatus: (sheetsPanelDataset as any).syncStatus ?? null,
+          }}
+          appColumns={
+            (sheetsPanelDataset.schema?.fields ?? []).map((f, i) => ({
+              columnId: f.id,
+              name: f.name,
+              dataType: f.type,
+              required: f.required,
+            }))
+          }
+          allDatasets={(datasets ?? []).map((d) => ({ id: d.id, name: d.name }))}
+        />
+      )}
     </div>
   );
 }
+
 
 // ── Create dataset dialog (separate component for clarity) ───────────────
 

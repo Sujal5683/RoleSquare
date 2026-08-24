@@ -64,7 +64,6 @@ import {
   Calendar,
   Search,
 } from "lucide-react";
-import { BulkSheetLinkWizard } from "@/components/google-sheets/bulk-sheet-link-wizard";
 
 // ── Helpers ──────────────────────────────────────────────────────────────
 
@@ -146,7 +145,6 @@ export function OrganizationsView() {
   const [createOpen, setCreateOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<OrganizationDTO | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<OrganizationDTO | null>(null);
-  const [bulkLinkTarget, setBulkLinkTarget] = useState<OrganizationDTO | null>(null);
   const [filterRole, setFilterRole] = useState("all");
   const [filterPlan, setFilterPlan] = useState("all");
 
@@ -420,10 +418,6 @@ export function OrganizationsView() {
                           <Users className="mr-2 h-4 w-4" />
                           Members
                         </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => setBulkLinkTarget(org)}>
-                          <RefreshCw className="mr-2 h-4 w-4" />
-                          Link Sheets
-                        </DropdownMenuItem>
                         <DropdownMenuSeparator />
                         <DropdownMenuItem
                           className="text-destructive focus:text-destructive"
@@ -531,25 +525,6 @@ export function OrganizationsView() {
         target={editTarget}
         onClose={() => setEditTarget(null)}
       />
-
-      {/* Bulk Link Sheets Dialog */}
-      <Dialog open={!!bulkLinkTarget} onOpenChange={(open) => !open && setBulkLinkTarget(null)}>
-        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Bulk Link Google Sheets</DialogTitle>
-            <DialogDescription>
-              Select a spreadsheet to automatically create and map datasets for each tab.
-            </DialogDescription>
-          </DialogHeader>
-          {bulkLinkTarget && (
-            <BulkSheetLinkWizard 
-              organizationId={bulkLinkTarget.id} 
-              onComplete={() => setBulkLinkTarget(null)}
-              onCancel={() => setBulkLinkTarget(null)}
-            />
-          )}
-        </DialogContent>
-      </Dialog>
 
       {/* Delete confirmation */}
       <AlertDialog

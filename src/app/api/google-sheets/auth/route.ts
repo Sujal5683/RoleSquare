@@ -1,15 +1,37 @@
+// POST /api/google-sheets/auth
+//
+// Generates the Google OAuth consent URL for Sheets access.
+// This is separate from the existing Gmail/Drive OAuth at /api/google/callback.
+//
+// Body (JSON): { returnTo?: string }
+// Returns: { authorizeUrl: string }
+//
+// The frontend should navigate `window.location.href` to the returned URL
+// (never expose the URL to end users as a clickable link that skips consent).
+
 import { NextRequest, NextResponse } from "next/server";
-import { GoogleOAuthService } from "@/lib/services/google-oauth";
+import { requireOrgContext, AuthError, authErrorResponse } from "@/lib/auth";
+import { buildSheetsOAuthUrl } from "@/lib/services/google-sheets-oauth";
 
-export async function GET(request: NextRequest) {
-  const searchParams = request.nextUrl.searchParams;
-  const organizationId = searchParams.get("organizationId");
-  const userId = searchParams.get("userId"); // Assume passed from authenticated frontend or session
+export async function POST(req: NextRequest) {
+  try {
+    const { user, organizationId } = await requireOrgContext(req);
+    const body = await req.json().catch(() => ({}));
+    const returnTo = typeof body?.returnTo === "string" ? body.returnTo : "/";
 
-  if (!organizationId || !userId) {
-    return NextResponse.json({ error: "Missing parameters" }, { status: 400 });
+    const authorizeUrl = buildSheetsOAuthUrl({
+      userId: user.id,
+      organizationId,
+      purpose: "sheets",
+      returnTo,
+    });
+
+    return NextResponse.json({ authorizeUrl });
+  } catch (err) {
+    if (err instanceof AuthError) return authErrorResponse(err);
+    return NextResponse.json(
+      { error: err instanceof Error ? err.message : "Failed to start Google Sheets authorization" },
+      { status: 500 }
+    );
   }
-
-  const url = GoogleOAuthService.getAuthUrl(organizationId, userId);
-  return NextResponse.redirect(url);
 }

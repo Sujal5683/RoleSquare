@@ -105,11 +105,8 @@ import {
   Upload,
   Sparkles,
   Zap,
-  Link as LinkIcon,
 } from "lucide-react";
 import type { SchemaDTO } from "@/lib/types";
-import { SheetMappingWizard } from "@/components/google-sheets/sheet-mapping-wizard";
-import { SyncDashboard } from "@/components/google-sheets/sync-dashboard";
 
 
 // ── Helpers ──────────────────────────────────────────────────────────────
@@ -245,7 +242,6 @@ export function DatasetDetailView() {
   const [extractDialog, setExtractDialog] = useState(false);
   const [extractSchemaId, setExtractSchemaId] = useState("");
   const [extractDatasetName, setExtractDatasetName] = useState("");
-  const [sheetLinkOpen, setSheetLinkOpen] = useState(false);
 
   // Inline Record Editing state
   const [editValue, setEditValue] = useState<DatasetValueDTO | null>(null);
@@ -513,7 +509,6 @@ export function DatasetDetailView() {
           refreshing={false}
           onExport={(f) => exportMutation.mutate({ format: f })}
           exporting={exportMutation.isPending}
-          onLinkSheet={() => setSheetLinkOpen(true)}
         />
         <LoadingState rows={5} />
       </div>
@@ -530,7 +525,6 @@ export function DatasetDetailView() {
           refreshing={false}
           onExport={(f) => exportMutation.mutate({ format: f })}
           exporting={exportMutation.isPending}
-          onLinkSheet={() => setSheetLinkOpen(true)}
         />
         <ErrorState
           message="Failed to load dataset"
@@ -551,7 +545,6 @@ export function DatasetDetailView() {
           refreshing={false}
           onExport={(f) => exportMutation.mutate({ format: f })}
           exporting={exportMutation.isPending}
-          onLinkSheet={() => setSheetLinkOpen(true)}
         />
         <EmptyState
           icon={<Database className="h-5 w-5" />}
@@ -577,7 +570,6 @@ export function DatasetDetailView() {
         refreshing={recordsFetching}
         onExport={(f) => exportMutation.mutate({ format: f })}
         exporting={exportMutation.isPending}
-        onLinkSheet={() => setSheetLinkOpen(true)}
       />
 
       {/* Saved views bar */}
@@ -1203,19 +1195,6 @@ export function DatasetDetailView() {
         recordId={editValue?.recordId ?? null}
         onClose={() => setEditValue(null)}
       />
-
-      {/* Link Google Sheet Dialog */}
-      <Dialog open={sheetLinkOpen} onOpenChange={setSheetLinkOpen}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-          <SheetMappingWizard 
-            datasetId={datasetId} 
-            googleIntegrationId={""} 
-            organizationId={dataset?.organizationId || ""}
-            onSuccess={() => setSheetLinkOpen(false)}
-            onCancel={() => setSheetLinkOpen(false)}
-          />
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }
@@ -1230,7 +1209,6 @@ function DetailTopBar({
   refreshing,
   onExport,
   exporting,
-  onLinkSheet,
 }: {
   dataset: DatasetDTO | null;
   onBack: () => void;
@@ -1238,7 +1216,6 @@ function DetailTopBar({
   refreshing: boolean;
   onExport: (format: "csv" | "json") => void;
   exporting: boolean;
-  onLinkSheet: () => void;
 }) {
   const setView = useAppStore((s) => s.setView);
   return (
@@ -1301,14 +1278,6 @@ function DetailTopBar({
         >
           <Share2 className="mr-2 h-3.5 w-3.5" />
           Share
-        </Button>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={onLinkSheet}
-        >
-          <LinkIcon className="mr-2 h-3.5 w-3.5" />
-          Link Google Sheet
         </Button>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>

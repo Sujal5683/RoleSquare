@@ -254,6 +254,11 @@ export function serializeDatasetRecord(r: any): DatasetRecordDTO {
 }
 
 export function serializeDataset(d: any): DatasetDTO {
+  // Resolve the first active SheetMapping if eager-loaded
+  const mapping = d.sheetMappings?.find?.(
+    (m: any) => m.status !== "unlinked"
+  );
+
   return {
     id: d.id,
     organizationId: d.organizationId,
@@ -266,6 +271,13 @@ export function serializeDataset(d: any): DatasetDTO {
       d.createdAt instanceof Date ? d.createdAt.toISOString() : d.createdAt,
     isDefault: !!d.isDefault,
     sourceId: d.sources?.[0]?.id ?? null,
+    // Google Sheets fields (only populated when mapping is included)
+    sheetMappingId: mapping?.id ?? null,
+    syncStatus: mapping?.status ?? null,
+    lastSyncAt: mapping?.syncState?.lastSyncAt instanceof Date
+      ? mapping.syncState.lastSyncAt.toISOString()
+      : (mapping?.syncState?.lastSyncAt ?? null),
+    pendingConflicts: mapping?._count?.syncConflicts ?? 0,
   };
 }
 

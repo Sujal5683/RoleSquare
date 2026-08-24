@@ -1,88 +1,173 @@
+// POST /api/google-sheets/link
+// Creates (or re-uses) a SpreadsheetConnection, then creates a SheetMapping
+// for the specified tab. Optionally triggers an initial push to the sheet.
+//
+// Body: {
+//   datasetId: string,
+//   sheetsAccountId: string,
+//   spreadsheetId: string,
+//   spreadsheetName?: string,
+//   sheetId?: number,
+//   sheetName: string,
+//   direction?: "bidirectional" | "to_sheet" | "from_sheet",
+//   conflictStrategy?: "flag" | "app_wins" | "sheet_wins",
+//   doPush?: boolean,
+//   columnMappings?: Array<{ appColumnId?: string | null; sheetHeader: string; dataType?: string; isNewColumn?: boolean; confidence?: number }>
+// }
+
 import { NextRequest, NextResponse } from "next/server";
-import { db as prisma } from "@/lib/db";
-import { GoogleSheetsService } from "@/lib/services/google-sheets";
-import { SchemaValidationService } from "@/lib/services/schema-validation";
-import { SyncEngine } from "@/lib/services/sync-engine";
+import { db } from "@/lib/db";
+import { requireOrgContext, AuthError, authErrorResponse } from "@/lib/auth";
+import { logAudit } from "@/lib/audit";
+import { runSync } from "@/lib/services/sync-engine";
 
-export async function POST(request: NextRequest) {
+const VALID_DIRECTIONS = ["bidirectional", "to_sheet", "from_sheet"];
+const VALID_STRATEGIES = ["flag", "app_wins", "sheet_wins"];
+
+export async function POST(req: NextRequest) {
   try {
-    const body = await request.json();
-    const { googleIntegrationId, spreadsheetId, sheetName, datasetId, columnMappings, organizationId } = body;
+    const { user, organizationId } = await requireOrgContext(req);
+    const body = await req.json().catch(() => ({}));
 
-    let actualIntegrationId = googleIntegrationId;
+    const {
+      datasetId,
+      sheetsAccountId,
+      spreadsheetId,
+      spreadsheetName = "Untitled",
+      sheetId = 0,
+      sheetName,
+      direction = "bidirectional",
+      conflictStrategy = "flag",
+      doPush = false,
+      columnMappings = [],
+    } = body;
 
-    if (!actualIntegrationId || actualIntegrationId === "mock-integration" || actualIntegrationId === "") {
-      if (!organizationId) {
-        throw new Error("Missing organizationId to resolve google integration");
-      }
-      const integration = await prisma.googleIntegration.findFirst({
-        where: { organizationId, status: "active" }
-      });
-      if (!integration) {
-        throw new Error("No active Google Integration found for this organization. Please link an account first.");
-      }
-      actualIntegrationId = integration.id;
+    if (!datasetId || !sheetsAccountId || !spreadsheetId || !sheetName) {
+      return NextResponse.json(
+        { error: "datasetId, sheetsAccountId, spreadsheetId, and sheetName are required" },
+        { status: 400 }
+      );
     }
 
-    // 1. Create spreadsheet connection if it doesn't exist
-    let connection = await prisma.spreadsheetConnection.findFirst({
-      where: { googleIntegrationId: actualIntegrationId, spreadsheetId }
-    });
+    if (!VALID_DIRECTIONS.includes(direction)) {
+      return NextResponse.json(
+        { error: `direction must be one of: ${VALID_DIRECTIONS.join(", ")}` },
+        { status: 400 }
+      );
+    }
 
-    if (!connection) {
-      const meta = await GoogleSheetsService.getSpreadsheetMetadata(actualIntegrationId, spreadsheetId);
-      connection = await prisma.spreadsheetConnection.create({
-        data: {
-          googleIntegrationId: actualIntegrationId,
+    if (!VALID_STRATEGIES.includes(conflictStrategy)) {
+      return NextResponse.json(
+        { error: `conflictStrategy must be one of: ${VALID_STRATEGIES.join(", ")}` },
+        { status: 400 }
+      );
+    }
+
+    // IDOR: verify dataset belongs to this org
+    const dataset = await db.dataset.findFirst({
+      where: { id: datasetId, organizationId },
+      select: { id: true },
+    });
+    if (!dataset) {
+      return NextResponse.json({ error: "Dataset not found" }, { status: 404 });
+    }
+
+    // IDOR: verify Sheets account belongs to this org
+    const account = await db.googleSheetsAccount.findFirst({
+      where: { id: sheetsAccountId, organizationId },
+      select: { id: true },
+    });
+    if (!account) {
+      return NextResponse.json({ error: "Sheets account not found" }, { status: 404 });
+    }
+
+    // Transactionally: upsert SpreadsheetConnection + create SheetMapping + SyncState
+    const mapping = await db.$transaction(async (tx) => {
+      // Upsert the spreadsheet-level connection (idempotent — same spreadsheet
+      // can be linked by multiple tabs/datasets in the same org).
+      const conn = await tx.spreadsheetConnection.upsert({
+        where: {
+          organizationId_spreadsheetId: { organizationId, spreadsheetId },
+        },
+        create: {
+          organizationId,
+          sheetsAccountId,
           spreadsheetId,
-          name: meta.properties?.title || "Untitled Spreadsheet",
-        }
+          spreadsheetName,
+        },
+        update: {
+          spreadsheetName,
+          // update account binding if re-linking with a different account
+          sheetsAccountId,
+        },
       });
-    }
 
-    // 2. Upsert SheetMapping
-    const sheetMapping = await prisma.sheetMapping.upsert({
-      where: {
-        spreadsheetConnectionId_sheetId: {
-          spreadsheetConnectionId: connection.id,
-          sheetId: sheetName,
-        }
-      },
-      update: {
-        datasetId,
-        syncEnabled: true,
-      },
-      create: {
-        spreadsheetConnectionId: connection.id,
-        datasetId,
-        sheetId: sheetName, // In production, resolve this to the actual numeric sheetId
-        sheetName,
-        syncEnabled: true,
+      // Guard: reject if this exact tab is already linked
+      const existing = await tx.sheetMapping.findFirst({
+        where: {
+          datasetId,
+          spreadsheetConnectionId: conn.id,
+          sheetName,
+          status: { not: "unlinked" },
+        },
+        select: { id: true },
+      });
+      if (existing) {
+        throw new Error("ALREADY_LINKED");
       }
+
+      const m = await tx.sheetMapping.create({
+        data: {
+          organizationId,
+          datasetId,
+          spreadsheetConnectionId: conn.id,
+          sheetId: Number(sheetId),
+          sheetName,
+          direction,
+          status: "active",
+        },
+      });
+
+      // Create SyncState for scheduling/tracking
+      await tx.syncState.create({
+        data: {
+          sheetMappingId: m.id,
+          enabled: true,
+          conflictStrategy,
+        },
+      });
+
+      return m;
     });
 
-    // 3. Save Column Mappings
-    if (columnMappings && Array.isArray(columnMappings)) {
-      await prisma.datasetColumnMapping.createMany({
-        data: columnMappings.map((cm: any) => ({
-          sheetMappingId: sheetMapping.id,
-          fieldId: cm.fieldId,
-          sheetColumnName: cm.sheetColumnName,
-        }))
-      });
+    await logAudit({
+      organizationId,
+      actorId: user.id,
+      action: "create",
+      entity: "sheet_mapping",
+      entityId: mapping.id,
+      after: { datasetId, spreadsheetId, sheetName, direction },
+    });
+
+    // Optionally push existing records to sheet (fire-and-forget)
+    if (doPush) {
+      runSync(mapping.id, "manual").catch((err) =>
+        console.error(`[link] Initial push failed for ${mapping.id}:`, err)
+      );
     }
 
-    // 4. Update Schema Fingerprint
-    await SchemaValidationService.updateSchemaFingerprint(sheetMapping.id);
-
-    // 5. Trigger initial sync to push dataset records to the empty sheet
-    // We do this detached so the API responds quickly.
-    SyncEngine.syncMapping(sheetMapping.id).catch(err => {
-      console.error("Initial sync failed:", err);
-    });
-
-    return NextResponse.json({ success: true, sheetMappingId: sheetMapping.id });
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ sheetMappingId: mapping.id }, { status: 201 });
+  } catch (err) {
+    if (err instanceof AuthError) return authErrorResponse(err);
+    if (err instanceof Error && err.message === "ALREADY_LINKED") {
+      return NextResponse.json(
+        { error: "This tab is already linked to the dataset" },
+        { status: 409 }
+      );
+    }
+    return NextResponse.json(
+      { error: err instanceof Error ? err.message : "Failed to link dataset" },
+      { status: 500 }
+    );
   }
 }

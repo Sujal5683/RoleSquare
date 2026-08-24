@@ -97,19 +97,6 @@ export async function GET(req: NextRequest) {
       },
     });
 
-    // Ensure a GoogleIntegration exists for this connection to support Google Sheets
-    const existingIntegration = await db.googleIntegration.findFirst({
-      where: { googleConnectionId: connection.id, organizationId }
-    });
-    if (!existingIntegration) {
-      await db.googleIntegration.create({
-        data: {
-          googleConnectionId: connection.id,
-          organizationId
-        }
-      });
-    }
-
     console.log(
       `[google/callback] Connection ${connection.id} ${existingConn ? "re-authorized" : "created"} for ${googleEmail}`
     );

@@ -26,6 +26,16 @@ export async function GET(req: NextRequest) {
       include: {
         schema: { include: { fields: true } },
         sources: { select: { id: true } },
+        sheetMappings: {
+          where: { status: { not: "unlinked" } },
+          take: 1,
+          select: {
+            id: true,
+            status: true,
+            syncState: { select: { lastSyncAt: true } },
+            _count: { select: { syncConflicts: true } },
+          },
+        },
       },
       orderBy: { createdAt: "desc" },
     });
@@ -41,6 +51,16 @@ export async function GET(req: NextRequest) {
               schema: { include: { fields: true } },
               sources: { select: { id: true } },
               organization: { select: { id: true, name: true } },
+              sheetMappings: {
+                where: { status: { not: "unlinked" } },
+                take: 1,
+                select: {
+                  id: true,
+                  status: true,
+                  syncState: { select: { lastSyncAt: true } },
+                  _count: { select: { syncConflicts: { where: { status: "pending" } } } },
+                },
+              },
             },
             orderBy: { createdAt: "desc" },
           })

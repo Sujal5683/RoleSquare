@@ -133,7 +133,7 @@ export function ExtractionRunsTab() {
             const isSelected = job.id === selectedJobId;
             const targetDs = datasets?.find(d => d.id === payload?.targetDatasetId);
             const sourceDs = datasets?.find(d => d.id === payload?.sourceDatasetId);
-            const targetName = payload?.targetDatasetName || targetDs?.name || (payload?.targetDatasetId ? String(payload.targetDatasetId).slice(0, 8) + "…" : "New");
+            const targetName = String(payload?.targetDatasetName || targetDs?.name || (payload?.targetDatasetId ? String(payload.targetDatasetId).slice(0, 8) + "…" : "New"));
             return (
               <button
                 key={job.id}

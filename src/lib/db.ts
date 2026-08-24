@@ -12,7 +12,6 @@ export const db =
 
 if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = db;
 
-// Force re-compilation of Prisma Client types in Next.js dev server
 // Start the in-process job runner. This ensures queued/running jobs are
 // processed even in the Next.js dev server environment. The runner is
 // lazy — it only starts on first import and polls every 5 seconds.

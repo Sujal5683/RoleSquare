@@ -57,13 +57,16 @@ model Organization {
   usageMetrics       UsageMetric[]
   sharingReqs        SharingRequest[]
   sharePerms         SharingPermission[]
-  webhooks           Webhook[]
-  apiKeys            ApiKey[]
-  crossOrgPerms      CrossOrgPermission[] @relation("OwnedCrossOrgPerms")
-  invitations        Invitation[]
-  ownedAccesses      DatasetAccess[]      @relation("OwnerOrgAccess")
-  granteeOrgAccesses DatasetAccess[]      @relation("GranteeOrgAccess")
-  googleIntegrations GoogleIntegration[]
+  webhooks               Webhook[]
+  apiKeys                ApiKey[]
+  crossOrgPerms          CrossOrgPermission[]   @relation("OwnedCrossOrgPerms")
+  invitations            Invitation[]
+  ownedAccesses          DatasetAccess[]        @relation("OwnerOrgAccess")
+  granteeOrgAccesses     DatasetAccess[]        @relation("GranteeOrgAccess")
+  // Google Sheets Integration
+  googleSheetsAccounts   GoogleSheetsAccount[]
+  spreadsheetConnections SpreadsheetConnection[]
+  sheetMappings          SheetMapping[]
 }
 
 model ApiKey {
@@ -120,7 +123,6 @@ model GoogleConnection {
   user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
   organization Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
   sources      Source[]
-  googleIntegrations GoogleIntegration[]
 
   @@index([userId])
   @@index([organizationId])
@@ -325,7 +327,6 @@ model SchemaField {
   confidenceThreshold Float  @default(0.7) // min confidence before routing to review (0..1)
 
   schema Schema @relation(fields: [schemaId], references: [id], onDelete: Cascade)
-  columnMappings DatasetColumnMapping[]
 
   @@index([schemaId])
 }
@@ -356,9 +357,11 @@ model Dataset {
   sharingReqs     SharingRequest[]
   crossOrgPerms   CrossOrgPermission[]
   datasetAccesses DatasetAccess[]
-  sheetMappings   SheetMapping[]
-  schemaVersions  DatasetSchemaVersion[]
-  rowExternalIds  DatasetRowExternalId[]
+  // Google Sheets Integration
+  sheetMappings        SheetMapping[]
+  schemaVersions       DatasetSchemaVersion[]
+  columnDefs           DatasetColumnDef[]
+  rowExternalIds       DatasetRowExternalId[]
 
   @@index([organizationId])
 }
@@ -374,7 +377,6 @@ model DatasetRecord {
 
   dataset Dataset        @relation(fields: [datasetId], references: [id], onDelete: Cascade)
   values  DatasetValue[]
-  externalIds DatasetRowExternalId[]
 
   @@index([datasetId])
   @@index([status])
@@ -662,170 +664,263 @@ model AgentLog {
 }
 
 // ────────────────────────────────────────────────────────────────────────────
-// Google Sheets Integration Architecture
+// Google Sheets Integration
+// Separate from the Gmail/Drive GoogleConnection — uses different scopes and
+// can be a completely different Google account from the user's app login.
 // ────────────────────────────────────────────────────────────────────────────
 
-model GoogleIntegration {
-  id                 String   @id @default(cuid())
-  organizationId     String
-  googleConnectionId String
-  status             String   @default("active") // active | error | disconnected
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
+/// A Google account connected specifically for Sheets access.
+/// Completely separate from GoogleConnection (which is for Gmail/Drive).
+/// The user can connect work@company.com for Sheets while their app login
+/// and Gmail connection uses personal@gmail.com.
+model GoogleSheetsAccount {
+  id             String    @id @default(cuid())
+  organizationId String
+  userId         String    // the app user who connected it
+  googleEmail    String
+  displayName    String?
+  avatarUrl      String?
+  scopes         String    @default("spreadsheets,drive.readonly")
+  status         String    @default("active") // active | expired | revoked | degraded
+  accessToken    String?   // AES-256-GCM encrypted short-lived token
+  refreshToken   String?   // AES-256-GCM encrypted long-lived token
+  tokenExpiresAt DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
 
-  organization       Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  connection         GoogleConnection     @relation(fields: [googleConnectionId], references: [id], onDelete: Cascade)
-  spreadsheets       SpreadsheetConnection[]
+  organization           Organization            @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  spreadsheetConnections SpreadsheetConnection[]
+  importJobs             ImportJob[]
 
+  @@unique([organizationId, googleEmail])
   @@index([organizationId])
-  @@index([googleConnectionId])
+  @@index([userId])
 }
 
+/// A specific Google Spreadsheet (Drive file) linked to the organization.
+/// Multiple datasets can share the same spreadsheet via different tabs.
 model SpreadsheetConnection {
-  id                  String   @id @default(cuid())
-  googleIntegrationId String
-  spreadsheetId       String
-  name                String
-  url                 String?
-  status              String   @default("active") // active | unavailable
-  createdAt           DateTime @default(now())
-  updatedAt           DateTime @updatedAt
+  id              String   @id @default(cuid())
+  organizationId  String
+  sheetsAccountId String
+  spreadsheetId   String   // Google's unique spreadsheetId
+  spreadsheetName String
+  spreadsheetUrl  String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
-  integration         GoogleIntegration @relation(fields: [googleIntegrationId], references: [id], onDelete: Cascade)
-  sheetMappings       SheetMapping[]
+  organization  Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  sheetsAccount GoogleSheetsAccount @relation(fields: [sheetsAccountId], references: [id], onDelete: Cascade)
+  sheetMappings SheetMapping[]
 
-  @@index([googleIntegrationId])
-  @@index([spreadsheetId])
+  @@unique([organizationId, spreadsheetId])
+  @@index([organizationId])
+  @@index([sheetsAccountId])
 }
 
+/// A specific tab within a spreadsheet, linked to exactly one dataset.
+/// The same spreadsheet can have multiple SheetMappings for different tabs.
 model SheetMapping {
   id                      String   @id @default(cuid())
-  spreadsheetConnectionId String
+  organizationId          String
   datasetId               String
-  sheetId                 String   // the internal ID of the tab
-  sheetName               String   // the name of the tab
-  syncEnabled             Boolean  @default(false)
-  syncDirection           String   @default("two_way") // two_way | app_to_sheet | sheet_to_app
-  conflictStrategy        String   @default("manual") // manual | keep_app | keep_sheet
-  status                  String   @default("connected") // connected | warning | mismatch | error
-  lastSyncAt              DateTime?
-  schemaFingerprint       String?  // SHA256 of expected sheet schema
+  spreadsheetConnectionId String
+  sheetId                 Int      // Google's numeric sheetId for protected ranges
+  sheetName               String   // tab name
+  direction               String   @default("bidirectional") // to_sheet | from_sheet | bidirectional
+  schemaFingerprint       String?  // SHA256(columnId+name+order+type) — changes trigger mismatch
+  rowIdColumnIndex        Int?     // 0-based index of hidden row-ID column in sheet
+  status                  String   @default("active") // active | paused | error | schema_mismatch | unlinked
   createdAt               DateTime @default(now())
   updatedAt               DateTime @updatedAt
 
-  spreadsheetConnection   SpreadsheetConnection @relation(fields: [spreadsheetConnectionId], references: [id], onDelete: Cascade)
-  dataset                 Dataset               @relation(fields: [datasetId], references: [id], onDelete: Cascade)
-  syncStates              SyncState[]
-  syncEvents              SyncEvent[]
-  syncConflicts           SyncConflict[]
-  columnMappings          DatasetColumnMapping[]
+  organization          Organization          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  dataset               Dataset               @relation(fields: [datasetId], references: [id], onDelete: Cascade)
+  spreadsheetConnection SpreadsheetConnection @relation(fields: [spreadsheetConnectionId], references: [id], onDelete: Cascade)
+  syncState             SyncState?
+  syncEvents            SyncEvent[]
+  syncConflicts         SyncConflict[]
+  rowExternalIds        DatasetRowExternalId[]
 
-  @@unique([spreadsheetConnectionId, sheetId])
+  @@index([organizationId])
+  @@index([datasetId])
+  @@index([spreadsheetConnectionId])
+}
+
+/// Schema version snapshot — created before every schema-changing operation.
+/// Enables rollback to any previous version.
+model DatasetSchemaVersion {
+  id           String   @id @default(cuid())
+  datasetId    String
+  version      Int      // monotonically increasing
+  columns      String   // JSON: DatasetColumnDef[] snapshot
+  fingerprint  String   // SHA256 of the serialized column set
+  changedBy    String?  // userId who approved the change
+  changeSource String   // user | sync | import | rollback | initial
+  reason       String?
+  createdAt    DateTime @default(now())
+
+  dataset Dataset @relation(fields: [datasetId], references: [id], onDelete: Cascade)
+
+  @@unique([datasetId, version])
   @@index([datasetId])
 }
 
+/// Permanent column definition — the authoritative schema for a dataset.
+/// Every column has a stable columnId that is never reused.
+model DatasetColumnDef {
+  id         String   @id @default(cuid())
+  datasetId  String
+  columnId   String   // permanent stable identifier, e.g. "col_8f91a3..."
+  name       String   // display name
+  dataType   String   // text | number | integer | decimal | boolean | date | datetime | email | url | currency | enum
+  position   Int      // display/column order
+  required   Boolean  @default(false)
+  options    String?  // JSON array — for enum type
+  validation String?  // JSON: { min?, max?, regex? }
+  isDeleted  Boolean  @default(false) // soft-delete
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  dataset Dataset @relation(fields: [datasetId], references: [id], onDelete: Cascade)
+
+  @@unique([datasetId, columnId])
+  @@index([datasetId])
+}
+
+/// Stable mapping between an application DatasetRecord and a Google Sheet row.
+/// Uses a hidden app-controlled UUID column in the sheet, NOT the row number.
+model DatasetRowExternalId {
+  id             String    @id @default(cuid())
+  datasetId      String
+  recordId       String    @unique // DatasetRecord.id
+  sheetMappingId String
+  externalId     String    // stable UUID stored in the sheet's hidden column
+  sheetRowIndex  Int?      // last known row number — informational only
+  lastSyncedAt   DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  dataset      Dataset      @relation(fields: [datasetId], references: [id], onDelete: Cascade)
+  sheetMapping SheetMapping @relation(fields: [sheetMappingId], references: [id], onDelete: Cascade)
+
+  @@unique([sheetMappingId, externalId])
+  @@index([datasetId])
+  @@index([sheetMappingId])
+}
+
+/// Current synchronization state and configuration for a SheetMapping.
 model SyncState {
-  id             String   @id @default(cuid())
-  sheetMappingId String
-  checkpoint     String?  // high-water mark or page token for syncing
-  stats          String   @default("{}") // JSON for total synced rows, errors
-  lastAttemptAt  DateTime?
-  lastSuccessAt  DateTime?
-  errorMessage   String?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  id               String    @id @default(cuid())
+  sheetMappingId   String    @unique
+  enabled          Boolean   @default(true)
+  conflictStrategy String    @default("flag") // flag | app_wins | sheet_wins
+  scheduleMode     String    @default("interval") // interval | manual
+  scheduleExpr     String    @default("5m")
+  lastSyncAt       DateTime?
+  lastSyncStatus   String?   // success | partial | failed | schema_change
+  lastSyncEventId  String?
+  nextSyncAt       DateTime?
+  syncedRows       Int       @default(0)
+  errorCount       Int       @default(0)
+  conflictCount    Int       @default(0)
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
 
-  sheetMapping   SheetMapping @relation(fields: [sheetMappingId], references: [id], onDelete: Cascade)
-
-  @@index([sheetMappingId])
+  sheetMapping SheetMapping @relation(fields: [sheetMappingId], references: [id], onDelete: Cascade)
 }
 
+/// Complete record of every sync run for a SheetMapping.
 model SyncEvent {
-  id             String   @id @default(cuid())
+  id             String    @id @default(cuid())
   sheetMappingId String
-  status         String   // success | failed | partial | conflict
-  rowsAdded      Int      @default(0)
-  rowsUpdated    Int      @default(0)
-  rowsDeleted    Int      @default(0)
-  conflictsFound Int      @default(0)
-  errors         Int      @default(0)
-  details        String?  // JSON
-  startedAt      DateTime
+  startedAt      DateTime  @default(now())
   finishedAt     DateTime?
+  status         String    // running | success | partial | failed | schema_change | conflict
+  direction      String    @default("bidirectional")
+  rowsAdded      Int       @default(0)
+  rowsUpdated    Int       @default(0)
+  rowsDeleted    Int       @default(0)
+  conflicts      Int       @default(0)
+  errors         Int       @default(0)
+  schemaChanges  String?   // JSON array of detected schema changes
+  errorDetail    String?
+  triggeredBy    String    @default("scheduler") // scheduler | manual | webhook | reconcile
 
-  sheetMapping   SheetMapping @relation(fields: [sheetMappingId], references: [id], onDelete: Cascade)
-
-  @@index([sheetMappingId])
-  @@index([startedAt])
-}
-
-model SyncConflict {
-  id             String   @id @default(cuid())
-  sheetMappingId String
-  recordId       String?  // The app dataset record ID
-  sheetRowId     String?  // The sheet row identifier
-  status         String   @default("pending") // pending | resolved_app | resolved_sheet | ignored
-  appData        String   // JSON of app state
-  sheetData      String   // JSON of sheet state
-  resolutionData String?  // JSON of final chosen state
-  resolvedBy     String?  
-  resolvedAt     DateTime?
-  createdAt      DateTime @default(now())
-
-  sheetMapping   SheetMapping @relation(fields: [sheetMappingId], references: [id], onDelete: Cascade)
+  sheetMapping SheetMapping @relation(fields: [sheetMappingId], references: [id], onDelete: Cascade)
 
   @@index([sheetMappingId])
   @@index([status])
+  @@index([startedAt])
 }
 
-model DatasetSchemaVersion {
-  id             String   @id @default(cuid())
-  datasetId      String
-  version        Int
-  schemaDef      String   // JSON representation of the schema fields
-  changedColumns String?  // JSON tracking what changed (renamed, added, removed)
-  impactRows     Int      @default(0)
-  source         String   @default("app") // app | google_sheets | import
-  approvedBy     String?
-  createdAt      DateTime @default(now())
+/// Per-cell conflict detected when both the app and the sheet changed the same value.
+/// Requires user resolution before sync can continue.
+model SyncConflict {
+  id              String    @id @default(cuid())
+  sheetMappingId  String
+  recordId        String    // DatasetRecord.id
+  columnId        String    // DatasetColumnDef.columnId
+  columnName      String    // human-readable for display
+  appValue        String?   // JSON-encoded current app value
+  sheetValue      String?   // JSON-encoded current sheet value
+  lastSyncedValue String?   // JSON-encoded value at last successful sync
+  detectedAt      DateTime  @default(now())
+  resolvedAt      DateTime?
+  resolvedBy      String?   // userId
+  resolution      String?   // keep_app | keep_sheet | manual
+  status          String    @default("pending") // pending | resolved | auto_resolved
 
-  dataset        Dataset  @relation(fields: [datasetId], references: [id], onDelete: Cascade)
+  sheetMapping SheetMapping @relation(fields: [sheetMappingId], references: [id], onDelete: Cascade)
 
-  @@index([datasetId, version])
+  @@index([sheetMappingId, status])
+  @@index([recordId])
 }
 
-model DatasetColumnMapping {
-  id             String   @id @default(cuid())
-  sheetMappingId String
-  fieldId        String
-  sheetColumnId  String?  // Google sheets column letter/index or ID
-  sheetColumnName String  // The header text
-  confidence     Float    @default(1.0)
-  isConfirmed    Boolean  @default(true)
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+/// An import operation from Google Sheets (one-time, not continuous sync).
+model ImportJob {
+  id              String    @id @default(cuid())
+  organizationId  String
+  userId          String
+  datasetId       String?   // null if creating a new dataset during import
+  newDatasetName  String?
+  sheetsAccountId String
+  spreadsheetId   String
+  spreadsheetName String?
+  sheetName       String
+  importMode      String    @default("append") // append | update_existing | append_update | replace
+  matchField      String?   // columnId to match on for update_existing
+  status          String    @default("pending") // pending | running | success | partial | failed
+  totalRows       Int       @default(0)
+  processedRows   Int       @default(0)
+  insertedRows    Int       @default(0)
+  updatedRows     Int       @default(0)
+  skippedRows     Int       @default(0)
+  errorRows       Int       @default(0)
+  errors          String?   // JSON: { row, message }[]
+  createdAt       DateTime  @default(now())
+  startedAt       DateTime?
+  finishedAt      DateTime?
 
-  sheetMapping   SheetMapping @relation(fields: [sheetMappingId], references: [id], onDelete: Cascade)
-  field          SchemaField  @relation(fields: [fieldId], references: [id], onDelete: Cascade)
+  sheetsAccount GoogleSheetsAccount @relation(fields: [sheetsAccountId], references: [id])
+  mappings      ImportMapping[]
 
-  @@unique([sheetMappingId, fieldId])
-  @@unique([sheetMappingId, sheetColumnName])
-  @@index([sheetMappingId])
+  @@index([organizationId])
+  @@index([status])
 }
 
-model DatasetRowExternalId {
-  id             String   @id @default(cuid())
-  datasetId      String
-  recordId       String
-  system         String   @default("google_sheets")
-  externalRowId  String   // A permanent unique ID assigned to the row in the sheet
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+/// Column-to-column mapping for a specific ImportJob.
+model ImportMapping {
+  id           String  @id @default(cuid())
+  importJobId  String
+  sheetHeader  String  // Google Sheet column header
+  columnId     String? // DatasetColumnDef.columnId — null = skip
+  columnName   String? // resolved column name
+  dataType     String? // resolved data type
+  isNewColumn  Boolean @default(false) // true = create new column on import
+  confidence   Float   @default(0)    // AI mapping confidence 0..1
 
-  dataset        Dataset       @relation(fields: [datasetId], references: [id], onDelete: Cascade)
-  record         DatasetRecord @relation(fields: [recordId], references: [id], onDelete: Cascade)
+  importJob ImportJob @relation(fields: [importJobId], references: [id], onDelete: Cascade)
 
-  @@unique([datasetId, recordId, system])
-  @@unique([datasetId, externalRowId, system])
-  @@index([datasetId])
+  @@index([importJobId])
 }

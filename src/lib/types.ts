@@ -215,6 +215,11 @@ export interface DatasetDTO {
   isShared?: boolean;
   ownerOrgName?: string;
   ownerOrgId?: string;
+  // Google Sheets sync metadata (populated when dataset is linked)
+  sheetMappingId?: string | null;
+  syncStatus?: string | null;
+  lastSyncAt?: string | null;
+  pendingConflicts?: number;
 }
 
 export interface AiJobDTO {
