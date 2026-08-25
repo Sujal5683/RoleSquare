@@ -117,11 +117,43 @@ export async function runSync(
     const sheetName = mapping.sheetName;
 
     // 1. Get current columns
-    const columns = await getCurrentColumns(mapping.datasetId);
+    let columns = await getCurrentColumns(mapping.datasetId);
     if (!columns.length) {
-      throw new Error(
-        "Dataset has no column definitions. Initialize columns before syncing."
-      );
+      // Fallback: read from DatasetColumnDef directly (handles datasets that have
+      // imported columns but no formal Schema linked yet)
+      const rawCols = await db.datasetColumnDef.findMany({
+        where: { datasetId: mapping.datasetId, isDeleted: false },
+        orderBy: { position: "asc" },
+      });
+      if (rawCols.length) {
+        columns = rawCols.map((c) => ({
+          columnId: c.columnId,
+          name: c.name,
+          dataType: c.dataType,
+          position: c.position,
+          required: c.required,
+        }));
+      } else {
+        throw new Error(
+          "Dataset has no column definitions. Initialize columns before syncing."
+        );
+      }
+    }
+
+    // 1a. Ensure SyncState exists (may be null for newly-linked datasets)
+    if (!mapping.syncState) {
+      await db.syncState.upsert({
+        where: { sheetMappingId },
+        create: {
+          sheetMappingId,
+          enabled: true,
+          conflictStrategy: "flag",
+          syncedRows: 0,
+          errorCount: 0,
+          conflictCount: 0,
+        },
+        update: {},
+      });
     }
 
     // 2. Fetch sheet data (headers + all rows)
@@ -218,26 +250,22 @@ export async function runSync(
     if (mapping.direction !== "from_sheet") {
       const rowsToAppend: string[][] = [];
       const sheetUpdates: Array<{ rowIndex: number; rowData: string[] }> = [];
+      // External ID records to create AFTER successful batch append
+      const pendingExternalIds: Array<{ recordId: string; externalId: string }> = [];
 
       for (const record of appRecords) {
         const extId = externalIdByRecordId.get(record.id);
 
         if (!extId) {
           // New app record — push to sheet as a new row
+          // IMPORTANT: create the externalId DB record AFTER the append succeeds,
+          // not before, to avoid orphaned IDs if the sheet write fails mid-way.
           const newExtId = randomUUID();
           const rowData = buildSheetRow(record, columns, newExtId);
           rowsToAppend.push(rowData);
 
-          // We'll create the external ID mapping after appending
-          // (using a best-effort approach since we don't know the exact row index)
-          await db.datasetRowExternalId.create({
-            data: {
-              datasetId: mapping.datasetId,
-              recordId: record.id,
-              sheetMappingId,
-              externalId: newExtId,
-            },
-          });
+          // Store (extId, record.id) to create mappings after batch append
+          pendingExternalIds.push({ recordId: record.id, externalId: newExtId });
 
           result.rowsAdded++;
           continue;
@@ -273,9 +301,20 @@ export async function runSync(
         }
       }
 
-      // Append new rows in batch
+      // Append new rows in batch — create external ID mappings only after success
       if (rowsToAppend.length > 0) {
         await appendRowsToSheet(sheetsAccountId, spreadsheetId, sheetName, rowsToAppend);
+        // Now that the append succeeded, safely create the DB mappings
+        for (const { recordId, externalId } of pendingExternalIds) {
+          await db.datasetRowExternalId.create({
+            data: {
+              datasetId: mapping.datasetId,
+              recordId,
+              sheetMappingId,
+              externalId,
+            },
+          });
+        }
       }
 
       // Apply updates

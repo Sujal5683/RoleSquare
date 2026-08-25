@@ -199,11 +199,20 @@ export interface DatasetRecordDTO {
   values: DatasetValueDTO[];
 }
 
+export interface DatasetColumnDefDTO {
+  columnId: string;
+  name: string;
+  dataType: string;
+  required: boolean;
+  position: number;
+}
+
 export interface DatasetDTO {
   id: string;
   organizationId: string;
   schemaId: string | null;
   schema?: SchemaDTO | null;
+  columnDefs?: DatasetColumnDefDTO[];
   name: string;
   description: string | null;
   recordCount: number;

@@ -38,6 +38,7 @@ export async function POST(req: NextRequest) {
       sheetName,
       direction = "bidirectional",
       conflictStrategy = "flag",
+      scheduleExpr = "5m",
       doPush = false,
       columnMappings = [],
     } = body;
@@ -134,6 +135,8 @@ export async function POST(req: NextRequest) {
           sheetMappingId: m.id,
           enabled: true,
           conflictStrategy,
+          scheduleMode: scheduleExpr === "manual" ? "manual" : "interval",
+          scheduleExpr: scheduleExpr === "manual" ? "5m" : scheduleExpr,
         },
       });
 

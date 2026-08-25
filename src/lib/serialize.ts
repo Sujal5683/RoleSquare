@@ -264,6 +264,13 @@ export function serializeDataset(d: any): DatasetDTO {
     organizationId: d.organizationId,
     schemaId: d.schemaId ?? null,
     schema: d.schema ? serializeSchema(d.schema) : null,
+    columnDefs: Array.isArray(d.columnDefs) ? d.columnDefs.map((c: any) => ({
+      columnId: c.columnId,
+      name: c.name,
+      dataType: c.dataType,
+      required: c.required,
+      position: c.position,
+    })) : undefined,
     name: d.name,
     description: d.description ?? null,
     recordCount: d.recordCount,

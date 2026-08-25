@@ -105,8 +105,10 @@ import {
   Upload,
   Sparkles,
   Zap,
+  AlertTriangle,
 } from "lucide-react";
 import type { SchemaDTO } from "@/lib/types";
+import { NewShareRequestDialog } from "@/components/sharing/new-share-request-dialog";
 
 
 // ── Helpers ──────────────────────────────────────────────────────────────
@@ -242,6 +244,7 @@ export function DatasetDetailView() {
   const [extractDialog, setExtractDialog] = useState(false);
   const [extractSchemaId, setExtractSchemaId] = useState("");
   const [extractDatasetName, setExtractDatasetName] = useState("");
+  const [shareOpen, setShareOpen] = useState(false);
 
   // Inline Record Editing state
   const [editValue, setEditValue] = useState<DatasetValueDTO | null>(null);
@@ -448,7 +451,27 @@ export function DatasetDetailView() {
   });
 
   // ── Derived: visible fields ───────────────────────────────────────────
-  const allFields = useMemo(() => dataset?.schema?.fields ?? [], [dataset]);
+  const allFields = useMemo(() => {
+    if (dataset?.schema?.fields && dataset.schema.fields.length > 0) {
+      return dataset.schema.fields;
+    }
+    if (dataset?.columnDefs && dataset.columnDefs.length > 0) {
+      return dataset.columnDefs.map((c) => ({
+        id: c.columnId,
+        name: c.name,
+        type: c.dataType as any,
+        description: null,
+        instructions: null,
+        required: c.required,
+        options: null,
+        validation: null,
+        position: c.position,
+        confidenceThreshold: 0.7,
+      }));
+    }
+    return [];
+  }, [dataset]);
+
   const visibleFields = useMemo(
     () => allFields.filter((f) => !hiddenFields.has(f.id)),
     [allFields, hiddenFields]
@@ -534,32 +557,11 @@ export function DatasetDetailView() {
     );
   }
 
-  // ── No schema → empty state ───────────────────────────────────────────
-  if (!dataset.schema) {
-    return (
-      <div className="space-y-4">
-        <DetailTopBar
-          dataset={dataset}
-          onBack={() => setView("datasets")}
-          onRefresh={() => refetchDataset()}
-          refreshing={false}
-          onExport={(f) => exportMutation.mutate({ format: f })}
-          exporting={exportMutation.isPending}
-        />
-        <EmptyState
-          icon={<Database className="h-5 w-5" />}
-          title="No schema assigned"
-          description="This dataset doesn't have a schema yet, so it has no columns. Assign a schema to start exploring records in the Airtable-style grid."
-          action={
-            <Button size="sm" onClick={() => setView("schema-builder")}>
-              <Database className="mr-2 h-3.5 w-3.5" />
-              Open Schema Builder
-            </Button>
-          }
-        />
-      </div>
-    );
-  }
+  // ── No schema → soft banner (don't hard-block when imported columns exist) ─
+  // Datasets imported from Google Sheets have DatasetColumnDef rows but the
+  // schema link may not be set yet. We show a gentle banner instead of
+  // redirecting the user to the Schema Builder every time.
+  const noSchema = !dataset.schema;
 
   return (
     <div className="space-y-4">
@@ -570,7 +572,33 @@ export function DatasetDetailView() {
         refreshing={recordsFetching}
         onExport={(f) => exportMutation.mutate({ format: f })}
         exporting={exportMutation.isPending}
+        onShare={() => setShareOpen(true)}
       />
+
+      {/* Inline share dialog */}
+      <NewShareRequestDialog
+        open={shareOpen}
+        onOpenChange={setShareOpen}
+        dataset={dataset as any}
+      />
+
+      {/* Soft no-schema banner — doesn't block the grid */}
+      {noSchema && (
+        <div className="flex items-center gap-3 rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm">
+          <AlertTriangle className="h-4 w-4 shrink-0 text-amber-400" />
+          <span className="text-amber-200">
+            No schema assigned — showing imported columns. Records are visible but field types may be approximate.
+          </span>
+          <Button
+            variant="outline"
+            size="sm"
+            className="ml-auto shrink-0 border-amber-500/40 text-amber-300 hover:bg-amber-500/20"
+            onClick={() => setView("schema-builder")}
+          >
+            Assign Schema
+          </Button>
+        </div>
+      )}
 
       {/* Saved views bar */}
       {savedViews.length > 0 && (
@@ -1209,6 +1237,7 @@ function DetailTopBar({
   refreshing,
   onExport,
   exporting,
+  onShare,
 }: {
   dataset: DatasetDTO | null;
   onBack: () => void;
@@ -1216,6 +1245,7 @@ function DetailTopBar({
   refreshing: boolean;
   onExport: (format: "csv" | "json") => void;
   exporting: boolean;
+  onShare?: () => void;
 }) {
   const setView = useAppStore((s) => s.setView);
   return (
@@ -1269,12 +1299,7 @@ function DetailTopBar({
         <Button
           variant="outline"
           size="sm"
-          onClick={() => {
-            toast.info("Open Sharing Center", {
-              description: "Manage dataset sharing permissions and requests.",
-            });
-            setView("sharing");
-          }}
+          onClick={() => onShare?.()}
         >
           <Share2 className="mr-2 h-3.5 w-3.5" />
           Share

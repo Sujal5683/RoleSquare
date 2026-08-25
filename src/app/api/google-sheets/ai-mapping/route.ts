@@ -44,13 +44,34 @@ export async function POST(req: NextRequest) {
       }
       datasetName = dataset.name;
 
-      const columns = await getCurrentColumns(datasetId);
-      appColumns = columns.map((c) => ({
-        columnId: c.columnId,
-        name: c.name,
-        dataType: c.dataType,
-        required: c.required,
-      }));
+      // Try schema-based columns first
+      const schemaCols = await getCurrentColumns(datasetId);
+      if (schemaCols.length > 0) {
+        appColumns = schemaCols.map((c) => ({
+          columnId: c.columnId,
+          name: c.name,
+          dataType: c.dataType,
+          required: c.required,
+        }));
+      } else {
+        // Fallback: use DatasetColumnDef rows directly (imported datasets without a Schema link)
+        const rawCols = await db.datasetColumnDef.findMany({
+          where: { datasetId, isDeleted: false },
+          orderBy: { position: "asc" },
+          select: {
+            columnId: true,
+            name: true,
+            dataType: true,
+            required: true,
+          },
+        });
+        appColumns = rawCols.map((c) => ({
+          columnId: c.columnId,
+          name: c.name,
+          dataType: c.dataType,
+          required: c.required,
+        }));
+      }
     }
 
     const result = await suggestColumnMappings(
@@ -63,6 +84,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(result);
   } catch (err) {
     if (err instanceof AuthError) return authErrorResponse(err);
+    console.error("[ai-mapping] Error:", err);
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Failed to generate AI mapping" },
       { status: 500 }

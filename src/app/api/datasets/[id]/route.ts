@@ -14,6 +14,7 @@ async function requireDataset(id: string, organizationId: string, userId: string
     where: { id },
     include: {
       schema: { include: { fields: { orderBy: { position: "asc" } } } },
+      columnDefs: { orderBy: { position: "asc" } },
       sources: { select: { id: true } },
     },
   });

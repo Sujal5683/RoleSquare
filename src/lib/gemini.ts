@@ -38,32 +38,32 @@ interface ModelDef {
 
 const MODEL_CHAIN: ModelDef[] = [
   {
-    id: "gemini-3.7-flash",
-    displayName: "Gemini 3.7 Flash",
+    id: "gemini-2.0-flash-exp",
+    displayName: "Gemini 2.0 Flash",
     role: "Primary",
     rpmCooldownMs: 60_000,
   },
   {
-    id: "gemini-3.6-flash",
-    displayName: "Gemini 3.6 Flash",
+    id: "gemini-2.0-flash",
+    displayName: "Gemini 2.0 Flash Stable",
     role: "Fallback 1",
     rpmCooldownMs: 60_000,
   },
   {
-    id: "gemini-3.5-flash",
-    displayName: "Gemini 3.5 Flash",
+    id: "gemini-1.5-flash",
+    displayName: "Gemini 1.5 Flash",
     role: "Fallback 2",
     rpmCooldownMs: 60_000,
   },
   {
-    id: "gemini-3.5-flash-lite",
-    displayName: "Gemini 3.5 Flash Lite",
+    id: "gemini-1.5-flash-8b",
+    displayName: "Gemini 1.5 Flash 8B",
     role: "Fallback 3",
     rpmCooldownMs: 60_000,
   },
   {
-    id: "gemini-3.1-flash-lite",
-    displayName: "Gemini 3.1 Flash Lite",
+    id: "gemini-1.0-pro",
+    displayName: "Gemini 1.0 Pro",
     role: "Fallback 4",
     rpmCooldownMs: 60_000,
   },
@@ -224,7 +224,7 @@ export async function callGeminiWithFallback(
       const result = await Promise.race([
         chat.sendMessage(lastMessage.content),
         new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error("Timeout: model did not respond within 10s")), 10000)
+          setTimeout(() => reject(new Error("Timeout: model did not respond within 30s")), 30000)
         ),
       ]);
       const response = result.response;

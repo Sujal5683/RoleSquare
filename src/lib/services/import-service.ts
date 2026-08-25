@@ -94,7 +94,7 @@ export async function processImport(params: ImportParams): Promise<ImportProgres
     let datasetId = job.datasetId;
 
     if (!datasetId) {
-      // Create new dataset
+      // Create new dataset (schemaId will be set by createColumnsFromMappings below)
       const dataset = await db.dataset.create({
         data: {
           organizationId,
@@ -107,8 +107,11 @@ export async function processImport(params: ImportParams): Promise<ImportProgres
       datasetId = dataset.id;
       await db.importJob.update({ where: { id: importJobId }, data: { datasetId } });
 
-      // Initialize columns from import mappings
-      await createColumnsFromMappings(datasetId, job.mappings, userId);
+      // Initialize columns from import mappings AND auto-create a linked Schema
+      await createColumnsFromMappings(datasetId, job.mappings, userId, {
+        datasetName: job.newDatasetName || job.sheetName || "Imported Dataset",
+        organizationId,
+      });
     }
 
     // 3. Get current column definitions
@@ -295,6 +298,11 @@ async function processBatch(
 
 // ── Column creation from import mappings ──────────────────────────────────────
 
+/**
+ * Creates DatasetColumnDef rows from the import mappings.
+ * Also auto-creates a proper Schema + SchemaField record so that dataset.schema
+ * is never null after a Google Sheets import (fixes the "build a schema" wall).
+ */
 async function createColumnsFromMappings(
   datasetId: string,
   mappings: Array<{
@@ -304,10 +312,11 @@ async function createColumnsFromMappings(
     dataType: string | null;
     isNewColumn: boolean;
   }>,
-  userId: string
+  userId: string,
+  meta: { datasetName: string; organizationId: string }
 ): Promise<void> {
   const { randomUUID } = await import("crypto");
-  const columns: import("@/lib/services/schema-validation").ColumnSpec[] = [];
+  const columns: ColumnSpec[] = [];
   let position = 0;
 
   for (const mapping of mappings) {
@@ -334,6 +343,65 @@ async function createColumnsFromMappings(
   }
 
   await createSchemaVersion(datasetId, columns, "import", userId, "Initial import schema");
+
+  // ── Auto-create a proper Schema + SchemaField record and link it ──────────
+  // Without this, dataset.schema is null → the app shows "build a schema" prompt
+  // every time the user opens a dataset that was imported from Google Sheets.
+  if (columns.length > 0) {
+    await createImportedSchema(datasetId, columns, userId, meta);
+  }
+}
+
+/**
+ * Creates a Schema record (visible in Schema Builder) from the imported column
+ * definitions, then links the dataset to it via schemaId.
+ * Idempotent — if a schema is already linked this is a no-op.
+ */
+async function createImportedSchema(
+  datasetId: string,
+  columns: ColumnSpec[],
+  userId: string,
+  meta: { datasetName: string; organizationId: string }
+): Promise<void> {
+  // Guard: check if a schema is already linked (e.g. user selected existing schema)
+  const existing = await db.dataset.findUnique({
+    where: { id: datasetId },
+    select: { schemaId: true },
+  });
+  if (existing?.schemaId) return;
+
+  // Create the Schema record
+  const schema = await db.schema.create({
+    data: {
+      organizationId: meta.organizationId,
+      createdBy: userId,
+      name: `${meta.datasetName} (imported)`,
+      description:
+        "Auto-generated schema from Google Sheets import. You can rename or modify fields in the Schema Builder.",
+      isDefault: false,
+      datasetType: "custom",
+      version: 1,
+    },
+  });
+
+  // Create SchemaField rows mirroring the DatasetColumnDef rows
+  await db.schemaField.createMany({
+    data: columns.map((col) => ({
+      schemaId: schema.id,
+      name: col.name,
+      type: col.dataType,
+      description: null,
+      required: col.required,
+      position: col.position,
+      confidenceThreshold: 0.7,
+    })),
+  });
+
+  // Link the schema to the dataset
+  await db.dataset.update({
+    where: { id: datasetId },
+    data: { schemaId: schema.id },
+  });
 }
 
 // ── Finalize ──────────────────────────────────────────────────────────────────

@@ -64,6 +64,7 @@ interface WizardState {
   columnMappings: ColumnMappingEntry[];
   direction: "bidirectional" | "to_sheet" | "from_sheet";
   conflictStrategy: "flag" | "app_wins" | "sheet_wins";
+  scheduleExpr: string;
   doPush: boolean;
 }
 
@@ -113,6 +114,7 @@ export function LinkSheetWizard({
     columnMappings: [],
     direction: "bidirectional",
     conflictStrategy: "flag",
+    scheduleExpr: "5m",
     doPush: true,
   });
 
@@ -175,6 +177,7 @@ export function LinkSheetWizard({
         columnMappings: [],
         direction: "bidirectional",
         conflictStrategy: "flag",
+        scheduleExpr: "5m",
         doPush: true,
       });
     },
@@ -195,7 +198,7 @@ export function LinkSheetWizard({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Link2 className="h-5 w-5 text-emerald-400" />
@@ -226,7 +229,7 @@ export function LinkSheetWizard({
         </p>
 
         {/* Step content */}
-        <div className="min-h-[260px]">
+        <div className="min-h-[260px] overflow-y-auto overflow-x-hidden pr-2 flex-1">
           {step === 0 && (
             <GoogleSheetsAccountSelector
               value={state.sheetsAccountId}
@@ -326,6 +329,29 @@ export function LinkSheetWizard({
                 </p>
               </div>
 
+              <div className="space-y-2">
+                <Label>Sync interval</Label>
+                <Select
+                  value={state.scheduleExpr}
+                  onValueChange={(v) => update({ scheduleExpr: v })}
+                >
+                  <SelectTrigger id="sync-interval-select">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="manual">Manual only</SelectItem>
+                    <SelectItem value="1m">Every 1 minute</SelectItem>
+                    <SelectItem value="5m">Every 5 minutes</SelectItem>
+                    <SelectItem value="1h">Every 1 hour</SelectItem>
+                    <SelectItem value="1d">Every 1 day</SelectItem>
+                    <SelectItem value="1w">Every 1 week</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  How frequently the background worker should sync changes.
+                </p>
+              </div>
+
               <div className="flex items-center justify-between rounded-md border px-4 py-3">
                 <div>
                   <p className="text-sm font-medium">Push existing records</p>
@@ -370,6 +396,17 @@ export function LinkSheetWizard({
               <SummaryRow
                 label="Columns mapped"
                 value={`${state.columnMappings.filter((m) => m.columnId !== null || m.isNewColumn).length} of ${state.columnMappings.length}`}
+              />
+              <SummaryRow
+                label="Sync interval"
+                value={
+                  state.scheduleExpr === "manual" ? "Manual only" :
+                  state.scheduleExpr === "1m" ? "Every 1 minute" :
+                  state.scheduleExpr === "5m" ? "Every 5 minutes" :
+                  state.scheduleExpr === "1h" ? "Every 1 hour" :
+                  state.scheduleExpr === "1d" ? "Every 1 day" :
+                  "Every 1 week"
+                }
               />
               <SummaryRow
                 label="Initial push"

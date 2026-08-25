@@ -33,6 +33,9 @@ import {
   Plus,
   SkipForward,
   Sparkles,
+  CheckCircle2,
+  AlertCircle,
+  Loader2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -101,6 +104,119 @@ function getConfidenceLevel(confidence: number) {
   return "low";
 }
 
+// ── AI Loading Skeleton ───────────────────────────────────────────────────────
+
+function AIMappingLoadingSkeleton({ headers }: { headers: string[] }) {
+  return (
+    <div className="space-y-4">
+      {/* AI Banner */}
+      <div className="relative overflow-hidden rounded-xl border border-violet-500/30 bg-gradient-to-r from-violet-950/60 via-indigo-950/60 to-violet-950/60 p-4">
+        {/* Animated shimmer */}
+        <div className="absolute inset-0 -translate-x-full animate-[shimmer_2s_infinite] bg-gradient-to-r from-transparent via-white/5 to-transparent" />
+        <div className="flex items-center gap-3">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-violet-500/20 ring-1 ring-violet-500/30">
+            <Brain className="h-5 w-5 animate-pulse text-violet-300" />
+          </div>
+          <div className="flex-1 space-y-1">
+            <p className="text-sm font-semibold text-violet-100">
+              AI is auto-mapping your columns
+            </p>
+            <p className="text-xs text-violet-300/70">
+              Analyzing {headers.length} column{headers.length !== 1 ? "s" : ""} and finding best matches…
+            </p>
+          </div>
+          <Loader2 className="h-4 w-4 shrink-0 animate-spin text-violet-400" />
+        </div>
+        {/* Progress dots */}
+        <div className="mt-3 flex items-center gap-1.5">
+          {[0, 1, 2].map((i) => (
+            <div
+              key={i}
+              className="h-1 flex-1 rounded-full bg-violet-500/30"
+              style={{
+                animation: `pulse 1.5s ease-in-out ${i * 0.3}s infinite`,
+              }}
+            />
+          ))}
+        </div>
+      </div>
+
+      {/* Skeleton rows */}
+      <ScrollArea className="max-h-80">
+        <div className="space-y-1.5 pr-1">
+          {headers.map((header, idx) => (
+            <div
+              key={`${header}-${idx}`}
+              className="flex items-center gap-2 rounded-md border bg-card/50 px-3 py-2 animate-pulse"
+            >
+              {/* Sheet header skeleton */}
+              <div className="w-36 shrink-0 space-y-1">
+                <div className="h-3 w-24 rounded bg-muted/60" />
+                <div className="h-2 w-12 rounded bg-muted/40" />
+              </div>
+              <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground/30" />
+              {/* Destination skeleton */}
+              <div className="flex-1 min-w-0">
+                <div className="h-7 w-full rounded-md bg-muted/60" />
+              </div>
+            </div>
+          ))}
+        </div>
+      </ScrollArea>
+    </div>
+  );
+}
+
+// ── AI Summary Banner ─────────────────────────────────────────────────────────
+
+function AISummaryBanner({
+  suggestions,
+  mappedCount,
+  skippedCount,
+}: {
+  suggestions: AISuggestion[];
+  mappedCount: number;
+  skippedCount: number;
+}) {
+  const highConf = suggestions.filter((s) => s.confidence >= 0.85).length;
+  const medConf = suggestions.filter((s) => s.confidence >= 0.6 && s.confidence < 0.85).length;
+  const lowConf = suggestions.filter((s) => s.confidence < 0.6).length;
+
+  return (
+    <div className="flex items-center gap-3 rounded-lg border border-violet-500/20 bg-violet-500/5 px-3 py-2">
+      <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-violet-500/15">
+        <Sparkles className="h-3.5 w-3.5 text-violet-400" />
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className="text-xs font-medium text-violet-300">AI Mapping Applied</p>
+        <p className="text-[10px] text-muted-foreground">
+          {mappedCount} mapped · {skippedCount} skipped
+        </p>
+      </div>
+      {/* Confidence breakdown */}
+      <div className="flex items-center gap-1.5 shrink-0">
+        {highConf > 0 && (
+          <span className="flex items-center gap-1 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-[10px] text-emerald-400">
+            <CheckCircle2 className="h-2.5 w-2.5" />
+            {highConf} high
+          </span>
+        )}
+        {medConf > 0 && (
+          <span className="flex items-center gap-1 rounded-full border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-[10px] text-amber-400">
+            <AlertCircle className="h-2.5 w-2.5" />
+            {medConf} med
+          </span>
+        )}
+        {lowConf > 0 && (
+          <span className="rounded-full border border-slate-500/30 bg-slate-500/10 px-2 py-0.5 text-[10px] text-slate-400">
+            {lowConf} low
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ── Main component ────────────────────────────────────────────────────────────
 
 export function ColumnMapping({
@@ -160,25 +276,27 @@ export function ColumnMapping({
   const mappedCount = value.filter((e) => e.columnId !== null || e.isNewColumn).length;
   const skippedCount = value.filter((e) => e.columnId === null && !e.isNewColumn).length;
 
+  // ── Loading state: rich skeleton + AI banner ───────────────────────────────
+  if (isLoadingAI) {
+    return <AIMappingLoadingSkeleton headers={sheetHeaders} />;
+  }
+
   return (
     <div className={cn("space-y-3", className)}>
       {/* Summary bar */}
-      <div className="flex items-center gap-3 text-xs text-muted-foreground">
-        {isLoadingAI ? (
-          <span className="flex items-center gap-1.5">
-            <Sparkles className="h-3.5 w-3.5 animate-pulse text-violet-400" />
-            AI analyzing columns…
+      {aiSuggestions.length > 0 ? (
+        <AISummaryBanner
+          suggestions={aiSuggestions}
+          mappedCount={mappedCount}
+          skippedCount={skippedCount}
+        />
+      ) : (
+        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          <span>
+            {mappedCount} mapped · {skippedCount} skipped
           </span>
-        ) : aiSuggestions.length > 0 ? (
-          <span className="flex items-center gap-1.5">
-            <Brain className="h-3.5 w-3.5 text-violet-400" />
-            AI suggestions applied
-          </span>
-        ) : null}
-        <span>
-          {mappedCount} mapped · {skippedCount} skipped
-        </span>
-      </div>
+        </div>
+      )}
 
       {/* Column rows */}
       <ScrollArea className="max-h-80">

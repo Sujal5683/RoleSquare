@@ -82,17 +82,20 @@ export function GoogleSheetsPanel({
     <>
       <Sheet open={open} onOpenChange={onOpenChange}>
         <SheetContent className="w-full sm:max-w-[480px] overflow-y-auto" side="right">
-          <SheetHeader className="space-y-1">
-            <SheetTitle className="flex items-center gap-2 text-base">
-              <FileSpreadsheet className="h-5 w-5 text-emerald-400" />
+          <SheetHeader className="relative overflow-hidden rounded-xl bg-gradient-to-br from-emerald-500/10 via-emerald-500/5 to-transparent p-5 border border-emerald-500/10">
+            <div className="absolute -right-4 -top-4 h-24 w-24 rounded-full bg-emerald-500/10 blur-2xl" />
+            <SheetTitle className="flex items-center gap-2 text-lg font-semibold tracking-tight">
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-500/20 shadow-inner">
+                <FileSpreadsheet className="h-4 w-4 text-emerald-400" />
+              </div>
               Google Sheets
             </SheetTitle>
-            <SheetDescription className="text-xs">
-              {dataset.name}
+            <SheetDescription className="mt-1.5 flex flex-wrap items-center gap-2">
+              <span className="text-sm font-medium text-foreground/80">{dataset.name}</span>
               {isLinked && (
                 <Badge
                   variant="outline"
-                  className="ml-2 text-[10px] py-0 bg-emerald-500/10 text-emerald-400 border-emerald-500/30"
+                  className="bg-emerald-500/10 text-emerald-400 border-emerald-500/20 px-2 py-0.5 text-[10px] uppercase tracking-wider"
                 >
                   Linked
                 </Badge>
@@ -100,7 +103,7 @@ export function GoogleSheetsPanel({
             </SheetDescription>
           </SheetHeader>
 
-          <Separator className="my-4" />
+          <Separator className="my-5 opacity-50" />
 
           {isLinked ? (
             /* ── Linked state — show tabs ── */
@@ -156,46 +159,63 @@ export function GoogleSheetsPanel({
               </TabsContent>
             </Tabs>
           ) : (
-            /* ── Unlinked state — CTA ── */
-            <div className="space-y-4">
-              <p className="text-sm text-muted-foreground">
-                This dataset is not linked to a Google Sheet. Link it to enable
-                continuous two-way sync, or import / export data one time.
-              </p>
+            /* ── Unlinked state — Premium CTA ── */
+            <div className="space-y-6">
+              <div className="relative overflow-hidden rounded-2xl border border-emerald-500/20 bg-card p-6 shadow-lg shadow-emerald-500/5 transition-all hover:shadow-emerald-500/10">
+                <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/5 to-transparent pointer-events-none" />
+                <div className="relative z-10 flex flex-col items-center text-center space-y-3">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-500/10 ring-1 ring-emerald-500/20 shadow-inner">
+                    <Link2 className="h-6 w-6 text-emerald-400" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <h3 className="font-semibold tracking-tight text-foreground">
+                      Connect your dataset
+                    </h3>
+                    <p className="text-sm text-muted-foreground leading-relaxed">
+                      Link this dataset to a Google Sheet for real-time two-way sync. Any changes made in the app or sheet will reflect instantly.
+                    </p>
+                  </div>
+                  <Button
+                    size="lg"
+                    className="w-full mt-2 bg-emerald-600 hover:bg-emerald-500 text-white shadow-md shadow-emerald-600/20 transition-all font-medium"
+                    onClick={() => setLinkOpen(true)}
+                    id="link-sheet-btn"
+                  >
+                    <Link2 className="mr-2 h-4 w-4" />
+                    Set up two-way sync
+                  </Button>
+                </div>
+              </div>
 
-              <Button
-                className="w-full bg-emerald-600 hover:bg-emerald-700"
-                onClick={() => setLinkOpen(true)}
-                id="link-sheet-btn"
-              >
-                <Link2 className="mr-2 h-4 w-4" />
-                Link to Google Sheet
-              </Button>
-
-              <Separator />
-
-              <div className="space-y-2">
-                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                  One-time operations
-                </p>
-                <Button
-                  variant="outline"
-                  className="w-full justify-start"
-                  onClick={() => setImportOpen(true)}
-                  id="import-only-btn"
-                >
-                  <Upload className="mr-2 h-4 w-4 text-blue-400" />
-                  Import from Google Sheets
-                </Button>
-                <Button
-                  variant="outline"
-                  className="w-full justify-start"
-                  onClick={() => setExportOpen(true)}
-                  id="export-only-btn"
-                >
-                  <Download className="mr-2 h-4 w-4 text-emerald-400" />
-                  Export to Google Sheets
-                </Button>
+              <div className="space-y-3 rounded-xl border bg-muted/20 p-4">
+                <div className="flex items-center gap-2">
+                  <div className="h-px flex-1 bg-border" />
+                  <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-widest">
+                    Or one-time operations
+                  </p>
+                  <div className="h-px flex-1 bg-border" />
+                </div>
+                
+                <div className="grid grid-cols-2 gap-3 pt-2">
+                  <Button
+                    variant="outline"
+                    className="h-auto flex-col py-3 px-2 gap-2 hover:bg-blue-500/5 hover:text-blue-400 hover:border-blue-500/30 transition-all"
+                    onClick={() => setImportOpen(true)}
+                    id="import-only-btn"
+                  >
+                    <Upload className="h-4 w-4" />
+                    <span className="text-xs font-medium">Import Data</span>
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="h-auto flex-col py-3 px-2 gap-2 hover:bg-emerald-500/5 hover:text-emerald-400 hover:border-emerald-500/30 transition-all"
+                    onClick={() => setExportOpen(true)}
+                    id="export-only-btn"
+                  >
+                    <Download className="h-4 w-4" />
+                    <span className="text-xs font-medium">Export Data</span>
+                  </Button>
+                </div>
               </div>
             </div>
           )}

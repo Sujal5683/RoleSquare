@@ -71,6 +71,7 @@ import {
 } from "lucide-react";
 import { SyncStatusBadge } from "@/components/google-sheets/sync-status-badge";
 import { GoogleSheetsPanel } from "@/components/google-sheets/google-sheets-panel";
+import { OrgSheetsWizard } from "@/components/google-sheets/org-sheets-wizard";
 
 // ── Helpers ──────────────────────────────────────────────────────────────
 
@@ -205,6 +206,8 @@ export function DatasetsView() {
     setShareTarget(d);
   };
 
+  const [orgSheetsOpen, setOrgSheetsOpen] = useState(false);
+
   return (
     <div className="space-y-4">
       <PageHeader
@@ -213,6 +216,16 @@ export function DatasetsView() {
         icon={<Database className="h-5 w-5" />}
         actions={
           <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setOrgSheetsOpen(true)}
+              disabled={!activeOrgId}
+              title="Export all datasets to a Google Sheet (each in its own tab)"
+            >
+              <FileSpreadsheet className="mr-2 h-3.5 w-3.5" />
+              Connect to Sheets
+            </Button>
             <Button
               variant="outline"
               size="sm"
@@ -599,6 +612,14 @@ export function DatasetsView() {
           allDatasets={(datasets ?? []).map((d) => ({ id: d.id, name: d.name }))}
         />
       )}
+
+      {/* Org-to-Sheets export wizard */}
+      <OrgSheetsWizard
+        open={orgSheetsOpen}
+        onOpenChange={setOrgSheetsOpen}
+        datasets={(datasets ?? []).map((d) => ({ id: d.id, name: d.name, recordCount: d.recordCount }))}
+        organizationId={activeOrgId ?? ""}
+      />
     </div>
   );
 }
