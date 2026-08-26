@@ -4,7 +4,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { requireOrgContext, AuthError, authErrorResponse } from "@/lib/auth";
+import { requireOrgContext, AuthError, authErrorResponse , requireRole} from "@/lib/auth";
 import { runSync } from "@/lib/services/sync-engine";
 
 export async function POST(
@@ -13,7 +13,7 @@ export async function POST(
 ) {
   try {
     const { id } = await params;
-    const { organizationId } = await requireOrgContext(req);
+    const { organizationId } = await requireRole(req, "member");
 
     // IDOR: verify mapping belongs to this org
     const mapping = await db.sheetMapping.findFirst({

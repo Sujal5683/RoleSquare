@@ -8,7 +8,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { requireOrgContext, AuthError, authErrorResponse } from "@/lib/auth";
+import { requireOrgContext, AuthError, authErrorResponse , requireRole} from "@/lib/auth";
 import { logAudit } from "@/lib/audit";
 import { ensureJobRunnerStarted } from "@/lib/job-runner";
 
@@ -18,7 +18,7 @@ export async function POST(
 ) {
   try {
     const { id } = await params;
-    const { user, organizationId } = await requireOrgContext(req);
+    const { user, organizationId } = await requireRole(req, "member");
 
     // Validate source
     const source = await db.source.findUnique({ where: { id } });
@@ -48,6 +48,15 @@ export async function POST(
       return NextResponse.json(
         { error: "Source has no default dataset. Run a scan first." },
         { status: 400 }
+      );
+    }
+
+    const { verifyDatasetWriteAccess } = await import("@/lib/dataset-access");
+    const canEditSource = await verifyDatasetWriteAccess(source.datasetId, user.id, organizationId);
+    if (!canEditSource) {
+      return NextResponse.json(
+        { error: "You do not have write access to the source dataset." },
+        { status: 403 }
       );
     }
 

@@ -8,7 +8,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { verifyDatasetAccess, requireOrgContext, AuthError, authErrorResponse } from "@/lib/auth";
+import { verifyDatasetAccess, requireOrgContext, AuthError, authErrorResponse , requireRole} from "@/lib/auth";
 import { logAudit } from "@/lib/audit";
 import { attachFieldInfo, fieldsByIdMap, serializeDatasetValue } from "@/lib/serialize";
 
@@ -40,7 +40,7 @@ export async function PATCH(
 ) {
   try {
     const { id: datasetId, recordId, valueId } = await params;
-    const { user, organizationId } = await requireOrgContext(req);
+    const { user, organizationId } = await requireRole(req, "member");
     const before = await requireValue(datasetId, recordId, valueId, organizationId, user.id);
     if (!before) {
       return NextResponse.json(

@@ -301,6 +301,7 @@ export function OrgSheetsWizard({
                       "flex items-center gap-3 rounded-md border bg-card/50 px-3 py-2",
                       isReadOnly ? "opacity-50 cursor-not-allowed" : "cursor-pointer hover:bg-muted/40"
                     )}
+                    title={isReadOnly ? "View only - you must be an editor to select this dataset" : undefined}
                   >
                     <Checkbox
                       checked={selectedDatasets.has(d.id)}

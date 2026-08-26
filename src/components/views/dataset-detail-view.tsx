@@ -746,6 +746,7 @@ export function DatasetDetailView() {
         exporting={exportMutation.isPending}
         onShare={() => setShareOpen(true)}
         onAssignSchema={() => setAssignSchemaOpen(true)}
+        cannotEdit={cannotEdit}
       />
 
       {/* Inline share dialog */}
@@ -1691,6 +1692,7 @@ function DetailTopBar({
   exporting,
   onShare,
   onAssignSchema,
+  cannotEdit,
 }: {
   dataset: DatasetDTO | null;
   onBack: () => void;
@@ -1700,6 +1702,7 @@ function DetailTopBar({
   exporting: boolean;
   onShare?: () => void;
   onAssignSchema?: () => void;
+  cannotEdit?: boolean;
 }) {
   return (
     <div className="flex flex-col gap-3 border-b pb-4 sm:flex-row sm:items-center sm:justify-between">
@@ -1749,14 +1752,19 @@ function DetailTopBar({
           />
           Refresh
         </Button>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => onShare?.()}
-        >
-          <Share2 className="mr-2 h-3.5 w-3.5" />
-          Share
-        </Button>
+        {cannotEdit ? (
+          <div title="You must be an editor to share this dataset.">
+            <Button variant="outline" size="sm" disabled>
+              <Share2 className="mr-2 h-3.5 w-3.5" />
+              Share
+            </Button>
+          </div>
+        ) : (
+          <Button variant="outline" size="sm" onClick={() => onShare?.()}>
+            <Share2 className="mr-2 h-3.5 w-3.5" />
+            Share
+          </Button>
+        )}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button size="sm" disabled={exporting}>
@@ -1777,20 +1785,22 @@ function DetailTopBar({
           </DropdownMenuContent>
         </DropdownMenu>
         {/* Three-dot actions menu */}
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="outline" size="icon" className="h-8 w-8 shrink-0">
-              <MoreHorizontal className="h-4 w-4" />
-              <span className="sr-only">More actions</span>
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-48">
-            <DropdownMenuItem onClick={() => onAssignSchema?.()}>
-              <FileCode2 className="mr-2 h-4 w-4" />
-              {dataset?.schema ? "Change Schema" : "Assign Schema"}
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+        {!cannotEdit && (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="icon" className="h-8 w-8 shrink-0">
+                <MoreHorizontal className="h-4 w-4" />
+                <span className="sr-only">More actions</span>
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-48">
+              <DropdownMenuItem onClick={() => onAssignSchema?.()}>
+                <FileCode2 className="mr-2 h-4 w-4" />
+                {dataset?.schema ? "Change Schema" : "Assign Schema"}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
       </div>
     </div>
   );

@@ -91,6 +91,12 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Dataset not found" }, { status: 404 });
     }
 
+    const { verifyDatasetWriteAccess } = await import("@/lib/dataset-access");
+    const canEdit = await verifyDatasetWriteAccess(datasetId, user.id, organizationId);
+    if (!canEdit) {
+      return NextResponse.json({ error: "You do not have write access to this dataset" }, { status: 403 });
+    }
+
     // Resolve granteeEmail → granteeUserId
     if (granteeEmail && !granteeUserId) {
       const targetUser = await db.user.findUnique({
@@ -165,6 +171,14 @@ export async function DELETE(req: NextRequest) {
 
     if (!isOwner && !isGranteeOrg && !isGranteeUser) {
       return NextResponse.json({ error: "Permission not found or unauthorized" }, { status: 403 });
+    }
+
+    if (isOwner) {
+      const { verifyDatasetWriteAccess } = await import("@/lib/dataset-access");
+      const canEdit = await verifyDatasetWriteAccess(existing.datasetId, user.id, organizationId);
+      if (!canEdit) {
+        return NextResponse.json({ error: "You do not have write access to this dataset to manage permissions" }, { status: 403 });
+      }
     }
     // Soft-delete: mark as revoked rather than hard delete (preserves audit trail)
     await db.datasetAccess.update({

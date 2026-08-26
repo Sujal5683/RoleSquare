@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireOrgContext, AuthError, authErrorResponse } from "@/lib/auth";
+import { requireOrgContext, AuthError, authErrorResponse , requireRole} from "@/lib/auth";
 import { getGmailClient } from "@/lib/google-client";
 
 export async function POST(req: NextRequest) {
   try {
-    const { organizationId } = await requireOrgContext(req);
+    const { organizationId } = await requireRole(req, "member");
     
     const body = await req.json().catch(() => ({}));
     const { rules, googleConnectionId } = body;

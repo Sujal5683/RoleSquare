@@ -5,7 +5,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { requireOrgContext, AuthError, authErrorResponse } from "@/lib/auth";
+import { requireOrgContext, AuthError, authErrorResponse , requireRole} from "@/lib/auth";
 import { resolveConflict, type ConflictResolution } from "@/lib/services/conflict-service";
 
 export async function POST(
@@ -14,7 +14,7 @@ export async function POST(
 ) {
   try {
     const { id: sheetMappingId, conflictId } = await params;
-    const { user, organizationId } = await requireOrgContext(req);
+    const { user, organizationId } = await requireRole(req, "member");
 
     // IDOR: verify mapping belongs to org
     const mapping = await db.sheetMapping.findFirst({

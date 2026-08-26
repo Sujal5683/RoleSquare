@@ -1108,12 +1108,14 @@ export function SourceBuilderView() {
                         {(datasets ?? []).map((d) => {
                           const isReadOnly = d.accessLevel === "read" || d.accessLevel === "comment";
                           return (
-                            <SelectItem key={d.id} value={d.id} disabled={isReadOnly}>
-                              <div className="flex items-center gap-2">
-                                <span>{d.name} ({d.recordCount} records)</span>
-                                {isReadOnly && <span className="text-muted-foreground text-xs">(View only)</span>}
-                              </div>
-                            </SelectItem>
+                            <div key={d.id} title={isReadOnly ? "View only - you must be an editor to select this dataset" : undefined}>
+                              <SelectItem value={d.id} disabled={isReadOnly}>
+                                <div className="flex items-center gap-2">
+                                  <span>{d.name} ({d.recordCount} records)</span>
+                                  {isReadOnly && <span className="text-muted-foreground text-xs">(View only)</span>}
+                                </div>
+                              </SelectItem>
+                            </div>
                           );
                         })}
                       </SelectContent>

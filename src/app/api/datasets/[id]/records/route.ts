@@ -8,7 +8,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { verifyDatasetAccess, requireOrgContext, AuthError, authErrorResponse } from "@/lib/auth";
+import { verifyDatasetAccess, requireOrgContext, AuthError, authErrorResponse , requireRole} from "@/lib/auth";
 import { logAudit } from "@/lib/audit";
 import {
   attachFieldsToRecords,
@@ -111,7 +111,7 @@ export async function POST(
 ) {
   try {
     const { id } = await params;
-    const { user, organizationId } = await requireOrgContext(req);
+    const { user, organizationId } = await requireRole(req, "member");
     const dataset = await requireDataset(id, organizationId, user.id, "edit");
     if (!dataset) {
       return NextResponse.json(

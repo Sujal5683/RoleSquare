@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { verifyDatasetAccess, requireOrgContext, AuthError, authErrorResponse } from "@/lib/auth";
+import { verifyDatasetAccess, requireOrgContext, AuthError, authErrorResponse , requireRole} from "@/lib/auth";
 import { mergeAndGetColumnIds } from "@/lib/dataset-columns";
 
 export async function GET(
@@ -38,7 +38,7 @@ export async function POST(
 ) {
   try {
     const { id } = await params;
-    const { user, organizationId } = await requireOrgContext(req);
+    const { user, organizationId } = await requireRole(req, "member");
     
     const dataset = await db.dataset.findUnique({
       where: { id },

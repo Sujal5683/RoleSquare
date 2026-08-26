@@ -3,7 +3,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { requireOrgContext, AuthError, authErrorResponse } from "@/lib/auth";
+import { requireOrgContext, AuthError, authErrorResponse , requireRole} from "@/lib/auth";
 
 export async function DELETE(
   req: NextRequest,
@@ -11,7 +11,7 @@ export async function DELETE(
 ) {
   try {
     const { id: datasetId } = await params;
-    const { organizationId } = await requireOrgContext(req);
+    const { organizationId } = await requireRole(req, "member");
 
     // Verify dataset belongs to org
     const dataset = await db.dataset.findFirst({

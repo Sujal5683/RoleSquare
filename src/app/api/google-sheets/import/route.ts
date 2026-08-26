@@ -20,7 +20,7 @@
 
 import { NextRequest, NextResponse, after } from "next/server";
 import { db } from "@/lib/db";
-import { requireOrgContext, AuthError, authErrorResponse } from "@/lib/auth";
+import { requireOrgContext, AuthError, authErrorResponse , requireRole} from "@/lib/auth";
 import { logAudit } from "@/lib/audit";
 import { processImport } from "@/lib/services/import-service";
 
@@ -28,7 +28,7 @@ const VALID_MODES = ["append", "update_existing", "append_update", "replace"];
 
 export async function POST(req: NextRequest) {
   try {
-    const { user, organizationId } = await requireOrgContext(req);
+    const { user, organizationId } = await requireRole(req, "member");
     const body = await req.json().catch(() => ({}));
 
     const {
@@ -73,14 +73,12 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Sheets account not found" }, { status: 404 });
     }
 
-    // IDOR: verify dataset belongs to this org (if provided)
+    // IDOR & Permission: verify dataset write access
     if (datasetId) {
-      const dataset = await db.dataset.findFirst({
-        where: { id: datasetId, organizationId },
-        select: { id: true },
-      });
-      if (!dataset) {
-        return NextResponse.json({ error: "Dataset not found" }, { status: 404 });
+      const { verifyDatasetWriteAccess } = await import("@/lib/dataset-access");
+      const canEdit = await verifyDatasetWriteAccess(datasetId, user.id, organizationId);
+      if (!canEdit) {
+        return NextResponse.json({ error: "You do not have write access to this dataset" }, { status: 403 });
       }
     }
 

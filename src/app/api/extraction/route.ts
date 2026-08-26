@@ -9,7 +9,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { requireOrgContext, AuthError, authErrorResponse } from "@/lib/auth";
+import { requireOrgContext, AuthError, authErrorResponse , requireRole} from "@/lib/auth";
 import { logAudit } from "@/lib/audit";
 import { bumpUsageMetric } from "@/lib/usage";
 import { extractWithLLM, flagFieldsForReview } from "@/lib/extraction";
@@ -22,7 +22,7 @@ export async function POST(req: NextRequest) {
     // Ensure the in-process job runner is alive so any queued AI jobs are
     // processed alongside this synchronous extraction call.
     ensureJobRunnerStarted();
-    const { user, organizationId } = await requireOrgContext(req);
+    const { user, organizationId } = await requireRole(req, "member");
     const body = await req.json().catch(() => ({}));
     const schemaId = String(body?.schemaId ?? "").trim();
     const sourceText = String(body?.sourceText ?? "");
