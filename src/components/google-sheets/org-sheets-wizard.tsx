@@ -26,6 +26,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -295,32 +296,38 @@ export function OrgSheetsWizard({
                 {datasets.map((d) => {
                   const isReadOnly = d.accessLevel === "read" || d.accessLevel === "comment";
                   return (
-                  <label
-                    key={d.id}
-                    className={cn(
-                      "flex items-center gap-3 rounded-md border bg-card/50 px-3 py-2",
-                      isReadOnly ? "opacity-50 cursor-not-allowed" : "cursor-pointer hover:bg-muted/40"
-                    )}
-                    title={isReadOnly ? "View only - you must be an editor to select this dataset" : undefined}
-                  >
-                    <Checkbox
-                      checked={selectedDatasets.has(d.id)}
-                      onCheckedChange={() => !isReadOnly && toggleDataset(d.id)}
-                      disabled={isReadOnly}
-                    />
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <p className="text-sm font-medium truncate">{d.name}</p>
-                        {isReadOnly && <span className="text-xs text-muted-foreground">(View only)</span>}
-                      </div>
-                      <p className="text-xs text-muted-foreground">
-                        {d.recordCount} record{d.recordCount !== 1 ? "s" : ""}
-                      </p>
-                    </div>
-                    <Badge variant="outline" className="text-[10px] shrink-0 truncate max-w-[100px]" title={d.name}>
-                      Tab: {d.name.slice(0, 15)}
-                    </Badge>
-                  </label>
+                                    <TooltipProvider key={d.id}>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <label
+                          className={cn(
+                            "flex items-center gap-3 rounded-md border bg-card/50 px-3 py-2",
+                            isReadOnly ? "opacity-50 cursor-not-allowed" : "cursor-pointer hover:bg-muted/40"
+                          )}
+                        >
+                          <Checkbox
+                            checked={selectedDatasets.has(d.id)}
+                            onCheckedChange={() => !isReadOnly && toggleDataset(d.id)}
+                            disabled={isReadOnly}
+                          />
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <p className="text-sm font-medium truncate">{d.name}</p>
+                              {isReadOnly && <span className="text-xs text-muted-foreground">(View only)</span>}
+                            </div>
+                            <p className="text-xs text-muted-foreground">
+                              {d.recordCount} record{d.recordCount !== 1 ? "s" : ""}
+                            </p>
+                          </div>
+                        </label>
+                      </TooltipTrigger>
+                      {isReadOnly && (
+                        <TooltipContent>
+                          <p>View only - you must be an editor to select this dataset</p>
+                        </TooltipContent>
+                      )}
+                    </Tooltip>
+                  </TooltipProvider>
                 )})}
               </div>
             </ScrollArea>

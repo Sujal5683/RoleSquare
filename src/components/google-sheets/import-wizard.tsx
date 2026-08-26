@@ -54,6 +54,7 @@ import {
   type AppColumn,
 } from "@/components/google-sheets/column-mapping";
 import { DestructiveChangeConfirmation } from "@/components/google-sheets/destructive-change-confirmation";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 type ImportMode = "append" | "update_existing" | "append_update" | "replace";
 
@@ -410,14 +411,25 @@ export function ImportWizard({
                         {datasets.map((d) => {
                           const isReadOnly = d.accessLevel === "read" || d.accessLevel === "comment";
                           return (
-                            <div key={d.id} title={isReadOnly ? "View only - you must be an editor to select this dataset" : undefined}>
-                              <SelectItem value={d.id} disabled={isReadOnly}>
-                                <div className="flex items-center gap-2">
-                                  <span>{d.name}</span>
-                                  {isReadOnly && <span className="text-muted-foreground text-xs">(View only)</span>}
-                                </div>
-                              </SelectItem>
-                            </div>
+                            <TooltipProvider key={d.id}>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <div>
+                                    <SelectItem value={d.id} disabled={isReadOnly}>
+                                      <div className="flex items-center gap-2">
+                                        <span>{d.name}</span>
+                                        {isReadOnly && <span className="text-muted-foreground text-xs">(View only)</span>}
+                                      </div>
+                                    </SelectItem>
+                                  </div>
+                                </TooltipTrigger>
+                                {isReadOnly && (
+                                  <TooltipContent>
+                                    <p>View only - you must be an editor to select this dataset</p>
+                                  </TooltipContent>
+                                )}
+                              </Tooltip>
+                            </TooltipProvider>
                           );
                         })}
                       </SelectContent>

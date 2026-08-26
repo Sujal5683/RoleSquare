@@ -127,6 +127,7 @@ import {
 } from "lucide-react";
 import { NewShareRequestDialog } from "@/components/sharing/new-share-request-dialog";
 import { AssignSchemaDialog } from "@/components/datasets/assign-schema-dialog";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 
 // ── Helpers ──────────────────────────────────────────────────────────────
@@ -856,27 +857,63 @@ export function DatasetDetailView() {
             {/* Right-side toolbar: Connect Sheets | View Toggle | Column Toggle | Three-dot */}
             <div className="flex items-center gap-2 shrink-0">
               {/* Connect Sheets */}
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setSheetsPanelOpen(true)}
-                title="Connect to Google Sheets"
-              >
-                <FileSpreadsheet className="mr-1.5 h-3.5 w-3.5 text-emerald-500" />
-                Connect Sheets
-              </Button>
+              {cannotEdit ? (
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <div>
+                        <Button variant="outline" size="sm" disabled className="opacity-50">
+                          <FileSpreadsheet className="mr-1.5 h-3.5 w-3.5 text-emerald-500" />
+                          Connect Sheets
+                        </Button>
+                      </div>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>You must be an editor to connect sheets.</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              ) : (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setSheetsPanelOpen(true)}
+                  title="Connect to Google Sheets"
+                >
+                  <FileSpreadsheet className="mr-1.5 h-3.5 w-3.5 text-emerald-500" />
+                  Connect Sheets
+                </Button>
+              )}
 
               {/* AI Extract — primary action when available */}
               {dataset?.isDefault && dataset.sourceId && (
-                <Button
-                  size="sm"
-                  className="gap-1.5 bg-gradient-to-r from-violet-600 to-indigo-600 text-white hover:from-violet-700 hover:to-indigo-700 shadow-sm"
-                  onClick={() => setExtractDialog(true)}
-                  title="Run AI extraction from this Default Dataset into a new Custom Dataset"
-                >
-                  <Zap className="h-3.5 w-3.5" />
-                  Extract Custom Fields (AI)
-                </Button>
+                cannotEdit ? (
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <div>
+                          <Button size="sm" className="gap-1.5 bg-gradient-to-r from-violet-600/50 to-indigo-600/50 text-white/70 shadow-sm" disabled>
+                            <Zap className="h-3.5 w-3.5" />
+                            Extract Custom Fields (AI)
+                          </Button>
+                        </div>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>You must be an editor to extract custom fields.</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                ) : (
+                  <Button
+                    size="sm"
+                    className="gap-1.5 bg-gradient-to-r from-violet-600 to-indigo-600 text-white hover:from-violet-700 hover:to-indigo-700 shadow-sm"
+                    onClick={() => setExtractDialog(true)}
+                    title="Run AI extraction from this Default Dataset into a new Custom Dataset"
+                  >
+                    <Zap className="h-3.5 w-3.5" />
+                    Extract Custom Fields (AI)
+                  </Button>
+                )
               )}
 
               {/* List / Card view toggle */}
@@ -1753,12 +1790,21 @@ function DetailTopBar({
           Refresh
         </Button>
         {cannotEdit ? (
-          <div title="You must be an editor to share this dataset.">
-            <Button variant="outline" size="sm" disabled>
-              <Share2 className="mr-2 h-3.5 w-3.5" />
-              Share
-            </Button>
-          </div>
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div>
+                  <Button variant="outline" size="sm" disabled>
+                    <Share2 className="mr-2 h-3.5 w-3.5" />
+                    Share
+                  </Button>
+                </div>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>You must be an editor to share this dataset.</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
         ) : (
           <Button variant="outline" size="sm" onClick={() => onShare?.()}>
             <Share2 className="mr-2 h-3.5 w-3.5" />
