@@ -5,7 +5,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { requireOrgContext, AuthError, authErrorResponse } from "@/lib/auth";
+import { requireOrgContext, requireRole, AuthError, authErrorResponse } from "@/lib/auth";
 import { logAudit } from "@/lib/audit";
 import { serializeSharingRequest } from "@/lib/serialize";
 import { dispatchWebhookEvent } from "@/lib/webhook-dispatcher";
@@ -20,7 +20,7 @@ export async function POST(
 ) {
   try {
     const { id } = await params;
-    const { user, organizationId, membership } = await requireOrgContext(req);
+    const { user, organizationId, membership } = await requireRole(req, "member");
 
     const existing = await db.sharingRequest.findUnique({
       where: { id },

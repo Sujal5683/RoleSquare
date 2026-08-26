@@ -55,6 +55,7 @@ interface DatasetItem {
   id: string;
   name: string;
   recordCount: number;
+  accessLevel?: string;
 }
 
 interface OrgSheetsWizardProps {

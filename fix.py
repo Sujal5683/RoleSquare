@@ -1,45 +1,47 @@
-import sys
+import os
 
-with open(r"c:\CDS IIT JMU\src\components\views\dataset-detail-view.tsx", "r", encoding="utf-8") as f:
-    lines = f.readlines()
+files = [
+    'src/app/api/schemas/[id]/fields/route.ts',
+    'src/app/api/schemas/[id]/fields/[fieldId]/route.ts',
+    'src/app/api/schemas/[id]/fields/reorder/route.ts',
+    'src/app/api/sources/[id]/route.ts',
+    'src/app/api/sources/[id]/clone/route.ts',
+    'src/app/api/sources/[id]/rules/route.ts',
+    'src/app/api/google-connections/[id]/route.ts',
+    'src/app/api/google-sheets/accounts/[id]/route.ts',
+    'src/app/api/google-sheets/link/route.ts',
+    'src/app/api/webhooks/[id]/route.ts',
+    'src/app/api/datasets/[id]/route.ts',
+    'src/app/api/schemas/route.ts',
+    'src/app/api/sources/route.ts',
+    'src/app/api/google-connections/route.ts',
+    'src/app/api/google-sheets/ai-mapping/route.ts',
+    'src/app/api/google-sheets/auth/route.ts',
+    'src/app/api/webhooks/route.ts',
+    'src/app/api/datasets/route.ts',
+    'src/app/api/schemas/[id]/route.ts'
+]
 
-# find useEffect
-start_idx = -1
-end_idx = -1
-for i, line in enumerate(lines):
-    if "// -- Clipboard Copy (Ctrl+C / Cmd+C)" in line:
-        start_idx = i
-        break
+for f in files:
+    if not os.path.exists(f): continue
+    with open(f, 'r', encoding='utf8') as file:
+        content = file.read()
 
-if start_idx != -1:
-    for i in range(start_idx, len(lines)):
-        if "}, [selectedRecords, filteredRecords, visibleFields]);" in lines[i]:
-            end_idx = i
-            break
-
-if start_idx != -1 and end_idx != -1:
-    # extract the block
-    block = lines[start_idx:end_idx+1]
+    changed = False
     
-    # remove the block from original position
-    del lines[start_idx:end_idx+1]
+    parts = content.split('export async function ')
     
-    # find where to insert it (after filteredRecords declaration)
-    insert_idx = -1
-    for i, line in enumerate(lines):
-        if "}, [records, search, minConfidence]);" in line:
-            insert_idx = i + 1
-            break
+    for i in range(1, len(parts)):
+        if parts[i].startswith('GET'):
+            if 'requireRole(req, "member")' in parts[i]:
+                parts[i] = parts[i].replace('requireRole(req, "member")', 'requireOrgContext(req)')
+                changed = True
+                
+    if changed:
+        new_content = parts[0]
+        for p in parts[1:]:
+            new_content += 'export async function ' + p
             
-    if insert_idx != -1:
-        lines[insert_idx:insert_idx] = ["\n"] + block + ["\n"]
-
-# now fix the appColumns in allDatasets
-for i, line in enumerate(lines):
-    if "appColumns: allFields.map((f) => ({" in line:
-        # this is inside allDatasets
-        # let's just use regex to remove it
-        pass
-
-with open(r"c:\CDS IIT JMU\src\components\views\dataset-detail-view.tsx", "w", encoding="utf-8") as f:
-    f.writelines(lines)
+        with open(f, 'w', encoding='utf8') as file:
+            file.write(new_content)
+        print('Fixed GET in', f)

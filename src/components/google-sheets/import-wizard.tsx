@@ -73,7 +73,7 @@ interface WizardState {
 interface ImportWizardProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  datasets: Array<{ id: string; name: string; appColumns?: AppColumn[] }>;
+  datasets: Array<{ id: string; name: string; appColumns?: AppColumn[]; accessLevel?: string }>;
   onSuccess?: (jobId: string) => void;
 }
 

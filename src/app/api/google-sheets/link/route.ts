@@ -17,7 +17,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { requireOrgContext, AuthError, authErrorResponse } from "@/lib/auth";
+import { requireOrgContext, requireRole, AuthError, authErrorResponse } from "@/lib/auth";
 import { logAudit } from "@/lib/audit";
 import { runSync } from "@/lib/services/sync-engine";
 import { createColumnsFromMappings } from "@/lib/services/import-service";
@@ -27,7 +27,7 @@ const VALID_STRATEGIES = ["flag", "app_wins", "sheet_wins"];
 
 export async function POST(req: NextRequest) {
   try {
-    const { user, organizationId } = await requireOrgContext(req);
+    const { user, organizationId } = await requireRole(req, "member");
     const body = await req.json().catch(() => ({}));
 
     const {

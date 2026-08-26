@@ -10,6 +10,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { logAudit } from "@/lib/audit";
+import { getCurrentUser } from "@/lib/auth";
 import {
   decodeOAuthState,
   exchangeCodeForTokens,
@@ -36,6 +37,22 @@ export async function GET(req: NextRequest) {
   try {
     // 1. Decode state → userId + organizationId
     const { userId, organizationId } = decodeOAuthState(stateParam);
+
+    const currentUser = await getCurrentUser();
+    if (currentUser.id !== userId) {
+      console.error("[google/callback] OAuth state user ID mismatch");
+      return NextResponse.redirect(`${origin}/?error=google_user_mismatch`);
+    }
+
+    const membership = currentUser.memberships.find(m => m.organizationId === organizationId && m.status === "active");
+    if (!membership) {
+      return NextResponse.redirect(`${origin}/?error=google_org_not_found`);
+    }
+
+    const ROLE_LEVEL: Record<string, number> = { owner: 5, admin: 4, manager: 3, member: 2, viewer: 1 };
+    if ((ROLE_LEVEL[membership.role] ?? 0) < 2) {
+      return NextResponse.redirect(`${origin}/?error=google_insufficient_role`);
+    }
 
     // 2. Exchange code for real tokens
     const { accessToken, refreshToken, expiresAt, googleEmail } =

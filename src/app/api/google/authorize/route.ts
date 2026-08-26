@@ -6,12 +6,12 @@
 // callback without relying on session cookies.
 
 import { NextRequest, NextResponse } from "next/server";
-import { requireOrgContext, AuthError, authErrorResponse } from "@/lib/auth";
+import { requireOrgContext, requireRole, AuthError, authErrorResponse } from "@/lib/auth";
 import { buildGoogleOAuthUrl } from "@/lib/google-auth";
 
 export async function GET(req: NextRequest) {
   try {
-    const { user, organizationId } = await requireOrgContext(req);
+    const { user, organizationId } = await requireRole(req, "member");
 
     const url = buildGoogleOAuthUrl({ userId: user.id, organizationId });
 
