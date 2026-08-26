@@ -80,7 +80,7 @@ function pushRecent(list: RecentItem[], item: Omit<RecentItem, "timestamp">): Re
 export const useAppStore = create<AppState>()(
   persist(
     (set, get) => ({
-      view: "landing",
+      view: "dashboard",
       setView: (v) => set({ view: v }),
 
       selectedOrganizationId: null,

@@ -455,6 +455,7 @@ export function serializeDatasetAccess(a: any): DatasetAccessDTO {
     granteeUserName: a.granteeUser?.name ?? null,
     level: a.level,
     status: a.status,
+    isPaused: Boolean(a.isPaused),
     fieldScope: a.fieldScope ? parseJson<Record<string, unknown>>(a.fieldScope, {}) : null,
     rowFilter: a.rowFilter ? parseJson<Record<string, unknown>>(a.rowFilter, {}) : null,
     sourceRequestId: a.sourceRequestId ?? null,
@@ -513,3 +514,44 @@ export function attachFieldsToRecords(
   }));
 }
 
+/**
+ * Builds a fieldId→column map from DatasetColumnDef rows.
+ * This is the preferred way to resolve fieldId in the dataset detail view,
+ * since DatasetColumnDef is the per-dataset source of truth (independent of schema).
+ */
+export function columnsByIdMap(columnDefs: any[]): Map<string, any> {
+  return new Map((columnDefs ?? []).map((c) => [c.columnId, {
+    id: c.columnId,
+    name: c.name,
+    type: c.dataType,
+    required: c.required,
+    options: c.options ? parseJson<string[]>(c.options, []) : null,
+    position: c.position,
+  }]));
+}
+
+/**
+ * Merges schema field map with dataset column def map.
+ * DatasetColumnDef takes precedence over SchemaField for name/type resolution.
+ * This ensures that even if a SchemaField is deleted, values referencing
+ * its ID still display correctly via the DatasetColumnDef snapshot.
+ */
+export function mergedFieldsMap(
+  schemaFields: any[],
+  columnDefs: any[]
+): Map<string, any> {
+  // Start with schema fields as base
+  const base = fieldsByIdMap(schemaFields);
+  // Override with column defs (which are dataset-local and more authoritative)
+  for (const col of (columnDefs ?? [])) {
+    base.set(col.columnId, {
+      id: col.columnId,
+      name: col.name,
+      type: col.dataType,
+      required: col.required,
+      options: col.options ? parseJson<string[]>(col.options, []) : null,
+      position: col.position,
+    });
+  }
+  return base;
+}

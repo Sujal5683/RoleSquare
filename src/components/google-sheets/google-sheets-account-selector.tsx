@@ -147,34 +147,34 @@ export function GoogleSheetsAccountSelector({
             <SelectTrigger id="sheets-account-select" className="w-full">
               <SelectValue placeholder="Select a Google account…" />
             </SelectTrigger>
-            <SelectContent>
+            <SelectContent className="max-w-[calc(100vw-2rem)] sm:max-w-md overflow-hidden">
               {accounts.map((account) => {
                 const statusCfg = STATUS_CONFIG[account.status] ?? STATUS_CONFIG.active;
                 const Icon = statusCfg.icon;
                 return (
-                  <SelectItem key={account.id} value={account.id}>
-                    <div className="flex items-center gap-2">
+                  <SelectItem key={account.id} value={account.id} className="w-full">
+                    <div className="flex items-center gap-2 max-w-[250px] sm:max-w-[350px]">
                       {account.avatarUrl ? (
-                        // eslint-disable-next-line @next/next/no-img-element
+                         
                         <img
                           src={account.avatarUrl}
                           alt=""
-                          className="h-5 w-5 rounded-full"
+                          className="h-5 w-5 rounded-full shrink-0"
                         />
                       ) : (
-                        <UserCircle2 className="h-5 w-5 text-muted-foreground" />
+                        <UserCircle2 className="h-5 w-5 text-muted-foreground shrink-0" />
                       )}
-                      <div className="flex flex-col">
-                        <span className="text-sm">{account.googleEmail}</span>
+                      <div className="flex flex-col min-w-0 flex-1">
+                        <span className="text-sm truncate">{account.googleEmail}</span>
                         {account.displayName && (
-                          <span className="text-xs text-muted-foreground">
+                          <span className="text-xs text-muted-foreground truncate">
                             {account.displayName}
                           </span>
                         )}
                       </div>
                       <Badge
                         variant="outline"
-                        className={cn("ml-auto text-[10px] py-0", statusCfg.className)}
+                        className={cn("ml-auto text-[10px] py-0 shrink-0", statusCfg.className)}
                       >
                         <Icon className="mr-1 h-2.5 w-2.5" />
                         {statusCfg.label}

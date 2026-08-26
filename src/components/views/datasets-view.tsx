@@ -69,6 +69,9 @@ import {
   Filter,
   FileSpreadsheet,
   FileCode2,
+  LayoutGrid,
+  LayoutList,
+  Columns3,
 } from "lucide-react";
 import { SyncStatusBadge } from "@/components/google-sheets/sync-status-badge";
 import { GoogleSheetsPanel } from "@/components/google-sheets/google-sheets-panel";
@@ -118,6 +121,7 @@ export function DatasetsView() {
   const [dataSourceFilter, setDataSourceFilter] = useState("all");
   const [createdByFilter, setCreatedByFilter] = useState("all");
   const [modifiedFilter, setModifiedFilter] = useState("all");
+  const [viewMode, setViewMode] = useState<"grid" | "list" | "columns">("grid");
 
   // ── Queries ────────────────────────────────────────────────────────────
   const {
@@ -286,6 +290,36 @@ export function DatasetsView() {
                 >
                   <Filter className="h-4 w-4" />
                 </Button>
+                {/* View mode toggle */}
+                <div className="flex items-center gap-0.5 rounded-lg border p-0.5">
+                  <Button
+                    variant={viewMode === "grid" ? "secondary" : "ghost"}
+                    size="icon"
+                    className="h-7 w-7"
+                    onClick={() => setViewMode("grid")}
+                    title="Grid view"
+                  >
+                    <LayoutGrid className="h-3.5 w-3.5" />
+                  </Button>
+                  <Button
+                    variant={viewMode === "columns" ? "secondary" : "ghost"}
+                    size="icon"
+                    className="h-7 w-7"
+                    onClick={() => setViewMode("columns")}
+                    title="Columns view (2 columns)"
+                  >
+                    <Columns3 className="h-3.5 w-3.5" />
+                  </Button>
+                  <Button
+                    variant={viewMode === "list" ? "secondary" : "ghost"}
+                    size="icon"
+                    className="h-7 w-7"
+                    onClick={() => setViewMode("list")}
+                    title="List view"
+                  >
+                    <LayoutList className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
               </div>
             </div>
 
@@ -368,49 +402,58 @@ export function DatasetsView() {
           }
         />
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className={
+          viewMode === "list"
+            ? "flex flex-col gap-3"
+            : viewMode === "columns"
+            ? "grid gap-4 sm:grid-cols-2"
+            : "grid gap-4 sm:grid-cols-2 lg:grid-cols-3"
+        }>
           {filtered.map((d) => (
             <Card
               key={d.id}
-              className="flex flex-col gap-3 p-4 transition-shadow hover:shadow-md"
+              className={`flex gap-3 p-4 transition-shadow hover:shadow-md ${viewMode === "list" ? "flex-row items-center" : "flex-col"}`}
             >
               {/* Header */}
-              <div className="flex items-start justify-between gap-3">
-                <div className="flex min-w-0 items-start gap-3">
+              <div className={`flex items-start gap-3 ${viewMode === "list" ? "flex-1 min-w-0" : "justify-between"}`}>
+                <div className="flex min-w-0 items-start gap-3 flex-1">
                   <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
                     <Database className="h-4 w-4" />
                   </div>
-                  <div className="min-w-0 space-y-1">
+                  <div className="min-w-0 flex-1 space-y-1">
                     <button
                       onClick={() => openDataset(d.id, d.name)}
-                      className="block text-left text-base font-semibold leading-tight truncate hover:underline"
+                      className="block w-full text-left text-base font-semibold leading-tight truncate hover:underline max-w-full"
                       title={d.name}
                     >
                       {d.name}
                     </button>
                     <div className="flex items-center gap-1.5 flex-wrap">
                       {d.isShared && (
-                        <Badge className="bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400 font-normal text-xs">
+                        <Badge className="bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400 font-normal text-xs shrink-0">
                           Shared
                         </Badge>
                       )}
+                      {d.syncStatus && (
+                        <SyncStatusBadge status={d.syncStatus as any} className="shrink-0" />
+                      )}
                       {d.schema ? (
-                        <Badge variant="secondary" className="font-normal">
+                        <Badge variant="secondary" className="font-normal truncate max-w-[140px]" title={d.schema.name}>
                           {d.schema.name}
                           {d.schema.fields?.length
                             ? ` · ${d.schema.fields.length} fields`
                             : ""}
                         </Badge>
                       ) : (
-                        <Badge variant="outline" className="font-normal text-muted-foreground">
+                        <Badge variant="outline" className="font-normal text-muted-foreground shrink-0">
                           No schema
                         </Badge>
                       )}
                     </div>
                     {d.isShared && d.ownerOrgName && (
-                      <div className="text-xs text-muted-foreground flex items-center gap-1">
-                        <ChevronRight className="h-3 w-3" />
-                        From: {d.ownerOrgName}
+                      <div className="text-xs text-muted-foreground flex items-center gap-1 truncate">
+                        <ChevronRight className="h-3 w-3 shrink-0" />
+                        <span className="truncate">From: {d.ownerOrgName}</span>
                       </div>
                     )}
                   </div>
@@ -498,7 +541,7 @@ export function DatasetsView() {
                   id={`sheets-badge-${d.id}`}
                 >
                   <SyncStatusBadge
-                    status={(d as any).syncStatus}
+                    status={(d as any).syncStatus as any}
                     lastSyncAt={(d as any).lastSyncAt}
                     conflictCount={(d as any).pendingConflicts}
                   />

@@ -303,6 +303,20 @@ export function MembersView() {
   const [inviteOpen, setInviteOpen] = useState(false);
   const [rbacOpen, setRbacOpen] = useState(false);
   const [removeTarget, setRemoveTarget] = useState<MemberDTO | null>(null);
+  
+  const [search, setSearch] = useState("");
+  const [filterRole, setFilterRole] = useState("all");
+
+  const filteredMembers = (members ?? []).filter((m) => {
+    if (filterRole !== "all" && m.role !== filterRole) return false;
+    const q = search.toLowerCase();
+    if (q) {
+      const nameMatch = m.user.name?.toLowerCase().includes(q);
+      const emailMatch = m.user.email?.toLowerCase().includes(q);
+      if (!nameMatch && !emailMatch) return false;
+    }
+    return true;
+  });
 
   return (
     <div className="space-y-4">
@@ -398,12 +412,37 @@ export function MembersView() {
       {/* Members table */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Team members</CardTitle>
-          <CardDescription>
-            {members
-              ? `${members.length} member${members.length === 1 ? "" : "s"}`
-              : "Loading members…"}
-          </CardDescription>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+              <CardTitle className="text-base">Team members</CardTitle>
+              <CardDescription>
+                {members
+                  ? `${members.length} member${members.length === 1 ? "" : "s"}`
+                  : "Loading members…"}
+              </CardDescription>
+            </div>
+            {members && members.length > 0 && (
+              <div className="flex flex-col sm:flex-row items-center gap-2">
+                <Input
+                  placeholder="Search members..."
+                  className="h-8 w-[200px]"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                />
+                <Select value={filterRole} onValueChange={setFilterRole}>
+                  <SelectTrigger className="h-8 w-[120px]">
+                    <SelectValue placeholder="Role" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Roles</SelectItem>
+                    {ROLES.map((r) => (
+                      <SelectItem key={r} value={r} className="capitalize">{r}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+          </div>
         </CardHeader>
         <CardContent className="p-0">
           {!activeOrgId ? (
@@ -443,6 +482,13 @@ export function MembersView() {
               }
               className="mx-4 mb-4"
             />
+          ) : filteredMembers.length === 0 ? (
+            <EmptyState
+              icon={<Users className="h-5 w-5" />}
+              title="No members match your search"
+              description="Try adjusting your search query."
+              className="mx-4 mb-4"
+            />
           ) : (
             <div className="max-h-[28rem] overflow-y-auto">
               <Table>
@@ -456,7 +502,7 @@ export function MembersView() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {members.map((m) => (
+                  {filteredMembers.map((m) => (
                     <TableRow key={m.id}>
                       <TableCell>
                         <div className="flex items-center gap-3">

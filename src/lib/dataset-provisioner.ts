@@ -9,6 +9,7 @@
 import { db } from "@/lib/db";
 import { ensureDefaultSchema } from "@/lib/default-schema";
 import type { ParsedEmailFields } from "@/lib/email-parser";
+import { mergeAndGetColumnIds } from "@/lib/dataset-columns";
 
 const DEFAULT_DATASET_SUFFIX = "(Default)";
 
@@ -114,12 +115,20 @@ export async function writeDefaultDatasetRecord(
   fields: ParsedEmailFields,
   schemaId: string
 ): Promise<void> {
-  // Load schema fields so we can map field name → field id
+  // Load schema fields to get types for column creation
   const schemaFields = await db.schemaField.findMany({
     where: { schemaId },
-    select: { id: true, name: true },
+    select: { id: true, name: true, type: true, required: true },
   });
-  const fieldIdByName = new Map(schemaFields.map((f) => [f.name, f.id]));
+
+  // Merge incoming fields with DatasetColumnDef (additive — never removes columns)
+  const incomingFieldSpecs = schemaFields.map((f) => ({
+    id: f.id,
+    name: f.name,
+    type: f.type,
+    required: f.required,
+  }));
+  const columnIdByName = await mergeAndGetColumnIds(datasetId, incomingFieldSpecs);
 
   // Check if a record already exists for this email in this dataset
   const existingRecord = await db.datasetRecord.findFirst({
@@ -130,11 +139,11 @@ export async function writeDefaultDatasetRecord(
   if (existingRecord) {
     // Update existing values
     for (const [name, value] of Object.entries(fields)) {
-      const fieldId = fieldIdByName.get(name);
-      if (!fieldId) continue;
+      const columnId = columnIdByName.get(name);
+      if (!columnId) continue;
       const rawValue = JSON.stringify(value ?? "");
       await db.datasetValue.updateMany({
-        where: { recordId: existingRecord.id, fieldId },
+        where: { recordId: existingRecord.id, fieldId: columnId },
         data: { value: rawValue },
       });
     }
@@ -148,17 +157,17 @@ export async function writeDefaultDatasetRecord(
         datasetId,
         sourceEmailId: emailId,
         status: "valid",
-        confidence: 1.0, // deterministic = 100% confidence
+        confidence: 1.0,
       },
     });
 
     const valuesToCreate = Object.entries(fields)
       .map(([name, value]) => {
-        const fieldId = fieldIdByName.get(name);
-        if (!fieldId) return null;
+        const columnId = columnIdByName.get(name);
+        if (!columnId) return null;
         return {
           recordId: record.id,
-          fieldId,
+          fieldId: columnId,
           value: JSON.stringify(value ?? ""),
           confidence: 1.0,
           evidence: "Deterministically extracted from Gmail API",

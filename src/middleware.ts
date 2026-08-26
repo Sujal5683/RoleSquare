@@ -12,6 +12,7 @@ import { NextResponse, type NextRequest } from "next/server";
 
 // Routes that are always publicly accessible (no auth required)
 const PUBLIC_PATHS = [
+  "/",
   "/login",
   "/api/auth/callback",              // Supabase email code exchange
   "/api/google/callback",            // Google OAuth token exchange (Gmail/Drive)

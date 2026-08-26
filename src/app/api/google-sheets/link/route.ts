@@ -20,6 +20,7 @@ import { db } from "@/lib/db";
 import { requireOrgContext, AuthError, authErrorResponse } from "@/lib/auth";
 import { logAudit } from "@/lib/audit";
 import { runSync } from "@/lib/services/sync-engine";
+import { createColumnsFromMappings } from "@/lib/services/import-service";
 
 const VALID_DIRECTIONS = ["bidirectional", "to_sheet", "from_sheet"];
 const VALID_STRATEGIES = ["flag", "app_wins", "sheet_wins"];
@@ -67,7 +68,7 @@ export async function POST(req: NextRequest) {
     // IDOR: verify dataset belongs to this org
     const dataset = await db.dataset.findFirst({
       where: { id: datasetId, organizationId },
-      select: { id: true },
+      select: { id: true, name: true },
     });
     if (!dataset) {
       return NextResponse.json({ error: "Dataset not found" }, { status: 404 });
@@ -142,6 +143,17 @@ export async function POST(req: NextRequest) {
 
       return m;
     });
+
+    // Run column creation outside transaction to avoid nesting issues with schema versions
+    if (columnMappings && columnMappings.length > 0) {
+      const hasNewColumns = columnMappings.some((m: any) => m.isNewColumn);
+      if (hasNewColumns) {
+        await createColumnsFromMappings(datasetId, columnMappings, user.id, {
+          datasetName: dataset.name,
+          organizationId,
+        });
+      }
+    }
 
     await logAudit({
       organizationId,

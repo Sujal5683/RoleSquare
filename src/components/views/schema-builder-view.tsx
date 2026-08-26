@@ -3,6 +3,23 @@
 import { useState, useMemo, useRef, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent
+} from "@dnd-kit/core";
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+  useSortable
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { api } from "@/lib/api-client";
 import { useAppStore } from "@/lib/store";
 import type {
@@ -124,8 +141,10 @@ const PREBUILT_TEMPLATES = [
       { name: "vendorName", type: "text", description: "Name of the merchant or vendor", required: true },
       { name: "totalAmount", type: "number", description: "Total amount paid including tax", required: true },
       { name: "date", type: "date", description: "Date of the transaction", required: true },
-      { name: "currency", type: "enum", description: "Currency of the transaction", required: false, options: ["USD", "EUR", "GBP", "INR"] },
+      { name: "currency", type: "enum", description: "Currency of the transaction", required: false, options: ["USD", "EUR", "GBP", "INR", "CAD", "AUD"] },
       { name: "taxAmount", type: "number", description: "Tax amount paid", required: false },
+      { name: "invoiceNumber", type: "text", description: "Invoice or receipt reference number", required: false },
+      { name: "paymentMethod", type: "enum", description: "Method of payment used", required: false, options: ["Credit Card", "Bank Transfer", "Cash", "Check", "PayPal", "Other"] },
     ]
   },
   {
@@ -133,12 +152,97 @@ const PREBUILT_TEMPLATES = [
     description: "Extract candidate details from resumes or emails",
     fields: [
       { name: "candidateName", type: "text", description: "Full name of the candidate", required: true },
-      { name: "email", type: "text", description: "Candidate email address", required: true, validation: { regex: "^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$" } },
+      { name: "email", type: "text", description: "Candidate email address", required: true },
       { name: "phone", type: "text", description: "Candidate phone number", required: false },
+      { name: "currentRole", type: "text", description: "Current or most recent job title", required: false },
       { name: "yearsOfExperience", type: "number", description: "Total years of professional experience", required: false },
       { name: "skills", type: "array", description: "List of technical or professional skills", required: false },
+      { name: "educationLevel", type: "enum", description: "Highest education level attained", required: false, options: ["High School", "Associate", "Bachelor's", "Master's", "PhD", "Other"] },
     ]
-  }
+  },
+  {
+    name: "Contract / Agreement",
+    description: "Extract key terms from contracts and legal agreements",
+    fields: [
+      { name: "contractTitle", type: "text", description: "Title or name of the contract", required: true },
+      { name: "partyA", type: "text", description: "First party (company or person) in the agreement", required: true },
+      { name: "partyB", type: "text", description: "Second party (company or person) in the agreement", required: true },
+      { name: "effectiveDate", type: "date", description: "Date the contract takes effect", required: true },
+      { name: "expirationDate", type: "date", description: "Date the contract expires or terminates", required: false },
+      { name: "contractValue", type: "number", description: "Total monetary value of the contract", required: false },
+      { name: "contractType", type: "enum", description: "Type of contract", required: false, options: ["Service Agreement", "NDA", "Employment", "Vendor", "Partnership", "License", "Other"] },
+      { name: "paymentTerms", type: "text", description: "Payment schedule and terms", required: false },
+    ]
+  },
+  {
+    name: "Medical / Health Record",
+    description: "Extract clinical information from medical documents",
+    fields: [
+      { name: "patientName", type: "text", description: "Full name of the patient", required: true },
+      { name: "dateOfBirth", type: "date", description: "Patient date of birth", required: false },
+      { name: "diagnosis", type: "text", description: "Primary diagnosis or condition", required: true },
+      { name: "medication", type: "array", description: "List of prescribed medications", required: false },
+      { name: "visitDate", type: "date", description: "Date of the medical visit", required: true },
+      { name: "doctorName", type: "text", description: "Name of the attending physician", required: false },
+      { name: "notes", type: "text", description: "Clinical notes or observations", required: false },
+    ]
+  },
+  {
+    name: "Real Estate Listing",
+    description: "Extract property details from listings or emails",
+    fields: [
+      { name: "propertyAddress", type: "text", description: "Full address of the property", required: true },
+      { name: "listingPrice", type: "number", description: "Asking or listing price in local currency", required: true },
+      { name: "propertyType", type: "enum", description: "Type of property", required: false, options: ["House", "Apartment", "Condo", "Townhouse", "Land", "Commercial", "Other"] },
+      { name: "bedrooms", type: "number", description: "Number of bedrooms", required: false },
+      { name: "bathrooms", type: "number", description: "Number of bathrooms", required: false },
+      { name: "squareFootage", type: "number", description: "Total area in square feet", required: false },
+      { name: "listingDate", type: "date", description: "Date the property was listed", required: false },
+      { name: "agentName", type: "text", description: "Name of the listing agent", required: false },
+    ]
+  },
+  {
+    name: "Sales Lead / Email",
+    description: "Extract lead information from sales emails and inquiries",
+    fields: [
+      { name: "contactName", type: "text", description: "Full name of the contact", required: true },
+      { name: "email", type: "text", description: "Contact email address", required: true },
+      { name: "company", type: "text", description: "Company or organization name", required: false },
+      { name: "jobTitle", type: "text", description: "Job title or role of the contact", required: false },
+      { name: "productInterest", type: "text", description: "Product or service the lead is interested in", required: false },
+      { name: "budget", type: "number", description: "Estimated budget or deal size", required: false },
+      { name: "urgency", type: "enum", description: "Timeline urgency of the lead", required: false, options: ["Immediate", "Within 1 month", "1-3 months", "3-6 months", "No timeline"] },
+      { name: "source", type: "enum", description: "Source of the lead", required: false, options: ["Email", "Webinar", "Referral", "Marketing", "Cold Outreach", "Other"] },
+    ]
+  },
+  {
+    name: "Shipping / Logistics",
+    description: "Extract shipment and delivery details",
+    fields: [
+      { name: "trackingNumber", type: "text", description: "Shipment tracking number", required: true },
+      { name: "carrier", type: "enum", description: "Shipping carrier", required: false, options: ["UPS", "FedEx", "DHL", "USPS", "Amazon", "Other"] },
+      { name: "senderName", type: "text", description: "Name of the sender", required: false },
+      { name: "recipientName", type: "text", description: "Name of the recipient", required: true },
+      { name: "deliveryAddress", type: "text", description: "Delivery address", required: true },
+      { name: "shipDate", type: "date", description: "Date the package was shipped", required: false },
+      { name: "estimatedDelivery", type: "date", description: "Estimated delivery date", required: false },
+      { name: "weight", type: "number", description: "Package weight in kilograms", required: false },
+    ]
+  },
+  {
+    name: "Product Review",
+    description: "Extract structured data from product reviews",
+    fields: [
+      { name: "productName", type: "text", description: "Name of the product being reviewed", required: true },
+      { name: "reviewerName", type: "text", description: "Name or username of the reviewer", required: false },
+      { name: "rating", type: "number", description: "Numeric rating given (e.g. 1-5)", required: true },
+      { name: "reviewDate", type: "date", description: "Date the review was written", required: false },
+      { name: "pros", type: "array", description: "List of positive points mentioned", required: false },
+      { name: "cons", type: "array", description: "List of negative points or complaints", required: false },
+      { name: "sentiment", type: "enum", description: "Overall sentiment of the review", required: false, options: ["Positive", "Neutral", "Negative", "Mixed"] },
+      { name: "verifiedPurchase", type: "boolean", description: "Whether this is a verified purchase review", required: false },
+    ]
+  },
 ];
 
 // ── Helpers ──────────────────────────────────────────────────────────────
@@ -177,6 +281,96 @@ function buildPrompt(schema: SchemaDTO | null | undefined): string {
 }
 
 import { useActiveOrg } from "@/hooks/use-active-org";
+
+interface SortableFieldItemProps {
+  field: SchemaFieldDTO;
+  onEdit: (f: SchemaFieldDTO) => void;
+  onDelete: (f: SchemaFieldDTO) => void;
+}
+
+function SortableFieldItem({ field, onEdit, onDelete }: SortableFieldItemProps) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
+    useSortable({ id: field.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    zIndex: isDragging ? 10 : 1,
+    opacity: isDragging ? 0.8 : 1,
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={`flex items-start gap-3 px-4 py-3 bg-card hover:bg-muted/40 relative ${
+        isDragging ? "shadow-md rounded-md ring-1 ring-border" : ""
+      }`}
+    >
+      <button
+        type="button"
+        className="mt-1 h-5 w-5 shrink-0 text-muted-foreground/40 hover:text-foreground cursor-grab active:cursor-grabbing flex items-center justify-center rounded transition-colors"
+        {...attributes}
+        {...listeners}
+      >
+        <GripVertical className="h-4 w-4" />
+      </button>
+      <div className="flex-1 min-w-0">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-sm font-medium">{field.name}</span>
+          <FieldTypeBadge type={field.type} />
+          {field.required && (
+            <span className="inline-flex items-center rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-700 dark:bg-amber-950 dark:text-amber-300">
+              required
+            </span>
+          )}
+          {field.options && field.options.length > 0 && (
+            <span className="text-[10px] text-muted-foreground">
+              {field.options.length} options
+            </span>
+          )}
+          {(field as any).validation && Object.keys((field as any).validation).length > 0 && (
+            <span className="inline-flex items-center rounded border px-1.5 py-0.5 text-[10px] font-mono text-muted-foreground">
+              {Object.entries((field as any).validation)
+                .map(([k, v]) => `${k}:${v}`)
+                .join(" ")}
+            </span>
+          )}
+        </div>
+        {field.description && (
+          <p className="mt-0.5 text-xs text-muted-foreground truncate">
+            {field.description}
+          </p>
+        )}
+        {field.instructions && (
+          <p className="mt-0.5 text-[10px] text-muted-foreground/80 italic truncate">
+            {field.instructions}
+          </p>
+        )}
+      </div>
+      <div className="flex items-center gap-1">
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-7 w-7"
+          onClick={() => onEdit(field)}
+          aria-label="Edit field"
+        >
+          <Pencil className="h-3.5 w-3.5" />
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-7 w-7 text-muted-foreground hover:text-destructive"
+          onClick={() => onDelete(field)}
+          aria-label="Delete field"
+        >
+          <Trash2 className="h-3.5 w-3.5" />
+        </Button>
+      </div>
+    </div>
+  );
+}
 
 // ── Component ────────────────────────────────────────────────────────────
 
@@ -347,6 +541,42 @@ export function SchemaBuilderView() {
     },
   });
 
+  const reorderFieldsMutation = useMutation({
+    mutationFn: (orderedFieldIds: string[]) =>
+      api.patch(`/api/schemas/${activeSchemaId}/fields/reorder`, { orderedFieldIds }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["schema", activeSchemaId] });
+      queryClient.invalidateQueries({ queryKey: ["schemas"] });
+    },
+    onError: (err: unknown) => {
+      toast.error("Failed to reorder fields");
+      queryClient.invalidateQueries({ queryKey: ["schema", activeSchemaId] });
+    }
+  });
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  );
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (active.id !== over?.id && activeSchema) {
+      const oldIndex = activeSchema.fields.findIndex(f => f.id === active.id);
+      const newIndex = activeSchema.fields.findIndex(f => f.id === over?.id);
+      
+      const newFields = arrayMove(activeSchema.fields, oldIndex, newIndex);
+      
+      // Optimistic update
+      queryClient.setQueryData(["schema", activeSchemaId], {
+        ...activeSchema,
+        fields: newFields
+      });
+
+      reorderFieldsMutation.mutate(newFields.map(f => f.id));
+    }
+  };
+
   // If no active schema and we have schemas available, default to the first one
   // (React-recommended render-time state adjustment — avoids setState-in-effect).
   if (activeSchemaId === null && schemas && schemas.length > 0) {
@@ -484,6 +714,10 @@ export function SchemaBuilderView() {
               </Select>
             </div>
             <div className="flex items-center gap-2">
+              <Button size="sm" variant="secondary" onClick={() => queryClient.invalidateQueries({ queryKey: ["schemas"] })}>
+                <RefreshCw className="mr-2 h-3.5 w-3.5" />
+                Refresh
+              </Button>
               <Button size="sm" variant="secondary" onClick={() => setTemplatesOpen(true)}>
                 <FileText className="mr-2 h-3.5 w-3.5" />
                 Templates
@@ -492,9 +726,6 @@ export function SchemaBuilderView() {
                 <Plus className="mr-2 h-3.5 w-3.5" />
                 New schema
               </Button>
-              {activeSchemaId && (
-                <></>
-              )}
             </div>
           </div>
         </CardContent>
@@ -771,67 +1002,25 @@ export function SchemaBuilderView() {
                   </div>
                 ) : (
                   <div className="max-h-[480px] overflow-y-auto divide-y">
-                    {activeSchema.fields.map((f) => (
-                      <div
-                        key={f.id}
-                        className="flex items-start gap-3 px-4 py-3 hover:bg-muted/40"
+                    <DndContext
+                      sensors={sensors}
+                      collisionDetection={closestCenter}
+                      onDragEnd={handleDragEnd}
+                    >
+                      <SortableContext
+                        items={activeSchema.fields.map((f) => f.id)}
+                        strategy={verticalListSortingStrategy}
                       >
-                        <GripVertical className="mt-1 h-4 w-4 shrink-0 text-muted-foreground/60" />
-                        <div className="flex-1 min-w-0">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <span className="text-sm font-medium">
-                              {f.name}
-                            </span>
-                            <FieldTypeBadge type={f.type} />
-                            {f.required && (
-                              <span className="inline-flex items-center rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-700 dark:bg-amber-950 dark:text-amber-300">
-                                required
-                              </span>
-                            )}
-                            {f.options && f.options.length > 0 && (
-                              <span className="text-[10px] text-muted-foreground">
-                                {f.options.length} options
-                              </span>
-                            )}
-                            {(f as any).validation && Object.keys((f as any).validation).length > 0 && (
-                              <span className="inline-flex items-center rounded border px-1.5 py-0.5 text-[10px] font-mono text-muted-foreground">
-                                {Object.entries((f as any).validation).map(([k,v]) => `${k}:${v}`).join(' ')}
-                              </span>
-                            )}
-                          </div>
-                          {f.description && (
-                            <p className="mt-0.5 text-xs text-muted-foreground truncate">
-                              {f.description}
-                            </p>
-                          )}
-                          {f.instructions && (
-                            <p className="mt-0.5 text-[10px] text-muted-foreground/80 italic truncate">
-                              {f.instructions}
-                            </p>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-7 w-7"
-                            onClick={() => handleOpenFieldEditor(f)}
-                            aria-label="Edit field"
-                          >
-                            <Pencil className="h-3.5 w-3.5" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-7 w-7 text-muted-foreground hover:text-destructive"
-                            onClick={() => setDeleteFieldTarget(f)}
-                            aria-label="Delete field"
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </Button>
-                        </div>
-                      </div>
-                    ))}
+                        {activeSchema.fields.map((f) => (
+                          <SortableFieldItem
+                            key={f.id}
+                            field={f}
+                            onEdit={handleOpenFieldEditor}
+                            onDelete={setDeleteFieldTarget}
+                          />
+                        ))}
+                      </SortableContext>
+                    </DndContext>
                   </div>
                 )}
               </CardContent>

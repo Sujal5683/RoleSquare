@@ -9,6 +9,7 @@ import type { DatasetAccessDTO, DatasetDTO } from "@/lib/types";
 import { EmptyState, LoadingState, ErrorState } from "@/components/ui/page-elements";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
@@ -156,7 +157,14 @@ export function OwnedTab({ onRowClick }: OwnedTabProps) {
                 <GranteeCell access={access} />
               </TableCell>
               <TableCell>
-                <LevelBadge level={access.level} />
+                <div className="flex items-center gap-2">
+                  <LevelBadge level={access.level} />
+                  {access.isPaused && (
+                    <Badge variant="secondary" className="bg-amber-500/15 text-amber-600 dark:text-amber-400">
+                      Paused
+                    </Badge>
+                  )}
+                </div>
               </TableCell>
               <TableCell className="text-sm text-muted-foreground">
                 {formatDistanceToNow(new Date(access.createdAt), { addSuffix: true })}
@@ -169,6 +177,15 @@ export function OwnedTab({ onRowClick }: OwnedTabProps) {
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
+                    <DropdownMenuItem
+                      onClick={() => {
+                        api.patch('/api/sharing/permissions', { id: access.id, isPaused: !access.isPaused })
+                           .then(() => queryClient.invalidateQueries({ queryKey: ["sharing-permissions"] }))
+                           .catch(() => toast.error("Failed to update status"));
+                      }}
+                    >
+                      {access.isPaused ? "Resume access" : "Pause access"}
+                    </DropdownMenuItem>
                     <DropdownMenuItem
                       className="text-destructive focus:text-destructive"
                       onClick={() => revokeMutation.mutate(access.id)}

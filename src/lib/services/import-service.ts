@@ -106,10 +106,14 @@ export async function processImport(params: ImportParams): Promise<ImportProgres
       });
       datasetId = dataset.id;
       await db.importJob.update({ where: { id: importJobId }, data: { datasetId } });
+    }
 
-      // Initialize columns from import mappings AND auto-create a linked Schema
+    // Initialize/append columns from import mappings AND auto-create a linked Schema if none exists
+    const hasNewColumns = job.mappings.some((m: any) => m.isNewColumn);
+    if (hasNewColumns || job.datasetId === null || job.datasetId === undefined) {
+      const ds = await db.dataset.findUnique({ where: { id: datasetId } });
       await createColumnsFromMappings(datasetId, job.mappings, userId, {
-        datasetName: job.newDatasetName || job.sheetName || "Imported Dataset",
+        datasetName: ds?.name || job.newDatasetName || job.sheetName || "Imported Dataset",
         organizationId,
       });
     }
@@ -312,7 +316,7 @@ async function processBatch(
  * Also auto-creates a proper Schema + SchemaField record so that dataset.schema
  * is never null after a Google Sheets import (fixes the "build a schema" wall).
  */
-async function createColumnsFromMappings(
+export async function createColumnsFromMappings(
   datasetId: string,
   mappings: Array<{
     sheetHeader: string;
@@ -325,10 +329,15 @@ async function createColumnsFromMappings(
   meta: { datasetName: string; organizationId: string }
 ): Promise<void> {
   const { randomUUID } = await import("crypto");
+  
+  const existingCols = await db.datasetColumnDef.findMany({ where: { datasetId } });
+  let position = existingCols.length > 0 ? Math.max(...existingCols.map(c => c.position)) + 1 : 0;
+  
   const columns: ColumnSpec[] = [];
-  let position = 0;
 
   for (const mapping of mappings) {
+    // Only create if it's explicitly a new column OR if we are initializing a completely empty dataset
+    if (!mapping.isNewColumn && existingCols.length > 0) continue;
     if (!mapping.columnId && !mapping.isNewColumn) continue;
 
     const columnId = mapping.columnId || `col_${randomUUID().replace(/-/g, "").slice(0, 12)}`;
@@ -351,13 +360,21 @@ async function createColumnsFromMappings(
     columns.push({ columnId, name, dataType, position: position - 1, required: false });
   }
 
-  await createSchemaVersion(datasetId, columns, "import", userId, "Initial import schema");
+  // Combine with existing for schema versioning
+  const allColumns = [
+    ...existingCols.map(c => ({ columnId: c.columnId, name: c.name, dataType: c.dataType, position: c.position, required: c.required })),
+    ...columns
+  ];
+
+  if (columns.length > 0) {
+    await createSchemaVersion(datasetId, allColumns, "import", userId, "Import schema update");
+  }
 
   // ── Auto-create a proper Schema + SchemaField record and link it ──────────
   // Without this, dataset.schema is null → the app shows "build a schema" prompt
   // every time the user opens a dataset that was imported from Google Sheets.
-  if (columns.length > 0) {
-    await createImportedSchema(datasetId, columns, userId, meta);
+  if (allColumns.length > 0) {
+    await createImportedSchema(datasetId, allColumns, userId, meta);
   }
 }
 

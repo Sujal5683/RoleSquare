@@ -12,6 +12,7 @@ import { db } from "@/lib/db";
 import { requireOrgContext, AuthError, authErrorResponse } from "@/lib/auth";
 import { logAudit } from "@/lib/audit";
 import { serializeDatasetRecord } from "@/lib/serialize";
+import { mergeAndGetColumnIds } from "@/lib/dataset-columns";
 
 export async function POST(
   req: NextRequest,
@@ -32,10 +33,9 @@ export async function POST(
       );
     }
 
-    // Fetch the dataset + schema fields
+    // Fetch the dataset
     const dataset = await db.dataset.findFirst({
       where: { id: datasetId },
-      include: { schema: { include: { fields: true } } },
     });
 
     if (!dataset) {
@@ -46,16 +46,6 @@ export async function POST(
     if (!(await verifyDatasetAccess(dataset, organizationId, user.id, "edit"))) {
       return NextResponse.json({ error: "Dataset not found or read-only access" }, { status: 403 });
     }
-
-    if (!dataset.schema) {
-      return NextResponse.json(
-        { error: "Dataset has no schema assigned — cannot map CSV columns" },
-        { status: 400 }
-      );
-    }
-
-    const fields = dataset.schema.fields;
-    const fieldByName = new Map(fields.map((f) => [f.name.toLowerCase(), f]));
 
     // Parse the data into a uniform format: array of { fieldName: value }
     let rows: Record<string, string>[] = [];
@@ -89,12 +79,14 @@ export async function POST(
         return result;
       };
 
-      const headers = parseLine(lines[0]).map((h) => h.trim().toLowerCase());
+      const headers = parseLine(lines[0]).map((h) => h.trim());
       for (let i = 1; i < lines.length; i++) {
         const values = parseLine(lines[i]);
         const row: Record<string, string> = {};
         headers.forEach((header, idx) => {
-          row[header] = (values[idx] || "").trim();
+          if (header) {
+            row[header] = (values[idx] || "").trim();
+          }
         });
         rows.push(row);
       }
@@ -117,6 +109,22 @@ export async function POST(
       return NextResponse.json({ error: "No rows to import" }, { status: 400 });
     }
 
+    // Determine the unique headers across all rows
+    const allHeaders = new Set<string>();
+    for (const row of rows) {
+      for (const key of Object.keys(row)) {
+        allHeaders.add(key);
+      }
+    }
+
+    const incomingFields = Array.from(allHeaders).map(name => ({
+      name,
+      type: "text" // Default everything to text for imports unless they match an existing schema
+    }));
+
+    // This handles mapping names to column IDs (or creating new columns if missing)
+    const columnIdMap = await mergeAndGetColumnIds(datasetId, incomingFields);
+
     // Create records + values transactionally
     const created = await db.$transaction(async (tx) => {
       const records = [];
@@ -128,29 +136,15 @@ export async function POST(
             status: "valid",
             confidence: 1.0,
             values: {
-              create: fields
-                .filter((f) => {
-                  const val = row[f.name.toLowerCase()];
-                  return val !== undefined && val !== "";
+              create: Array.from(allHeaders)
+                .filter(h => {
+                  const val = row[h];
+                  return val !== undefined && val !== null && val !== "";
                 })
-                .map((f) => {
-                  const val = row[f.name.toLowerCase()]!;
-                  let parsedValue: unknown = val;
-                  // Parse value based on field type
-                  if (f.type === "number") {
-                    parsedValue = Number(val);
-                    if (Number.isNaN(parsedValue)) parsedValue = val;
-                  } else if (f.type === "boolean") {
-                    parsedValue = /^(true|yes|1|y)$/i.test(val);
-                  } else if (f.type === "array" || f.type === "multiselect") {
-                    parsedValue = val.split(";").map((s) => s.trim()).filter(Boolean);
-                  } else if (f.type === "date") {
-                    // Keep as string for ISO date
-                    parsedValue = val;
-                  }
+                .map(h => {
                   return {
-                    fieldId: f.id,
-                    value: JSON.stringify(parsedValue),
+                    fieldId: columnIdMap.get(h)!,
+                    value: row[h],
                     confidence: 1.0,
                     evidence: "Imported via CSV/JSON upload",
                     sourceFile: "manual-import",

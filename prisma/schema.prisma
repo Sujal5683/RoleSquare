@@ -599,6 +599,7 @@ model DatasetAccess {
   fieldScope      String?  // JSON: { include?: string[], exclude?: string[] }
   rowFilter       String?  // JSON: arbitrary row-level filter
   status          String   @default("active") // active | revoked
+  isPaused        Boolean  @default(false)
   sourceRequestId String?  // back-ref to the SharingRequest that created this
 
   createdAt       DateTime @default(now())

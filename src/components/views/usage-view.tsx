@@ -42,6 +42,7 @@ import {
   Brain,
   type LucideIcon,
 } from "lucide-react";
+import { modelDisplayName } from "@/lib/model-pricing";
 
 interface UsageTrends {
   dailyTokens: { date: string; tokens: number; cost: number }[];
@@ -414,14 +415,16 @@ export function UsageView() {
                   />
                 </div>
               ) : (
-                data.modelUsage.map((m) => (
+                data.modelUsage
+                  .filter((m) => m.model && m.model !== "none" && m.model !== "unknown")
+                  .map((m) => (
                   <div key={m.model} className="flex items-center gap-3 px-4 py-3">
                     <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-violet-100 text-violet-700 dark:bg-violet-950 dark:text-violet-300">
                       <Brain className="h-4 w-4" />
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium truncate">
-                        {m.model.replace(/-/g, " ").replace(/\b\w/g, l => l.toUpperCase())}
+                        {modelDisplayName(m.model)}
                       </p>
                       <p className="text-[10px] text-muted-foreground font-mono truncate">{m.model}</p>
                       <p className="text-xs text-muted-foreground">

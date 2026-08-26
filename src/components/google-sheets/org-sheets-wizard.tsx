@@ -158,7 +158,7 @@ export function OrgSheetsWizard({
         onOpenChange(o);
       }}
     >
-      <DialogContent className="max-w-xl">
+      <DialogContent className="w-[90vw] max-w-3xl max-h-[90vh] flex flex-col overflow-hidden">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <FileSpreadsheet className="h-4 w-4 text-emerald-400" />
@@ -171,7 +171,7 @@ export function OrgSheetsWizard({
         </DialogHeader>
 
         {/* Step indicator */}
-        <div className="flex items-center gap-0">
+        <div className="flex items-center justify-between gap-1 sm:gap-2">
           {STEPS.map((label, i) => (
             <div key={label} className="flex items-center">
               <div
@@ -195,7 +195,7 @@ export function OrgSheetsWizard({
                 {label}
               </span>
               {i < STEPS.length - 1 && (
-                <div className="mx-2 h-px w-6 bg-border" />
+                <div className="mx-1 sm:mx-2 h-px w-2 sm:w-6 bg-border hidden sm:block" />
               )}
             </div>
           ))}
@@ -285,7 +285,7 @@ export function OrgSheetsWizard({
               </div>
             </div>
             <ScrollArea className="max-h-64">
-              <div className="space-y-1.5 pr-1">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pr-1">
                 {datasets.map((d) => (
                   <label
                     key={d.id}
@@ -301,8 +301,8 @@ export function OrgSheetsWizard({
                         {d.recordCount} record{d.recordCount !== 1 ? "s" : ""}
                       </p>
                     </div>
-                    <Badge variant="outline" className="text-[10px] shrink-0">
-                      Tab: {d.name.slice(0, 25)}
+                    <Badge variant="outline" className="text-[10px] shrink-0 truncate max-w-[100px]" title={d.name}>
+                      Tab: {d.name.slice(0, 15)}
                     </Badge>
                   </label>
                 ))}

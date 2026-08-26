@@ -48,6 +48,7 @@ export async function GET(req: NextRequest) {
           jobId: true,
           modelUsed: true,
           tokensUsed: true,
+          costUsd: true,
           createdAt: true,
         },
         orderBy: { createdAt: "asc" },
@@ -78,10 +79,11 @@ export async function GET(req: NextRequest) {
         (o) => o.createdAt >= dayStart && o.createdAt <= dayEnd
       );
       const tokens = dayOutputs.reduce((sum, o) => sum + o.tokensUsed, 0);
+      const cost = dayOutputs.reduce((sum, o) => sum + (o.costUsd || 0), 0);
       dailyTokens.push({
         date: dayStart.toISOString().split("T")[0],
         tokens,
-        cost: tokens * 0.001, // $0.001 per 1K tokens → $1 per 1M tokens
+        cost,
       });
     }
 
@@ -107,10 +109,13 @@ export async function GET(req: NextRequest) {
     }));
 
     // ── Cost breakdown by metric type (current month) ───────────────────
+    const currentMonthAiOutputs = aiOutputs.filter(o => o.createdAt >= startOfMonth);
+    const aiTokensCost = currentMonthAiOutputs.reduce((sum, o) => sum + (o.costUsd || 0), 0);
+
     const costByMetric = currentMonthMetrics.map((m) => {
       const cost =
         m.metricType === "ai_tokens"
-          ? m.value * 0.001
+          ? aiTokensCost
           : m.metricType === "documents_parsed"
           ? m.value * 0.01
           : m.metricType === "exports"
@@ -124,14 +129,15 @@ export async function GET(req: NextRequest) {
     });
 
     // ── Monthly summary ─────────────────────────────────────────────────
-    const currentMonthTokens =
-      currentMonthMetrics.find((m) => m.metricType === "ai_tokens")?.value || 0;
-    const prevMonthTokens =
-      prevMonthMetrics.find((m) => m.metricType === "ai_tokens")?.value || 0;
+    const currentMonthTokens = currentMonthAiOutputs.reduce((sum, o) => sum + o.tokensUsed, 0);
+    const prevMonthAiOutputs = aiOutputs.filter(o => o.createdAt >= startOfPrevMonth && o.createdAt <= endOfPrevMonth);
+    const prevMonthTokens = prevMonthAiOutputs.reduce((sum, o) => sum + o.tokensUsed, 0);
     const tokenTrend =
       prevMonthTokens > 0
         ? ((currentMonthTokens - prevMonthTokens) / prevMonthTokens) * 100
         : 0;
+    
+    const prevMonthAiCost = prevMonthAiOutputs.reduce((sum, o) => sum + (o.costUsd || 0), 0);
 
     const currentMonthEmails =
       currentMonthMetrics.find((m) => m.metricType === "emails_scanned")?.value || 0;
@@ -143,19 +149,20 @@ export async function GET(req: NextRequest) {
         : 0;
 
     // ── Model usage breakdown ───────────────────────────────────────────
-    const modelCounts: Record<string, { tokens: number; calls: number }> = {};
+    const modelCounts: Record<string, { tokens: number; calls: number; cost: number }> = {};
     for (const o of aiOutputs) {
       if (!modelCounts[o.modelUsed]) {
-        modelCounts[o.modelUsed] = { tokens: 0, calls: 0 };
+        modelCounts[o.modelUsed] = { tokens: 0, calls: 0, cost: 0 };
       }
       modelCounts[o.modelUsed].tokens += o.tokensUsed;
       modelCounts[o.modelUsed].calls += 1;
+      modelCounts[o.modelUsed].cost += (o.costUsd || 0);
     }
     const modelUsage = Object.entries(modelCounts).map(([model, data]) => ({
       model,
       tokens: data.tokens,
       calls: data.calls,
-      cost: data.tokens * 0.001,
+      cost: data.cost,
     }));
 
     // ── Quota calculation ───────────────────────────────────────────────
@@ -219,11 +226,11 @@ export async function GET(req: NextRequest) {
         currentMonthEmails,
         prevMonthEmails,
         emailTrend,
-        currentMonthCost: currentMonthTokens * 0.001,
-        prevMonthCost: prevMonthTokens * 0.001,
+        currentMonthCost: aiTokensCost,
+        prevMonthCost: prevMonthAiCost,
         costTrend:
-          prevMonthTokens > 0
-            ? ((currentMonthTokens - prevMonthTokens) / prevMonthTokens) * 100
+          prevMonthAiCost > 0
+            ? ((aiTokensCost - prevMonthAiCost) / prevMonthAiCost) * 100
             : 0,
       },
       quota: { // legacy support for older components

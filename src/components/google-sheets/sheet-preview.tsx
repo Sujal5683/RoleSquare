@@ -89,7 +89,8 @@ export function SheetPreview({
       </div>
 
       {/* Table */}
-      <ScrollArea className="rounded-md border">
+      <div className="min-w-0 overflow-hidden">
+        <ScrollArea className="rounded-md border">
         <div className="min-w-max">
           <table className="w-full text-xs">
             <thead>
@@ -138,6 +139,7 @@ export function SheetPreview({
         </div>
         <ScrollBar orientation="horizontal" />
       </ScrollArea>
+      </div>
     </div>
   );
 }

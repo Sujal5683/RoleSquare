@@ -99,6 +99,22 @@ export async function DELETE(
         { status: 404 }
       );
     }
+
+    // Count affected datasets before unlinking
+    const affectedDatasets = await db.dataset.count({ where: { schemaId: id } });
+
+    // Unlink all datasets from this schema BEFORE deleting the schema.
+    // DatasetColumnDef rows (per-dataset column definitions) and DatasetValue rows are
+    // NOT deleted — only the schema-level template is removed. Each dataset retains
+    // its own independent column definitions.
+    if (affectedDatasets > 0) {
+      await db.dataset.updateMany({
+        where: { schemaId: id },
+        data: { schemaId: null },
+      });
+    }
+
+    // Delete schema (cascades to SchemaField rows only)
     await db.schema.delete({ where: { id } });
 
     await logAudit({
@@ -108,9 +124,10 @@ export async function DELETE(
       entity: "schema",
       entityId: id,
       before: { name: before.name },
+      after: { affectedDatasets },
     });
 
-    return NextResponse.json({ ok: true });
+    return NextResponse.json({ ok: true, affectedDatasets });
   } catch (err) {
     if (err instanceof AuthError) return authErrorResponse(err);
     return NextResponse.json(

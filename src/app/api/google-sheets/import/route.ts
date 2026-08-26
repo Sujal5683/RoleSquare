@@ -18,7 +18,7 @@
 //   }>
 // }
 
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse, after } from "next/server";
 import { db } from "@/lib/db";
 import { requireOrgContext, AuthError, authErrorResponse } from "@/lib/auth";
 import { logAudit } from "@/lib/audit";
@@ -132,10 +132,12 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    // Start processing asynchronously
-    processImport({ importJobId: importJob.id, organizationId, userId: user.id }).catch((err) =>
-      console.error(`[import] Job ${importJob.id} failed:`, err)
-    );
+    // Start processing asynchronously in Next.js 15 'after' lifecycle
+    after(() => {
+      processImport({ importJobId: importJob.id, organizationId, userId: user.id }).catch((err) =>
+        console.error(`[import] Job ${importJob.id} failed:`, err)
+      );
+    });
 
     return NextResponse.json(
       { importJobId: importJob.id, status: "pending" },

@@ -63,6 +63,7 @@ import {
   Users,
   Calendar,
   Search,
+  FileSpreadsheet,
 } from "lucide-react";
 
 // ── Helpers ──────────────────────────────────────────────────────────────
@@ -133,6 +134,37 @@ function getAvatarColor(str: string) {
   return COLORS[Math.abs(hash) % COLORS.length];
 }
 
+import { OrgSheetsWizard } from "@/components/google-sheets/org-sheets-wizard";
+
+function OrgSheetsWrapper({
+  orgId,
+  open,
+  onOpenChange,
+}: {
+  orgId: string;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
+  const { data: datasets } = useQuery({
+    queryKey: ["datasets", orgId],
+    queryFn: () => api.get<any[]>(`/api/datasets?organizationId=${orgId}`),
+    enabled: !!orgId && open,
+  });
+
+  return (
+    <OrgSheetsWizard
+      open={open}
+      onOpenChange={onOpenChange}
+      datasets={(datasets ?? []).map((d) => ({
+        id: d.id,
+        name: d.name,
+        recordCount: d.recordCount || 0,
+      }))}
+      organizationId={orgId}
+    />
+  );
+}
+
 // ── Main component ───────────────────────────────────────────────────────
 
 export function OrganizationsView() {
@@ -145,6 +177,7 @@ export function OrganizationsView() {
   const [createOpen, setCreateOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<OrganizationDTO | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<OrganizationDTO | null>(null);
+  const [connectSheetsOrg, setConnectSheetsOrg] = useState<string | null>(null);
   const [filterRole, setFilterRole] = useState("all");
   const [filterPlan, setFilterPlan] = useState("all");
 
@@ -379,7 +412,7 @@ export function OrganizationsView() {
                             Active
                           </Badge>
                         )}
-                        {org.userRole && org.userRole !== "owner" && (
+                        {org.userRole && (
                           <Badge variant="outline" className="font-normal text-[10px] px-1.5 py-0 h-5 capitalize">
                             {org.userRole}
                           </Badge>
@@ -409,7 +442,7 @@ export function OrganizationsView() {
                           <MoreHorizontal className="h-4 w-4" />
                         </Button>
                       </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="w-44">
+                      <DropdownMenuContent align="end" className="w-56">
                         <DropdownMenuItem onClick={() => setEditTarget(org)}>
                           <Pencil className="mr-2 h-4 w-4" />
                           Edit
@@ -417,6 +450,10 @@ export function OrganizationsView() {
                         <DropdownMenuItem onClick={() => handleOpen(org)}>
                           <Users className="mr-2 h-4 w-4" />
                           Members
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => setConnectSheetsOrg(org.id)}>
+                          <FileSpreadsheet className="mr-2 h-4 w-4" />
+                          Connect to Google Sheets
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
                         <DropdownMenuItem
@@ -562,6 +599,15 @@ export function OrganizationsView() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Sheets Wizard */}
+      {connectSheetsOrg && (
+        <OrgSheetsWrapper
+          open={!!connectSheetsOrg}
+          onOpenChange={(open) => !open && setConnectSheetsOrg(null)}
+          orgId={connectSheetsOrg}
+        />
+      )}
     </div>
   );
 }

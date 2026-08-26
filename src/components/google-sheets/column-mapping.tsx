@@ -271,7 +271,7 @@ export function ColumnMapping({
       });
       onChange(initial);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   }, [aiSuggestions, sheetHeaders]);
 
   function updateEntry(index: number, patch: Partial<ColumnMappingEntry>) {

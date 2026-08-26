@@ -172,11 +172,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     return () => window.removeEventListener("keydown", handler);
   }, [toggleTheme, setAssistantOpen, clearAssistantUnread]);
 
-  // Landing page is rendered without the shell
-  if (view === "landing") {
-    return <>{children}</>;
-  }
-
   // Show a minimal loading skeleton while session is being fetched
   if (sessionLoading) {
     return (

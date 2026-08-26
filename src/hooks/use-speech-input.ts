@@ -36,14 +36,14 @@ export interface SpeechInputResult {
 }
 
 // Use a loose type for the browser Speech API to avoid lib.dom dependency
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+ 
 type AnySpeechRecognition = any;
 
 declare global {
   interface Window {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+     
     SpeechRecognition: any;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+     
     webkitSpeechRecognition: any;
   }
 }
@@ -88,7 +88,7 @@ export function useSpeechInput(opts: SpeechInputOptions): SpeechInputResult {
     }
 
     const SR = window.SpeechRecognition ?? window.webkitSpeechRecognition;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+     
     const rec: AnySpeechRecognition = new SR();
     rec.lang = lang;
     rec.interimResults = true;

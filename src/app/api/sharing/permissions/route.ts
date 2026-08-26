@@ -192,3 +192,61 @@ export async function DELETE(req: NextRequest) {
     );
   }
 }
+
+export async function PATCH(req: NextRequest) {
+  try {
+    const { user, organizationId } = await requireOrgContext(req);
+    const body = await req.json().catch(() => ({}));
+    const id = String(body?.id ?? "").trim();
+    const isPaused = body?.isPaused;
+
+    if (!id || typeof isPaused !== "boolean") {
+      return NextResponse.json(
+        { error: "id and isPaused boolean are required" },
+        { status: 400 }
+      );
+    }
+
+    const existing = await db.datasetAccess.findUnique({ where: { id } });
+
+    if (!existing) {
+      return NextResponse.json({ error: "Permission not found" }, { status: 404 });
+    }
+
+    // Only the owner org can pause/resume
+    if (existing.ownerOrgId !== organizationId) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
+    }
+
+    const access = await db.datasetAccess.update({
+      where: { id },
+      data: { isPaused },
+      include: {
+        dataset: { select: { id: true, name: true } },
+        ownerOrg: { select: { id: true, name: true } },
+        granteeOrg: { select: { id: true, name: true } },
+        granteeUser: { select: { id: true, email: true, name: true } },
+      },
+    });
+
+    await logAudit({
+      organizationId,
+      actorId: user.id,
+      action: "update",
+      entity: "dataset",
+      entityId: existing.datasetId,
+      before: { accessId: id, isPaused: existing.isPaused },
+      after: { accessId: id, isPaused },
+      reason: isPaused ? "pause_permission" : "resume_permission",
+    });
+
+    return NextResponse.json(serializeDatasetAccess(access));
+  } catch (err) {
+    if (err instanceof AuthError) return authErrorResponse(err);
+    return NextResponse.json(
+      { error: err instanceof Error ? err.message : "Failed to update permission" },
+      { status: 500 }
+    );
+  }
+}
+

@@ -13,6 +13,7 @@ import { logAudit } from "@/lib/audit";
 import {
   attachFieldsToRecords,
   fieldsByIdMap,
+  mergedFieldsMap,
   serializeDatasetRecord,
 } from "@/lib/serialize";
 
@@ -62,7 +63,14 @@ export async function GET(
       }),
     ]);
 
-    const fieldsMap = fieldsByIdMap(dataset?.schema?.fields ?? []);
+    // Load per-dataset column definitions (independent of schema)
+    const columnDefs = await db.datasetColumnDef.findMany({
+      where: { datasetId: id, isDeleted: false },
+      orderBy: { position: "asc" },
+    });
+    // Merge: DatasetColumnDef takes precedence over SchemaField for display
+    // This preserves data visibility even after schema fields are deleted
+    const fieldsMap = mergedFieldsMap(dataset?.schema?.fields ?? [], columnDefs);
     let enriched = attachFieldsToRecords(records, fieldsMap);
 
     const emailIds = enriched.map(r => r.sourceEmailId).filter(Boolean) as string[];
@@ -126,7 +134,11 @@ export async function POST(
       data: { recordCount: { increment: 1 } },
     });
 
-    const fieldsMap = fieldsByIdMap(dataset?.schema?.fields ?? []);
+    const postColumnDefs = await db.datasetColumnDef.findMany({
+      where: { datasetId: id, isDeleted: false },
+      orderBy: { position: "asc" },
+    });
+    const fieldsMap = mergedFieldsMap(dataset?.schema?.fields ?? [], postColumnDefs);
     const enrichedRecord = attachFieldsToRecords([record], fieldsMap)[0];
 
     await logAudit({

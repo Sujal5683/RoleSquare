@@ -89,6 +89,16 @@ export async function DELETE(
         { status: 404 }
       );
     }
+    // Delete the schema field.
+    // IMPORTANT: DatasetValue rows that reference this fieldId are NOT deleted —
+    // they remain in the database and continue to display using the per-dataset
+    // DatasetColumnDef snapshot (which is independent of the schema). The column
+    // definition in each dataset that used this schema is preserved.
+    // Delete the schema field.
+    // IMPORTANT: DatasetValue rows that reference this fieldId are NOT deleted —
+    // they remain in the database and continue to display using the per-dataset
+    // DatasetColumnDef snapshot (which is independent of the schema). The column
+    // definition in each dataset that used this schema is preserved.
     await db.schemaField.delete({ where: { id: fieldId } });
 
     await db.schema.update({

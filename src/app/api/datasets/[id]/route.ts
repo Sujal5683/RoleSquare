@@ -89,6 +89,11 @@ export async function PATCH(
       },
     });
 
+    if (updated.schema?.fields?.length) {
+      const { seedColumnsFromSchema } = await import("@/lib/dataset-columns");
+      await seedColumnsFromSchema(id, updated.schema.fields);
+    }
+
     await logAudit({
       organizationId,
       actorId: user.id,

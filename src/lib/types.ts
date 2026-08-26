@@ -2,7 +2,6 @@
 // Mirrors the plan's REST contract but adapted to a single-page App Router app.
 
 export type ViewId =
-  | "landing"
   | "dashboard"
   | "sources"
   | "source-builder"
@@ -305,6 +304,7 @@ export interface DatasetAccessDTO {
   granteeUserName?: string | null;
   level: string;
   status: string;
+  isPaused: boolean;
   fieldScope: Record<string, unknown> | null;
   rowFilter: Record<string, unknown> | null;
   sourceRequestId: string | null;
