@@ -41,7 +41,7 @@ export async function GET(
     
     let accessLevel = "read";
     let isShared = false;
-    let ownerOrgName = undefined;
+    let ownerOrgName: string | undefined = undefined;
 
     if (dataset.organizationId === organizationId) {
       // If they belong to the org, map their org role to an access level.

@@ -106,14 +106,14 @@ export function SharingDetailsSheet({ open, onOpenChange, data, type }: SharingD
                 <>
                   <div className="flex flex-col sm:flex-row gap-1 sm:gap-4">
                     <span className="text-muted-foreground sm:w-1/3">Target Org:</span>
-                    <span className="font-medium sm:w-2/3 break-words">{req.ownerOrgName || req.ownerOrgId}</span>
+                    <span className="font-medium sm:w-2/3 break-words">{req.targetOrganizationName || req.targetOrganizationId}</span>
                   </div>
                   <div className="flex flex-col sm:flex-row gap-1 sm:gap-4">
                     <span className="text-muted-foreground sm:w-1/3">Requester:</span>
                     <span className="font-medium sm:w-2/3 break-words">
                       {req.shareType === "request" 
                         ? (req.requesterName || req.requestedBy) 
-                        : (req.granteeOrgName || "Unknown Org")}
+                        : (req.targetOrganizationName || "Unknown Org")}
                     </span>
                   </div>
                 </>

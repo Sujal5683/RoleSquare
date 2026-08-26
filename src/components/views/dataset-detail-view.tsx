@@ -53,6 +53,8 @@ import {
   SheetHeader,
   SheetTitle,
   SheetDescription,
+  SheetBody,
+  SheetFooter,
 } from "@/components/ui/sheet";
 import {
   Dialog,
@@ -243,7 +245,6 @@ export function DatasetDetailView() {
   const [inlineEditCell, setInlineEditCell] = useState<{ recordId: string; fieldId: string } | null>(null);
   const [selectedRecords, setSelectedRecords] = useState<Set<string>>(new Set());
 
-  const cannotEdit = dataset?.accessLevel === "read" || dataset?.accessLevel === "comment";
 
   const clickTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -360,6 +361,8 @@ export function DatasetDetailView() {
     queryFn: () => api.get<DatasetDTO>(`/api/datasets/${datasetId}`),
     enabled: !!datasetId,
   });
+
+  const cannotEdit = dataset?.accessLevel === "read" || dataset?.accessLevel === "comment";
 
   // ── Records (paginated) ───────────────────────────────────────────────
   const {

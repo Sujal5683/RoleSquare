@@ -46,6 +46,7 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
+  DialogBody,
 } from "@/components/ui/dialog";
 import {
   AlertDialog,
@@ -148,6 +149,7 @@ export function SourcesView() {
     queryKey: ["sources", activeOrgId],
     queryFn: () => api.get<SourceDTO[]>("/api/sources"),
     enabled: !!activeOrgId,
+    refetchInterval: 3000,
   });
 
   // Runs query — only enabled when a source is opened in the dialog
@@ -156,6 +158,7 @@ export function SourcesView() {
     queryFn: () =>
       api.get<SourceRunDTO[]>(`/api/sources/${runsDialogSource!.id}/runs`),
     enabled: !!runsDialogSource,
+    refetchInterval: 2000,
   });
 
   const scanMutation = useMutation({
@@ -820,8 +823,6 @@ export function SourcesView() {
                 </div>
               </SheetHeader>
               
-              <div className="space-y-6">
-                <div>
               <SheetBody>
                 <div className="space-y-6">
                   <div>
@@ -934,7 +935,7 @@ export function SourcesView() {
               in the AI pipeline.
             </DialogDescription>
           </DialogHeader>
-          <div className="max-h-96 overflow-y-auto -mx-2 px-2">
+          <DialogBody className="p-0">
             {runsLoading ? (
               <LoadingState rows={3} />
             ) : !runs || runs.length === 0 ? (
@@ -944,7 +945,7 @@ export function SourcesView() {
                 description="Trigger a scan to see run history here."
               />
             ) : (
-              <div className="space-y-2">
+              <div className="space-y-2 p-6">
                 {runs.slice(0, 20).map((run) => (
                   <div
                     key={run.id}
@@ -994,7 +995,7 @@ export function SourcesView() {
                 ))}
               </div>
             )}
-          </div>
+          </DialogBody>
         </DialogContent>
       </Dialog>
 

@@ -382,7 +382,7 @@ async function processGmailScan(
     userId: "me",
     q: gmailQuery || undefined,
     maxResults: source.maxEmailsPerScan ?? 100,
-  });
+  }, { signal: AbortSignal.timeout(30000) });
   const messageRefs = listResp.data.messages ?? [];
 
   await agentInfo(job.id, job.organizationId, "system", `Fetching ${messageRefs.length} messages (limit: ${source.maxEmailsPerScan ?? 100})`, { query: gmailQuery, sourceId });
@@ -411,7 +411,7 @@ async function processGmailScan(
           userId: "me",
           id: ref.id,
           format: "full",
-        });
+        }, { signal: AbortSignal.timeout(30000) });
         const msg = msgResp.data;
         const headers = msg.payload?.headers ?? [];
 
