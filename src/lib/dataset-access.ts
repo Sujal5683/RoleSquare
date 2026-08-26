@@ -49,6 +49,7 @@ export async function resolveDatasetAccess(
       datasetId,
       granteeOrgId: orgId,
       status: "active",
+      isPaused: false,
     },
     select: { id: true, level: true },
   });
@@ -68,6 +69,7 @@ export async function resolveDatasetAccess(
       datasetId,
       granteeUserId: userId,
       status: "active",
+      isPaused: false,
     },
     select: { id: true, level: true },
   });
@@ -109,13 +111,13 @@ export async function getAccessibleDatasetIds(
 
   // Granted via org
   const orgGrants = await db.datasetAccess.findMany({
-    where: { granteeOrgId: orgId, status: "active" },
+    where: { granteeOrgId: orgId, status: "active", isPaused: false },
     select: { id: true, datasetId: true, level: true, ownerOrgId: true },
   });
 
   // Granted via user
   const userGrants = await db.datasetAccess.findMany({
-    where: { granteeUserId: userId, status: "active" },
+    where: { granteeUserId: userId, status: "active", isPaused: false },
     select: { id: true, datasetId: true, level: true, ownerOrgId: true },
   });
 
@@ -141,3 +143,4 @@ export async function getAccessibleDatasetIds(
     sharedAccesses: Array.from(sharedMap.values()),
   };
 }
+export async function verifyDatasetWriteAccess(datasetId: string, userId: string, orgId: string): Promise<boolean> { const dataset = await db.dataset.findUnique({ where: { id: datasetId }, select: { organizationId: true } }); if (!dataset) return false; if (dataset.organizationId === orgId) { const member = await db.organizationMember.findFirst({ where: { organizationId: orgId, userId, status: 'active' } }); if (!member) return false; return ['owner', 'admin', 'manager', 'member'].includes(member.role); } const access = await db.datasetAccess.findFirst({ where: { datasetId, status: 'active', isPaused: false, OR: [{ granteeOrgId: orgId }, { granteeUserId: userId }] } }); if (!access) return false; return ['edit', 'owner'].includes(access.level); }

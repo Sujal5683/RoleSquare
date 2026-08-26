@@ -154,6 +154,43 @@ const ACTION_STYLE: Record<string, string> = {
 
 import { useActiveOrg } from "@/hooks/use-active-org";
 
+// ── Helpers ────────────────────────────────────────────────────────────────
+
+function renderObjectDiff(data: any): React.ReactNode {
+  if (data === null || data === undefined || data === "") return <span className="text-xs text-muted-foreground">—</span>;
+  if (typeof data !== "object") {
+    return <span className="text-xs text-foreground break-words">{String(data)}</span>;
+  }
+  if (Array.isArray(data)) {
+    return <span className="text-xs text-foreground break-words">{data.length > 0 ? data.join(", ") : "—"}</span>;
+  }
+
+  const entries = Object.entries(data);
+  if (entries.length === 0) return <span className="text-xs text-muted-foreground">—</span>;
+
+  return (
+    <ul className="space-y-2">
+      {entries.map(([key, value]) => {
+        const formattedKey = key
+          .replace(/([A-Z])/g, " $1")
+          .replace(/^./, (str) => str.toUpperCase())
+          .trim();
+
+        const isNestedObject = value !== null && typeof value === "object" && !Array.isArray(value);
+
+        return (
+          <li key={key} className="text-xs flex flex-col gap-0.5">
+            <span className="font-medium text-muted-foreground">{formattedKey}</span>
+            <div className={isNestedObject ? "pl-2 ml-1 border-l border-border/50" : ""}>
+              {renderObjectDiff(value)}
+            </div>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
 // ── Main component ───────────────────────────────────────────────────────
 
 export function AuditView() {
@@ -479,18 +516,9 @@ export function AuditView() {
                                 {log.entityName}
                               </span>
                             ) : (
-                              <div className="flex items-center gap-1">
-                                <code className="text-[10px] text-muted-foreground bg-muted px-1 py-0.5 rounded truncate">
-                                  {truncateId(log.entityId, 10)}
-                                </code>
-                                <button
-                                  className="text-muted-foreground hover:text-foreground p-0.5 rounded-sm hover:bg-muted"
-                                  onClick={() => navigator.clipboard.writeText(log.entityId ?? "")}
-                                  title="Copy ID"
-                                >
-                                  <Copy className="h-3 w-3" />
-                                </button>
-                              </div>
+                              <span className="text-xs font-medium text-muted-foreground italic">
+                                Unnamed
+                              </span>
                             )}
                           </div>
                         </div>
@@ -516,33 +544,6 @@ export function AuditView() {
                               View change diff
                             </button>
                           </div>
-                        )}
-
-                        {/* Expand for compact entity ID */}
-                        {(log.entityId ?? "").length > 14 && (
-                          <button
-                            onClick={() =>
-                              setExpandedId(expanded ? null : log.id)
-                            }
-                            className="mt-1 inline-flex items-center text-xs text-primary hover:underline"
-                          >
-                            {expanded ? (
-                              <>
-                                <ChevronDown className="mr-1 h-3 w-3" />
-                                Hide full ID
-                              </>
-                            ) : (
-                              <>
-                                <ChevronRight className="mr-1 h-3 w-3" />
-                                Show full ID
-                              </>
-                            )}
-                          </button>
-                        )}
-                        {expanded && (log.entityId ?? "").length > 14 && (
-                          <code className="mt-1 block text-xs text-muted-foreground break-all">
-                            {log.entityId}
-                          </code>
                         )}
                       </div>
                     </li>
@@ -593,21 +594,17 @@ export function AuditView() {
               <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                 Before
               </p>
-              <pre className="rounded-md bg-destructive/5 border border-destructive/20 p-3 text-xs font-mono overflow-x-auto whitespace-pre-wrap break-words">
-                {diffDialog?.before
-                  ? JSON.stringify(diffDialog.before, null, 2)
-                  : "—"}
-              </pre>
+              <div className="rounded-md bg-destructive/5 border border-destructive/20 p-3">
+                {renderObjectDiff(diffDialog?.before)}
+              </div>
             </div>
             <div>
               <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                 After
               </p>
-              <pre className="rounded-md bg-emerald-500/5 border border-emerald-500/20 p-3 text-xs font-mono overflow-x-auto whitespace-pre-wrap break-words">
-                {diffDialog?.after
-                  ? JSON.stringify(diffDialog.after, null, 2)
-                  : "—"}
-              </pre>
+              <div className="rounded-md bg-emerald-500/5 border border-emerald-500/20 p-3">
+                {renderObjectDiff(diffDialog?.after)}
+              </div>
             </div>
           </div>
         </DialogContent>

@@ -5,14 +5,21 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { requireOrgContext, AuthError, authErrorResponse } from "@/lib/auth";
+import { requireOrgContext, requireRole, AuthError, authErrorResponse } from "@/lib/auth";
 import { logAudit } from "@/lib/audit";
 import { serializeDataset } from "@/lib/serialize";
 import { getAccessibleDatasetIds } from "@/lib/dataset-access";
 
 export async function GET(req: NextRequest) {
   try {
-    const { user, organizationId } = await requireOrgContext(req);
+    const { user, organizationId, membership } = await requireOrgContext(req);
+    
+    let orgAccessLevel: "owner" | "edit" | "read" = "read";
+    if (["owner", "admin", "manager"].includes(membership.role)) {
+      orgAccessLevel = "owner";
+    } else if (membership.role === "member") {
+      orgAccessLevel = "edit";
+    }
 
     // Get owned + shared dataset IDs
     const { ownedIds, sharedAccesses } = await getAccessibleDatasetIds(
@@ -70,7 +77,7 @@ export async function GET(req: NextRequest) {
     const result = [
       ...ownedDatasets.map((d) => ({
         ...serializeDataset(d),
-        accessLevel: "owner" as const,
+        accessLevel: orgAccessLevel,
         isShared: false,
       })),
       ...sharedDatasets.map((d) => {
@@ -99,7 +106,7 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    const { user, organizationId } = await requireOrgContext(req);
+    const { user, organizationId } = await requireRole(req, "member");
     const body = await req.json().catch(() => ({}));
     const name = String(body?.name ?? "").trim();
     if (!name) {

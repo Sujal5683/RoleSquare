@@ -380,6 +380,25 @@ export function serializeSharingPermission(
   };
 }
 
+/** Recursively removes properties whose keys match exactly 'id' or end in 'Id' (case-insensitive). */
+export function sanitizeSensitiveIds(obj: any): any {
+  if (Array.isArray(obj)) {
+    return obj.map(sanitizeSensitiveIds);
+  }
+  if (obj !== null && typeof obj === "object") {
+    const sanitized: any = {};
+    for (const [key, value] of Object.entries(obj)) {
+      const lower = key.toLowerCase();
+      if (lower === "id" || lower.endsWith("id")) {
+        continue;
+      }
+      sanitized[key] = sanitizeSensitiveIds(value);
+    }
+    return sanitized;
+  }
+  return obj;
+}
+
 export function serializeAuditLog(a: any): AuditLogDTO {
   const beforeObj = a.before ? parseJson<Record<string, unknown> | null>(a.before, null) : null;
   const afterObj = a.after ? parseJson<Record<string, unknown> | null>(a.after, null) : null;
@@ -396,8 +415,8 @@ export function serializeAuditLog(a: any): AuditLogDTO {
     entity: a.entity,
     entityId: a.entityId ?? null,
     entityName: entityName,
-    before: beforeObj,
-    after: afterObj,
+    before: beforeObj ? sanitizeSensitiveIds(beforeObj) : null,
+    after: afterObj ? sanitizeSensitiveIds(afterObj) : null,
     reason: a.reason ?? null,
     createdAt:
       a.createdAt instanceof Date ? a.createdAt.toISOString() : a.createdAt,

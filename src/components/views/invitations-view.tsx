@@ -61,6 +61,22 @@ export function InvitationsView() {
   const [viewMode, setViewMode] = useState<"card" | "list">("list");
   const [inviteOpen, setInviteOpen] = useState(false);
   const [selectedInvite, setSelectedInvite] = useState<InvitationDTO | null>(null);
+  
+  const activeOrgId = useActiveOrg();
+
+  const resendMutation = useMutation({
+    mutationFn: ({ orgId, email, role }: { orgId: string; email: string; role: string }) =>
+      api.post(`/api/organizations/${orgId}/invitations`, { email, role }),
+    onSuccess: () => {
+      toast.success("Invitation resent successfully");
+      queryClient.invalidateQueries({ queryKey: ["invitations", "outgoing", activeOrgId] });
+      setSelectedInvite(null);
+    },
+    onError: (err: unknown) => {
+      const msg = err instanceof Error ? err.message : "Failed to resend invitation";
+      toast.error("Error", { description: msg });
+    },
+  });
 
   const acceptMutation = useMutation({
     mutationFn: (token: string) =>
@@ -166,9 +182,12 @@ export function InvitationsView() {
       <InvitationDetailsSheet
         invitation={selectedInvite}
         open={!!selectedInvite}
+        type={tab}
         onOpenChange={(o) => { if (!o) setSelectedInvite(null); }}
         onAccept={(token) => acceptMutation.mutate(token)}
         onDecline={(token) => declineMutation.mutate(token)}
+        onCancel={(token) => declineMutation.mutate(token)}
+        onResend={(inv) => resendMutation.mutate({ orgId: inv.organizationId, email: inv.email, role: inv.role })}
       />
     </div>
   );
@@ -552,15 +571,21 @@ function OutgoingInvites({ onSelect, viewMode = "list" }: { onSelect: (inv: Invi
 function InvitationDetailsSheet({
   invitation,
   open,
+  type = "incoming",
   onOpenChange,
   onAccept,
   onDecline,
+  onCancel,
+  onResend,
 }: {
   invitation: InvitationDTO | null;
   open: boolean;
+  type?: "incoming" | "outgoing";
   onOpenChange: (o: boolean) => void;
   onAccept?: (token: string) => void;
   onDecline?: (token: string) => void;
+  onCancel?: (token: string) => void;
+  onResend?: (inv: InvitationDTO) => void;
 }) {
   if (!invitation) return null;
   
@@ -608,7 +633,7 @@ function InvitationDetailsSheet({
           </div>
         </div>
 
-        {invitation.status === "pending" && onAccept && onDecline && (
+        {invitation.status === "pending" && type === "incoming" && onAccept && onDecline && (
           <div className="mt-8 flex items-center gap-2 border-t pt-4">
             <Button
               className="flex-1"
@@ -626,6 +651,26 @@ function InvitationDetailsSheet({
             >
               <Check className="mr-2 h-4 w-4" />
               Accept
+            </Button>
+          </div>
+        )}
+
+        {invitation.status === "pending" && type === "outgoing" && onCancel && onResend && (
+          <div className="mt-8 flex items-center gap-2 border-t pt-4">
+            <Button
+              className="flex-1"
+              variant="outline"
+              onClick={() => onCancel(invitation.token)}
+            >
+              <X className="mr-2 h-4 w-4" />
+              Cancel Invite
+            </Button>
+            <Button
+              className="flex-1"
+              onClick={() => onResend(invitation)}
+            >
+              <RefreshCw className="mr-2 h-4 w-4" />
+              Resend Invite
             </Button>
           </div>
         )}

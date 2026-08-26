@@ -55,8 +55,17 @@ export async function POST(
     let targetDatasetId: string;
     if (existingDatasetId) {
       const ds = await db.dataset.findUnique({ where: { id: existingDatasetId } });
-      if (!ds || ds.organizationId !== organizationId) {
+      if (!ds) {
         return NextResponse.json({ error: "Target dataset not found" }, { status: 404 });
+      }
+      
+      const { verifyDatasetWriteAccess } = await import("@/lib/dataset-access");
+      const canEdit = await verifyDatasetWriteAccess(existingDatasetId, user.id, organizationId);
+      if (!canEdit) {
+        return NextResponse.json(
+          { error: "You do not have write access to the selected target dataset." },
+          { status: 403 }
+        );
       }
       targetDatasetId = existingDatasetId;
     } else {

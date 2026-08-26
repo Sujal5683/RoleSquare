@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { formatDistanceToNow } from "date-fns";
-import { Building2, Database, Upload, MoreHorizontal, Trash2 } from "lucide-react";
+import { Building2, Database, Upload, MoreHorizontal, Trash2, ChevronDown } from "lucide-react";
 import { toast } from "sonner";
 import { api } from "@/lib/api-client";
 import { useActiveOrg } from "@/hooks/use-active-org";
@@ -145,7 +145,26 @@ export function OwnedTab({ onRowClick }: OwnedTabProps) {
               </TableCell>
               <TableCell>
                 <div className="flex items-center gap-2">
-                  <LevelBadge level={access.level} />
+                  <DropdownMenu>
+                    <DropdownMenuTrigger className="focus:outline-none flex items-center group cursor-pointer" onClick={(e) => e.stopPropagation()}>
+                      <LevelBadge level={access.level} />
+                      <ChevronDown className="ml-1 h-3 w-3 text-muted-foreground opacity-50 group-hover:opacity-100 transition-opacity" />
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="start" onClick={(e) => e.stopPropagation()}>
+                      {["read", "comment", "edit"].map((lvl) => (
+                        <DropdownMenuItem
+                          key={lvl}
+                          onClick={() => {
+                            api.patch('/api/sharing/permissions', { id: access.id, level: lvl })
+                               .then(() => queryClient.invalidateQueries({ queryKey: ["sharing-permissions"] }))
+                               .catch(() => toast.error("Failed to change level"));
+                          }}
+                        >
+                          Change to {lvl === "read" ? "Viewer" : lvl === "comment" ? "Commenter" : "Editor"}
+                        </DropdownMenuItem>
+                      ))}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                   {access.status === "pending" && (
                     <Badge variant="secondary" className="bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300">
                       Pending Accept

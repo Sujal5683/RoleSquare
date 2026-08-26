@@ -10,12 +10,12 @@
 // (never expose the URL to end users as a clickable link that skips consent).
 
 import { NextRequest, NextResponse } from "next/server";
-import { requireOrgContext, AuthError, authErrorResponse } from "@/lib/auth";
+import { requireOrgContext, requireRole, AuthError, authErrorResponse } from "@/lib/auth";
 import { buildSheetsOAuthUrl } from "@/lib/services/google-sheets-oauth";
 
 export async function POST(req: NextRequest) {
   try {
-    const { user, organizationId } = await requireOrgContext(req);
+    const { user, organizationId } = await requireRole(req, "member");
     const body = await req.json().catch(() => ({}));
     const returnTo = typeof body?.returnTo === "string" ? body.returnTo : "/";
 

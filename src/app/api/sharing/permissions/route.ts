@@ -199,10 +199,11 @@ export async function PATCH(req: NextRequest) {
     const body = await req.json().catch(() => ({}));
     const id = String(body?.id ?? "").trim();
     const isPaused = body?.isPaused;
+    const level = body?.level ? String(body.level) : undefined;
 
-    if (!id || typeof isPaused !== "boolean") {
+    if (!id || (typeof isPaused !== "boolean" && !level)) {
       return NextResponse.json(
-        { error: "id and isPaused boolean are required" },
+        { error: "id and at least one of isPaused boolean or level string are required" },
         { status: 400 }
       );
     }
@@ -213,14 +214,18 @@ export async function PATCH(req: NextRequest) {
       return NextResponse.json({ error: "Permission not found" }, { status: 404 });
     }
 
-    // Only the owner org can pause/resume
+    // Only the owner org can update
     if (existing.ownerOrgId !== organizationId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
     }
 
+    const dataToUpdate: any = {};
+    if (typeof isPaused === "boolean") dataToUpdate.isPaused = isPaused;
+    if (level) dataToUpdate.level = level;
+
     const access = await db.datasetAccess.update({
       where: { id },
-      data: { isPaused },
+      data: dataToUpdate,
       include: {
         dataset: { select: { id: true, name: true } },
         ownerOrg: { select: { id: true, name: true } },
@@ -235,9 +240,9 @@ export async function PATCH(req: NextRequest) {
       action: "update",
       entity: "dataset",
       entityId: existing.datasetId,
-      before: { accessId: id, isPaused: existing.isPaused },
-      after: { accessId: id, isPaused },
-      reason: isPaused ? "pause_permission" : "resume_permission",
+      before: { accessId: id, isPaused: existing.isPaused, level: existing.level },
+      after: { accessId: id, isPaused: dataToUpdate.isPaused ?? existing.isPaused, level: dataToUpdate.level ?? existing.level },
+      reason: level ? "update_permission_level" : (dataToUpdate.isPaused ? "pause_permission" : "resume_permission"),
     });
 
     return NextResponse.json(serializeDatasetAccess(access));

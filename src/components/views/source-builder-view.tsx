@@ -1105,11 +1105,17 @@ export function SourceBuilderView() {
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="none">— No dataset —</SelectItem>
-                        {(datasets ?? []).map((d) => (
-                          <SelectItem key={d.id} value={d.id}>
-                            {d.name} ({d.recordCount} records)
-                          </SelectItem>
-                        ))}
+                        {(datasets ?? []).map((d) => {
+                          const isReadOnly = d.accessLevel === "read" || d.accessLevel === "comment";
+                          return (
+                            <SelectItem key={d.id} value={d.id} disabled={isReadOnly}>
+                              <div className="flex items-center gap-2">
+                                <span>{d.name} ({d.recordCount} records)</span>
+                                {isReadOnly && <span className="text-muted-foreground text-xs">(View only)</span>}
+                              </div>
+                            </SelectItem>
+                          );
+                        })}
                       </SelectContent>
                     </Select>
                   </div>

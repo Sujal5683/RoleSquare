@@ -422,15 +422,34 @@ export async function verifyDatasetAccess(
   userId: string,
   requiredLevel: "read" | "comment" | "edit" | "owner" = "read"
 ): Promise<boolean> {
-  // If the dataset is owned by the current organization context, access is granted.
-  // (The route handler should separately check org membership roles if needed for edit/delete)
-  if (dataset.organizationId === organizationId) return true;
+  const LEVEL_WEIGHT: Record<string, number> = {
+    read: 1,
+    comment: 2,
+    edit: 3,
+    owner: 4,
+  };
+
+  // If the dataset is owned by the current organization context, map their org role to access level.
+  if (dataset.organizationId === organizationId) {
+    const member = await db.organizationMember.findFirst({
+      where: { organizationId, userId, status: "active" },
+    });
+    if (!member) return false;
+    let orgLevel = "read";
+    if (["owner", "admin", "manager"].includes(member.role)) {
+      orgLevel = "owner";
+    } else if (member.role === "member") {
+      orgLevel = "edit";
+    }
+    return LEVEL_WEIGHT[orgLevel] >= LEVEL_WEIGHT[requiredLevel];
+  }
 
   // Otherwise, check for an active DatasetAccess grant
   const access = await db.datasetAccess.findFirst({
     where: {
       datasetId: dataset.id,
       status: "active",
+      isPaused: false,
       OR: [
         { granteeOrgId: organizationId },
         { granteeUserId: userId }
@@ -439,13 +458,6 @@ export async function verifyDatasetAccess(
   });
 
   if (!access) return false;
-
-  const LEVEL_WEIGHT: Record<string, number> = {
-    read: 1,
-    comment: 2,
-    edit: 3,
-    owner: 4,
-  };
 
   const userLevel = LEVEL_WEIGHT[access.level] ?? 0;
   const reqLevel = LEVEL_WEIGHT[requiredLevel] ?? 1;

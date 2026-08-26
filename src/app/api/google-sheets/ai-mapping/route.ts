@@ -12,13 +12,13 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { requireOrgContext, AuthError, authErrorResponse } from "@/lib/auth";
+import { requireOrgContext, requireRole, AuthError, authErrorResponse } from "@/lib/auth";
 import { suggestColumnMappings, type AppColumnHint } from "@/lib/services/ai-column-mapping";
 import { getCurrentColumns } from "@/lib/services/schema-versioning";
 
 export async function POST(req: NextRequest) {
   try {
-    const { organizationId } = await requireOrgContext(req);
+    const { organizationId } = await requireRole(req, "member");
     const body = await req.json().catch(() => ({}));
 
     const { sheetHeaders, sampleRows = [], datasetId } = body;

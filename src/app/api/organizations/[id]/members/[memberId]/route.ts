@@ -98,9 +98,12 @@ export async function DELETE(
 ) {
   try {
     const { id: organizationId, memberId } = await params;
-    const access = await verifyOrgAccess(organizationId, "admin");
-    if (access.error || !access.user || !access.membership) return access.error;
-    const { user, membership: actorMembership } = access;
+    const userReq = await getCurrentUser();
+    const actorMembership = userReq.memberships.find((m) => m.organizationId === organizationId);
+    if (!actorMembership || actorMembership.status !== "active") {
+      return NextResponse.json({ error: "Organization not found" }, { status: 404 });
+    }
+    const user = userReq;
 
     const existing = await db.organizationMember.findUnique({
       where: { id: memberId },
@@ -110,6 +113,18 @@ export async function DELETE(
         { error: "Member not found" },
         { status: 404 }
       );
+    }
+
+    const isSelf = existing.userId === user.id;
+
+    if (!isSelf) {
+      // If removing someone else, must be at least admin
+      if ((ROLE_LEVEL[actorMembership.role] ?? 0) < ROLE_LEVEL["admin"]) {
+        return NextResponse.json(
+          { error: `This action requires admin role or higher. You are a ${actorMembership.role}.` },
+          { status: 403 }
+        );
+      }
     }
 
     // Non-owners cannot remove owners

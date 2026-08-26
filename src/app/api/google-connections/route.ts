@@ -5,7 +5,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { requireOrgContext, AuthError, authErrorResponse } from "@/lib/auth";
+import { requireOrgContext, requireRole, AuthError, authErrorResponse } from "@/lib/auth";
 import { buildGoogleOAuthUrl } from "@/lib/google-auth";
 import { serializeGoogleConnection } from "@/lib/serialize";
 
@@ -28,7 +28,7 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    const { user, organizationId } = await requireOrgContext(req);
+    const { user, organizationId } = await requireRole(req, "member");
 
     // Build the real Google OAuth consent URL.
     // The frontend should redirect the browser (window.location.href) to this URL.

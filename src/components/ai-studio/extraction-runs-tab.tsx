@@ -9,6 +9,7 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { api } from "@/lib/api-client";
+import { sanitizeSensitiveIds } from "@/lib/serialize";
 import type { AiJobDTO, AiOutputDTO, DatasetDTO, SchemaDTO } from "@/lib/types";
 import { LoadingState, EmptyState } from "@/components/ui/page-elements";
 import { Badge } from "@/components/ui/badge";
@@ -392,8 +393,8 @@ export function ExtractionRunsTab() {
                                 <div>
                                   <p className="text-[10px] text-muted-foreground mb-1">Response (truncated)</p>
                                   <pre className="text-[10px] font-mono bg-background rounded p-2 overflow-x-auto whitespace-pre-wrap max-h-32">
-                                    {JSON.stringify(rawParsed as Record<string, unknown>, null, 1).slice(0, 800)}
-                                    {JSON.stringify(rawParsed as Record<string, unknown>, null, 1).length > 800 ? "…" : ""}
+                                    {JSON.stringify(sanitizeSensitiveIds(rawParsed as Record<string, unknown>), null, 1).slice(0, 800)}
+                                    {JSON.stringify(sanitizeSensitiveIds(rawParsed as Record<string, unknown>), null, 1).length > 800 ? "…" : ""}
                                   </pre>
                                 </div>
                               )}

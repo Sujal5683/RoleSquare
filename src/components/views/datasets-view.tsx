@@ -531,9 +531,16 @@ export function DatasetsView() {
                   <div className={`flex items-center justify-between ${viewMode === "list" ? "pt-1" : "border-t pt-3 mt-auto"}`}>
                     <div className="flex items-center gap-2">
                       {d.isShared && (
-                        <Badge className="bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400 font-normal text-[10px] shrink-0 h-5 px-1.5 py-0">
-                          Shared
-                        </Badge>
+                        <div className="flex items-center gap-1.5">
+                          <span className="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] sm:text-xs font-medium bg-violet-500/15 text-violet-600 border-violet-500/30 dark:text-violet-400 shrink-0">
+                            Shared
+                          </span>
+                          {d.accessLevel && (
+                            <span className="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] sm:text-xs font-medium bg-slate-500/15 text-slate-600 border-slate-500/30 dark:text-slate-400 capitalize shrink-0">
+                              {d.accessLevel} access
+                            </span>
+                          )}
+                        </div>
                       )}
                       {(d as any).syncStatus && (d as any).syncStatus !== "unlinked" && (
                         <button

@@ -272,9 +272,12 @@ export function OrgSheetsWizard({
               <div className="flex gap-2">
                 <button
                   className="text-xs text-primary hover:underline"
-                  onClick={() =>
-                    setSelectedDatasets(new Set(datasets.map((d) => d.id)))
-                  }
+                  onClick={() => {
+                    const editableIds = datasets
+                      .filter(d => d.accessLevel !== "read" && d.accessLevel !== "comment")
+                      .map(d => d.id);
+                    setSelectedDatasets(new Set(editableIds));
+                  }}
                 >
                   Select all
                 </button>
@@ -288,17 +291,26 @@ export function OrgSheetsWizard({
             </div>
             <ScrollArea className="max-h-64">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pr-1">
-                {datasets.map((d) => (
+                {datasets.map((d) => {
+                  const isReadOnly = d.accessLevel === "read" || d.accessLevel === "comment";
+                  return (
                   <label
                     key={d.id}
-                    className="flex cursor-pointer items-center gap-3 rounded-md border bg-card/50 px-3 py-2 hover:bg-muted/40"
+                    className={cn(
+                      "flex items-center gap-3 rounded-md border bg-card/50 px-3 py-2",
+                      isReadOnly ? "opacity-50 cursor-not-allowed" : "cursor-pointer hover:bg-muted/40"
+                    )}
                   >
                     <Checkbox
                       checked={selectedDatasets.has(d.id)}
-                      onCheckedChange={() => toggleDataset(d.id)}
+                      onCheckedChange={() => !isReadOnly && toggleDataset(d.id)}
+                      disabled={isReadOnly}
                     />
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate">{d.name}</p>
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm font-medium truncate">{d.name}</p>
+                        {isReadOnly && <span className="text-xs text-muted-foreground">(View only)</span>}
+                      </div>
                       <p className="text-xs text-muted-foreground">
                         {d.recordCount} record{d.recordCount !== 1 ? "s" : ""}
                       </p>
@@ -307,7 +319,7 @@ export function OrgSheetsWizard({
                       Tab: {d.name.slice(0, 15)}
                     </Badge>
                   </label>
-                ))}
+                )})}
               </div>
             </ScrollArea>
           </div>

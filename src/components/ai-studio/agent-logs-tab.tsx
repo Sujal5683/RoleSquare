@@ -13,6 +13,7 @@
 import { useCallback, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api-client";
+import { sanitizeSensitiveIds } from "@/lib/serialize";
 import type { AgentLogDTO } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { LoadingState, EmptyState } from "@/components/ui/page-elements";
@@ -201,8 +202,8 @@ export function AgentLogsTab({ jobId }: AgentLogsTabProps) {
 
               {/* Metadata */}
               {log.metadata && Object.keys(log.metadata).length > 0 && (
-                <span className="text-muted-foreground break-all max-w-[200px] truncate" title={JSON.stringify(log.metadata)}>
-                  {JSON.stringify(log.metadata)}
+                <span className="text-muted-foreground break-all max-w-[200px] truncate" title={JSON.stringify(sanitizeSensitiveIds(log.metadata))}>
+                  {JSON.stringify(sanitizeSensitiveIds(log.metadata))}
                 </span>
               )}
             </div>

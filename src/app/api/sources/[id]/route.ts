@@ -61,6 +61,20 @@ export async function PATCH(
       );
     }
     const body = await req.json().catch(() => ({}));
+
+    if (body?.datasetId !== undefined && body.datasetId !== before.datasetId) {
+      if (body.datasetId) {
+        const { verifyDatasetWriteAccess } = await import("@/lib/dataset-access");
+        const canEdit = await verifyDatasetWriteAccess(body.datasetId, user.id, organizationId);
+        if (!canEdit) {
+          return NextResponse.json(
+            { error: "You do not have write access to the selected dataset." },
+            { status: 403 }
+          );
+        }
+      }
+    }
+
     const data: any = {};
     if (typeof body?.name === "string" && body.name.trim()) data.name = body.name.trim();
     if (typeof body?.status === "string") data.status = body.status;

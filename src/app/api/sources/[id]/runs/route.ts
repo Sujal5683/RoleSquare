@@ -58,6 +58,18 @@ export async function POST(
         { status: 404 }
       );
     }
+
+    if (source.datasetId) {
+      const { verifyDatasetWriteAccess } = await import("@/lib/dataset-access");
+      const canEdit = await verifyDatasetWriteAccess(source.datasetId, user.id, organizationId);
+      if (!canEdit) {
+        return NextResponse.json(
+          { error: "You do not have write access to the dataset associated with this source." },
+          { status: 403 }
+        );
+      }
+    }
+
     const body = await req.json().catch(() => ({}));
     const mode = body?.mode === "historical" ? "historical" : "incremental";
 

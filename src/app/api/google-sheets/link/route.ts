@@ -65,10 +65,16 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // IDOR: verify dataset belongs to this org
-    const dataset = await db.dataset.findFirst({
-      where: { id: datasetId, organizationId },
-      select: { id: true, name: true },
+    // IDOR & Permission: verify dataset write access
+    const { verifyDatasetWriteAccess } = await import("@/lib/dataset-access");
+    const canEdit = await verifyDatasetWriteAccess(datasetId, user.id, organizationId);
+    if (!canEdit) {
+      return NextResponse.json({ error: "You do not have write access to this dataset" }, { status: 403 });
+    }
+
+    const dataset = await db.dataset.findUnique({
+      where: { id: datasetId },
+      select: { id: true, name: true, organizationId: true },
     });
     if (!dataset) {
       return NextResponse.json({ error: "Dataset not found" }, { status: 404 });

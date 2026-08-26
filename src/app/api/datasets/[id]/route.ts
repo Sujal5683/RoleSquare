@@ -63,6 +63,7 @@ export async function GET(
         where: {
           datasetId: dataset.id,
           status: "active",
+          isPaused: false,
           OR: [
             { granteeOrgId: organizationId },
             { granteeUserId: user.id }

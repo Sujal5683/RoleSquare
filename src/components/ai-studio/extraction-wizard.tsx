@@ -141,20 +141,20 @@ export function ExtractionWizard() {
             <CardDescription>Choose the raw dataset containing the text or emails you want to extract structured data from.</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="grid gap-3 sm:grid-cols-2 max-h-[40vh] overflow-y-auto pr-2">
+            <div className="grid gap-2 sm:grid-cols-2 max-h-[40vh] overflow-y-auto pr-2">
               {datasets?.map((d) => (
                 <div
                   key={d.id}
                   onClick={() => setSourceDatasetId(d.id)}
-                  className={`cursor-pointer rounded-lg border p-4 transition-all hover:border-primary/50 hover:bg-muted/30 ${
+                  className={`cursor-pointer rounded-md border p-2.5 transition-all hover:border-primary/50 hover:bg-muted/30 ${
                     sourceDatasetId === d.id ? "border-primary bg-primary/5 ring-1 ring-primary" : ""
                   }`}
                 >
-                  <div className="flex items-center gap-3">
-                    <Database className="h-5 w-5 text-muted-foreground" />
+                  <div className="flex items-center gap-2.5">
+                    <Database className="h-4 w-4 text-muted-foreground" />
                     <div className="flex-1 min-w-0">
-                      <p className="font-semibold truncate">{d.name}</p>
-                      <p className="text-xs text-muted-foreground">{d.recordCount} records</p>
+                      <p className="font-medium text-sm truncate">{d.name}</p>
+                      <p className="text-[11px] text-muted-foreground">{d.recordCount} records</p>
                     </div>
                   </div>
                 </div>
@@ -177,20 +177,20 @@ export function ExtractionWizard() {
             <CardDescription>Choose the structure you want the AI to extract into.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
-            <div className="grid gap-3 sm:grid-cols-2 max-h-[40vh] overflow-y-auto pr-2">
+            <div className="grid gap-2 sm:grid-cols-2 max-h-[40vh] overflow-y-auto pr-2">
               {schemas?.map((s) => (
                 <div
                   key={s.id}
                   onClick={() => setSchemaId(s.id)}
-                  className={`cursor-pointer rounded-lg border p-4 transition-all hover:border-primary/50 hover:bg-muted/30 ${
+                  className={`cursor-pointer rounded-md border p-2.5 transition-all hover:border-primary/50 hover:bg-muted/30 ${
                     schemaId === s.id ? "border-primary bg-primary/5 ring-1 ring-primary" : ""
                   }`}
                 >
-                  <div className="flex items-center gap-3">
-                    <FileJson className="h-5 w-5 text-muted-foreground" />
+                  <div className="flex items-center gap-2.5">
+                    <FileJson className="h-4 w-4 text-muted-foreground" />
                     <div className="flex-1 min-w-0">
-                      <p className="font-semibold truncate">{s.name}</p>
-                      <p className="text-xs text-muted-foreground">{s.fields.length} fields</p>
+                      <p className="font-medium text-sm truncate">{s.name}</p>
+                      <p className="text-[11px] text-muted-foreground">{s.fields.length} fields</p>
                     </div>
                   </div>
                 </div>
@@ -233,7 +233,17 @@ export function ExtractionWizard() {
                 <Select value={targetDatasetId} onValueChange={setTargetDatasetId}>
                   <SelectTrigger><SelectValue placeholder="Select existing dataset..." /></SelectTrigger>
                   <SelectContent>
-                    {datasets?.map(d => <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>)}
+                    {datasets?.map(d => {
+                      const isReadOnly = d.accessLevel === "read" || d.accessLevel === "comment";
+                      return (
+                        <SelectItem key={d.id} value={d.id} disabled={isReadOnly}>
+                          <div className="flex items-center gap-2">
+                            <span>{d.name}</span>
+                            {isReadOnly && <span className="text-muted-foreground text-xs">(View only)</span>}
+                          </div>
+                        </SelectItem>
+                      );
+                    })}
                   </SelectContent>
                 </Select>
               )}
@@ -243,7 +253,7 @@ export function ExtractionWizard() {
               <Label className="text-base">AI Agents</Label>
               <div className="grid gap-2 sm:grid-cols-2">
                 {ALL_AGENTS.map((agent) => (
-                  <div key={agent.key} className="flex items-start space-x-3 rounded-md border p-3">
+                  <div key={agent.key} className="flex items-start space-x-2.5 rounded-md border p-2.5">
                     <Checkbox
                       id={`agent-${agent.key}`}
                       checked={agentKeys.includes(agent.key)}
@@ -251,10 +261,11 @@ export function ExtractionWizard() {
                         if (c) setAgentKeys([...agentKeys, agent.key]);
                         else setAgentKeys(agentKeys.filter(k => k !== agent.key));
                       }}
+                      className="mt-0.5"
                     />
-                    <div className="grid gap-1.5 leading-none">
-                      <Label htmlFor={`agent-${agent.key}`} className="font-semibold cursor-pointer">{agent.label}</Label>
-                      <p className="text-xs text-muted-foreground">{agent.desc}</p>
+                    <div className="grid gap-1 leading-none">
+                      <Label htmlFor={`agent-${agent.key}`} className="font-medium text-sm cursor-pointer">{agent.label}</Label>
+                      <p className="text-[11px] text-muted-foreground">{agent.desc}</p>
                     </div>
                   </div>
                 ))}

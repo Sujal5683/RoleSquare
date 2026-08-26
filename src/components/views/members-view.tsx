@@ -92,6 +92,7 @@ import {
   Plus,
   LayoutGrid,
   LayoutList,
+  LogOut,
 } from "lucide-react";
 import {
   Tooltip,
@@ -181,6 +182,14 @@ function canAssignRole(actorRole: Role | undefined, roleToAssign: Role): boolean
   if (!actorRole) return false;
   // Actors can only assign roles strictly below their own rank
   return ROLE_RANK[actorRole] > ROLE_RANK[roleToAssign];
+}
+
+function canRemoveMember(actorRole: Role | undefined, targetRole: Role, isSelf: boolean): boolean {
+  if (isSelf) return true; // Anyone can leave
+  if (!actorRole) return false;
+  if (ROLE_RANK[actorRole] < ROLE_RANK["admin"]) return false;
+  if (targetRole === "owner" && actorRole !== "owner") return false;
+  return true;
 }
 
 function roleTooltip(actorRole: Role | undefined, targetRole: Role, isSelf: boolean): string | undefined {
@@ -327,15 +336,20 @@ export function MembersView() {
   const removeMemberMutation = useMutation({
     mutationFn: (memberId: string) =>
       api.delete(`/api/organizations/${activeOrgId}/members/${memberId}`),
-    onSuccess: () => {
-      toast.success("Member removed");
+    onSuccess: (_, variables) => {
+      const isSelf = removeTarget?.user.id === currentUserId;
+      toast.success(isSelf ? "You left the organization" : "Member removed");
       queryClient.invalidateQueries({
         queryKey: ["organizations", activeOrgId, "members"],
       });
+      if (isSelf) {
+        queryClient.invalidateQueries({ queryKey: ["session"] });
+      }
       setRemoveTarget(null);
     },
     onError: (err: unknown) => {
-      toast.error("Failed to remove member", {
+      const isSelf = removeTarget?.user.id === currentUserId;
+      toast.error(isSelf ? "Failed to leave organization" : "Failed to remove member", {
         description: err instanceof Error ? err.message : undefined,
       });
     },
@@ -657,7 +671,7 @@ export function MembersView() {
                               size="icon"
                               className="h-8 w-8"
                               aria-label="Member actions"
-                              disabled={!canChangeRole(myRole ?? undefined, m.role, m.user.id === currentUserId)}
+                              disabled={!canChangeRole(myRole ?? undefined, m.role, m.user.id === currentUserId) && !canRemoveMember(myRole ?? undefined, m.role, m.user.id === currentUserId)}
                             >
                               <MoreHorizontal className="h-4 w-4" />
                             </Button>
@@ -666,12 +680,18 @@ export function MembersView() {
                             <DropdownMenuLabel>Change role</DropdownMenuLabel>
                             {ROLES.filter((r) => r !== m.role).map((r) => {
                               const assignable = canAssignRole(myRole ?? undefined, r);
+                              const isSelf = m.user.id === currentUserId;
+                              const canChangeThisUserRole = canChangeRole(myRole ?? undefined, m.role, isSelf);
+                              const disabled = !assignable || !canChangeThisUserRole;
+                              const tip = roleTooltip(myRole ?? undefined, m.role, isSelf);
+                              
                               return (
                                 <DropdownMenuItem
                                   key={r}
-                                  disabled={!assignable}
+                                  disabled={disabled}
+                                  title={tip}
                                   onClick={() =>
-                                    assignable && changeRoleMutation.mutate({
+                                    !disabled && changeRoleMutation.mutate({
                                       memberId: m.id,
                                       role: r,
                                     })
@@ -684,10 +704,20 @@ export function MembersView() {
                             <DropdownMenuSeparator />
                             <DropdownMenuItem
                               className="text-destructive focus:text-destructive"
+                              disabled={!canRemoveMember(myRole ?? undefined, m.role, m.user.id === currentUserId)}
                               onClick={() => setRemoveTarget(m)}
                             >
-                              <Trash2 className="mr-2 h-4 w-4" />
-                              Remove member
+                              {m.user.id === currentUserId ? (
+                                <>
+                                  <LogOut className="mr-2 h-4 w-4" />
+                                  Leave organization
+                                </>
+                              ) : (
+                                <>
+                                  <Trash2 className="mr-2 h-4 w-4" />
+                                  Remove member
+                                </>
+                              )}
                             </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
@@ -728,33 +758,53 @@ export function MembersView() {
                           variant="ghost"
                           size="icon"
                           className="h-8 w-8 shrink-0 -mr-2 -mt-2"
-                          disabled={m.role === "owner"}
+                          disabled={!canChangeRole(myRole ?? undefined, m.role, m.user.id === currentUserId) && !canRemoveMember(myRole ?? undefined, m.role, m.user.id === currentUserId)}
                         >
                           <MoreHorizontal className="h-4 w-4" />
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end" className="w-48">
                         <DropdownMenuLabel>Change role</DropdownMenuLabel>
-                        {ROLES.filter((r) => r !== m.role).map((r) => (
-                          <DropdownMenuItem
-                            key={r}
-                            onClick={() =>
-                              changeRoleMutation.mutate({
-                                memberId: m.id,
-                                role: r,
-                              })
-                            }
-                          >
-                            <span className="capitalize">{r}</span>
-                          </DropdownMenuItem>
-                        ))}
+                        {ROLES.filter((r) => r !== m.role).map((r) => {
+                          const assignable = canAssignRole(myRole ?? undefined, r);
+                          const isSelf = m.user.id === currentUserId;
+                          const canChangeThisUserRole = canChangeRole(myRole ?? undefined, m.role, isSelf);
+                          const disabled = !assignable || !canChangeThisUserRole;
+                          const tip = roleTooltip(myRole ?? undefined, m.role, isSelf);
+
+                          return (
+                            <DropdownMenuItem
+                              key={r}
+                              disabled={disabled}
+                              title={tip}
+                              onClick={() =>
+                                !disabled && changeRoleMutation.mutate({
+                                  memberId: m.id,
+                                  role: r,
+                                })
+                              }
+                            >
+                              <span className="capitalize">{r}</span>
+                            </DropdownMenuItem>
+                          );
+                        })}
                         <DropdownMenuSeparator />
                         <DropdownMenuItem
                           className="text-destructive focus:text-destructive"
+                          disabled={!canRemoveMember(myRole ?? undefined, m.role, m.user.id === currentUserId)}
                           onClick={() => setRemoveTarget(m)}
                         >
-                          <Trash2 className="mr-2 h-4 w-4" />
-                          Remove member
+                          {m.user.id === currentUserId ? (
+                            <>
+                              <LogOut className="mr-2 h-4 w-4" />
+                              Leave organization
+                            </>
+                          ) : (
+                            <>
+                              <Trash2 className="mr-2 h-4 w-4" />
+                              Remove member
+                            </>
+                          )}
                         </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
@@ -840,14 +890,25 @@ export function MembersView() {
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Remove member?</AlertDialogTitle>
+            <AlertDialogTitle>
+              {removeTarget?.user.id === currentUserId ? "Leave organization?" : "Remove member?"}
+            </AlertDialogTitle>
             <AlertDialogDescription>
-              This will remove{" "}
-              <span className="font-medium text-foreground">
-                {removeTarget?.user.name ?? removeTarget?.user.email}
-              </span>{" "}
-              from the organization. They will lose access to all sources,
-              datasets, and audit history. This action cannot be undone.
+              {removeTarget?.user.id === currentUserId ? (
+                <>
+                  Are you sure you want to leave this organization? You will lose access to all sources,
+                  datasets, and audit history. This action cannot be undone.
+                </>
+              ) : (
+                <>
+                  This will remove{" "}
+                  <span className="font-medium text-foreground">
+                    {removeTarget?.user.name ?? removeTarget?.user.email}
+                  </span>{" "}
+                  from the organization. They will lose access to all sources,
+                  datasets, and audit history. This action cannot be undone.
+                </>
+              )}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -863,7 +924,10 @@ export function MembersView() {
                   removeMemberMutation.mutate(removeTarget.id);
               }}
             >
-              {removeMemberMutation.isPending ? "Removing…" : "Remove member"}
+              {removeMemberMutation.isPending 
+                ? (removeTarget?.user.id === currentUserId ? "Leaving…" : "Removing…") 
+                : (removeTarget?.user.id === currentUserId ? "Leave organization" : "Remove member")
+              }
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
