@@ -135,7 +135,7 @@ export async function runSync(
         }));
       } else {
         throw new Error(
-          "Dataset has no column definitions. Initialize columns before syncing."
+          "Dataset has no columns. Please assign a schema or import data to define column structure before syncing."
         );
       }
     }
@@ -162,6 +162,23 @@ export async function runSync(
       spreadsheetId,
       sheetName
     );
+
+    // 2a. If the sheet is completely empty (no headers), bootstrap it now.
+    // This happens when a new tab is linked but no initial push was triggered.
+    if (rawHeaders.length === 0 && mapping.direction !== "from_sheet") {
+      console.info(`[sync] Sheet is empty — bootstrapping headers and rows for mapping ${sheetMappingId}`);
+      await initialSheetPush(sheetMappingId, sheetsAccountId, spreadsheetId, sheetName, columns, mapping.datasetId);
+
+      // After initial push all app records have been written; mark as success and return
+      result.rowsAdded = await db.datasetRecord.count({ where: { datasetId: mapping.datasetId } });
+      await db.sheetMapping.update({
+        where: { id: sheetMappingId },
+        data: { status: "active" },
+      });
+      await finalizeSyncEvent(syncEvent.id, { status: "success" });
+      await updateSyncState(sheetMappingId, "success", result);
+      return result;
+    }
 
     // 3. Validate schema
     const rowIdIdx = rawHeaders.indexOf(ROW_ID_HEADER);

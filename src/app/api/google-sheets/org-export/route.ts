@@ -108,29 +108,49 @@ export async function POST(req: NextRequest) {
       finalSpreadsheetId = existingSpreadsheetId;
       spreadsheetUrl = `https://docs.google.com/spreadsheets/d/${finalSpreadsheetId}`;
 
-      // For existing spreadsheet: add tabs for each dataset
-      const requests = datasets.map((d) => ({
-        addSheet: {
-          properties: {
-            title: d.name.slice(0, 100).replace(/[\\/\?\*\[\]]/g, "_"),
-          },
-        },
-      }));
-
-      const batchRes = await withRetry(() =>
-        sheets.spreadsheets.batchUpdate({
-          spreadsheetId: finalSpreadsheetId,
-          requestBody: {
-            requests,
-          },
-        })
+      // For existing spreadsheet: fetch existing sheets first
+      const spreadsheet = await withRetry(() => 
+        sheets.spreadsheets.get({ spreadsheetId: finalSpreadsheetId })
       );
-
-      batchRes.data.replies?.forEach(reply => {
-          if (reply.addSheet?.properties?.title && reply.addSheet?.properties?.sheetId != null) {
-              sheetIdMap.set(reply.addSheet.properties.title, reply.addSheet.properties.sheetId as number);
-          }
+      
+      const existingSheets = spreadsheet.data.sheets || [];
+      const existingTitles = new Set(existingSheets.map(s => s.properties?.title));
+      
+      // Map existing sheet IDs so we can use them later
+      existingSheets.forEach(s => {
+        if (s.properties?.title && s.properties?.sheetId != null) {
+          sheetIdMap.set(s.properties.title, s.properties.sheetId as number);
+        }
       });
+
+      // Only add tabs that don't already exist
+      const requests = datasets
+        .map((d) => d.name.slice(0, 100).replace(/[\\/\?\*\[\]]/g, "_"))
+        .filter((title) => !existingTitles.has(title))
+        .map((title) => ({
+          addSheet: {
+            properties: {
+              title,
+            },
+          },
+        }));
+
+      if (requests.length > 0) {
+        const batchRes = await withRetry(() =>
+          sheets.spreadsheets.batchUpdate({
+            spreadsheetId: finalSpreadsheetId,
+            requestBody: {
+              requests,
+            },
+          })
+        );
+
+        batchRes.data.replies?.forEach(reply => {
+            if (reply.addSheet?.properties?.title && reply.addSheet?.properties?.sheetId != null) {
+                sheetIdMap.set(reply.addSheet.properties.title, reply.addSheet.properties.sheetId as number);
+            }
+        });
+      }
     }
 
     // ── Step 2: Create DB Mappings and Trigger Sync ─────────────────────────

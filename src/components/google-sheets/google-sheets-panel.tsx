@@ -160,24 +160,24 @@ export function GoogleSheetsPanel({
             </Tabs>
           ) : (
             /* ── Unlinked state — Premium CTA ── */
-            <div className="space-y-6">
-              <div className="relative overflow-hidden rounded-2xl border border-emerald-500/20 bg-card p-6 shadow-lg shadow-emerald-500/5 transition-all hover:shadow-emerald-500/10">
+            <div className="space-y-6 mt-4 pb-8">
+              <div className="relative overflow-hidden rounded-2xl border border-emerald-500/20 bg-card p-6 shadow-md shadow-emerald-500/5 transition-all hover:shadow-emerald-500/10">
                 <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/5 to-transparent pointer-events-none" />
-                <div className="relative z-10 flex flex-col items-center text-center space-y-3">
-                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-500/10 ring-1 ring-emerald-500/20 shadow-inner">
-                    <Link2 className="h-6 w-6 text-emerald-400" />
+                <div className="relative z-10 flex flex-col items-center text-center space-y-4">
+                  <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-500/10 ring-1 ring-emerald-500/20 shadow-inner">
+                    <Link2 className="h-7 w-7 text-emerald-400" />
                   </div>
-                  <div className="space-y-1.5">
-                    <h3 className="font-semibold tracking-tight text-foreground">
+                  <div className="space-y-2">
+                    <h3 className="font-semibold text-lg tracking-tight text-foreground">
                       Connect your dataset
                     </h3>
-                    <p className="text-sm text-muted-foreground leading-relaxed">
+                    <p className="text-sm text-muted-foreground leading-relaxed px-2">
                       Link this dataset to a Google Sheet for real-time two-way sync. Any changes made in the app or sheet will reflect instantly.
                     </p>
                   </div>
                   <Button
                     size="lg"
-                    className="w-full mt-2 bg-emerald-600 hover:bg-emerald-500 text-white shadow-md shadow-emerald-600/20 transition-all font-medium"
+                    className="w-full mt-4 bg-emerald-600 hover:bg-emerald-500 text-white shadow-md shadow-emerald-600/20 transition-all font-medium"
                     onClick={() => setLinkOpen(true)}
                     id="link-sheet-btn"
                   >
@@ -187,10 +187,10 @@ export function GoogleSheetsPanel({
                 </div>
               </div>
 
-              <div className="space-y-3 rounded-xl border bg-muted/20 p-4">
-                <div className="flex items-center gap-2">
+              <div className="space-y-4 rounded-xl border bg-muted/30 p-5">
+                <div className="flex items-center gap-3">
                   <div className="h-px flex-1 bg-border" />
-                  <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-widest">
+                  <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
                     Or one-time operations
                   </p>
                   <div className="h-px flex-1 bg-border" />
@@ -199,23 +199,28 @@ export function GoogleSheetsPanel({
                 <div className="grid grid-cols-2 gap-3 pt-2">
                   <Button
                     variant="outline"
-                    className="h-auto flex-col py-3 px-2 gap-2 hover:bg-blue-500/5 hover:text-blue-400 hover:border-blue-500/30 transition-all"
+                    className="h-auto flex-col py-4 px-3 gap-3 hover:bg-blue-500/5 hover:text-blue-500 hover:border-blue-500/30 transition-all"
                     onClick={() => setImportOpen(true)}
                     id="import-only-btn"
                   >
-                    <Upload className="h-4 w-4" />
-                    <span className="text-xs font-medium">Import Data</span>
+                    <Upload className="h-5 w-5 text-blue-400 mb-1" />
+                    <span className="text-xs font-semibold">Import Data</span>
                   </Button>
                   <Button
                     variant="outline"
-                    className="h-auto flex-col py-3 px-2 gap-2 hover:bg-emerald-500/5 hover:text-emerald-400 hover:border-emerald-500/30 transition-all"
+                    className="h-auto flex-col py-4 px-3 gap-3 hover:bg-emerald-500/5 hover:text-emerald-500 hover:border-emerald-500/30 transition-all"
                     onClick={() => setExportOpen(true)}
                     id="export-only-btn"
                   >
-                    <Download className="h-4 w-4" />
-                    <span className="text-xs font-medium">Export Data</span>
+                    <Download className="h-5 w-5 text-emerald-400 mb-1" />
+                    <span className="text-xs font-semibold">Export Data</span>
                   </Button>
                 </div>
+              </div>
+
+              <div className="pt-2">
+                <h4 className="mb-3 text-sm font-semibold text-foreground">Import History</h4>
+                <SyncHistory datasetId={dataset.id} />
               </div>
             </div>
           )}

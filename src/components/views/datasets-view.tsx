@@ -68,10 +68,12 @@ import {
   AlertCircle,
   Filter,
   FileSpreadsheet,
+  FileCode2,
 } from "lucide-react";
 import { SyncStatusBadge } from "@/components/google-sheets/sync-status-badge";
 import { GoogleSheetsPanel } from "@/components/google-sheets/google-sheets-panel";
 import { OrgSheetsWizard } from "@/components/google-sheets/org-sheets-wizard";
+import { AssignSchemaDialog } from "@/components/datasets/assign-schema-dialog";
 
 // ── Helpers ──────────────────────────────────────────────────────────────
 
@@ -110,6 +112,7 @@ export function DatasetsView() {
   const [deleteTarget, setDeleteTarget] = useState<DatasetDTO | null>(null);
   const [shareTarget, setShareTarget] = useState<DatasetDTO | null>(null);
   const [sheetsPanelDataset, setSheetsPanelDataset] = useState<DatasetDTO | null>(null);
+  const [assignSchemaTarget, setAssignSchemaTarget] = useState<DatasetDTO | null>(null);
 
   const [showFilters, setShowFilters] = useState(false);
   const [dataSourceFilter, setDataSourceFilter] = useState("all");
@@ -435,6 +438,12 @@ export function DatasetsView() {
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" className="w-48">
                       <DropdownMenuItem
+                        onClick={() => setAssignSchemaTarget(d)}
+                      >
+                        <FileCode2 className="mr-2 h-4 w-4" />
+                        {d.schema ? "Change Schema" : "Assign Schema"}
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
                         onClick={() => setSheetsPanelDataset(d)}
                       >
                         <FileSpreadsheet className="mr-2 h-4 w-4 text-emerald-500" />
@@ -619,6 +628,13 @@ export function DatasetsView() {
         onOpenChange={setOrgSheetsOpen}
         datasets={(datasets ?? []).map((d) => ({ id: d.id, name: d.name, recordCount: d.recordCount }))}
         organizationId={activeOrgId ?? ""}
+      />
+
+      {/* Assign / Change Schema dialog */}
+      <AssignSchemaDialog
+        dataset={assignSchemaTarget}
+        open={!!assignSchemaTarget}
+        onOpenChange={(open) => { if (!open) setAssignSchemaTarget(null); }}
       />
     </div>
   );

@@ -123,8 +123,17 @@ export async function processImport(params: ImportParams): Promise<ImportProgres
     // 4. Build column mapping (sheet header → column def)
     const headerToColumn = new Map<string, ColumnSpec>();
     for (const mapping of job.mappings) {
-      if (!mapping.columnId || !mapping.sheetHeader) continue;
-      const col = columns.find((c) => c.columnId === mapping.columnId);
+      if (!mapping.sheetHeader) continue;
+      
+      let col;
+      if (mapping.columnId) {
+        col = columns.find((c) => c.columnId === mapping.columnId);
+      } else if (mapping.isNewColumn) {
+        // Fallback for new datasets where columnId was generated during import
+        const expectedName = mapping.columnName || mapping.sheetHeader;
+        col = columns.find((c) => c.name === expectedName);
+      }
+      
       if (col) headerToColumn.set(mapping.sheetHeader, col);
     }
 

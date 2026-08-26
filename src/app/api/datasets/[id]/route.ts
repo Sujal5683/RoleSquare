@@ -1,4 +1,5 @@
 // GET /api/datasets/[id] — dataset detail with schema + fields.
+// PATCH /api/datasets/[id] — assign/change schema.
 // DELETE /api/datasets/[id] — delete dataset (cascades records + values).
 
 import { NextRequest, NextResponse } from "next/server";
@@ -42,6 +43,67 @@ export async function GET(
     if (err instanceof AuthError) return authErrorResponse(err);
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Failed to load dataset" },
+      { status: 500 }
+    );
+  }
+}
+
+// PATCH /api/datasets/[id] — assign or change schema
+export async function PATCH(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id } = await params;
+    const { user, organizationId } = await requireOrgContext(req);
+
+    // Requires edit access
+    const before = await requireDataset(id, organizationId, user.id, "edit");
+    if (!before) {
+      return NextResponse.json({ error: "Dataset not found" }, { status: 404 });
+    }
+
+    const body = await req.json().catch(() => ({}));
+    const { schemaId } = body;
+
+    if (!schemaId) {
+      return NextResponse.json({ error: "schemaId is required" }, { status: 400 });
+    }
+
+    // Verify the schema belongs to this org
+    const schema = await db.schema.findFirst({
+      where: { id: schemaId, organizationId },
+      select: { id: true, name: true },
+    });
+    if (!schema) {
+      return NextResponse.json({ error: "Schema not found" }, { status: 404 });
+    }
+
+    const updated = await db.dataset.update({
+      where: { id },
+      data: { schemaId },
+      include: {
+        schema: { include: { fields: { orderBy: { position: "asc" } } } },
+        columnDefs: { orderBy: { position: "asc" } },
+        sources: { select: { id: true } },
+      },
+    });
+
+    await logAudit({
+      organizationId,
+      actorId: user.id,
+      action: "update",
+      entity: "dataset",
+      entityId: id,
+      before: { schemaId: before.schemaId },
+      after: { schemaId, schemaName: schema.name },
+    });
+
+    return NextResponse.json(serializeDataset(updated));
+  } catch (err) {
+    if (err instanceof AuthError) return authErrorResponse(err);
+    return NextResponse.json(
+      { error: err instanceof Error ? err.message : "Failed to update dataset" },
       { status: 500 }
     );
   }

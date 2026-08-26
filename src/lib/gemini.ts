@@ -38,32 +38,32 @@ interface ModelDef {
 
 const MODEL_CHAIN: ModelDef[] = [
   {
-    id: "gemini-2.0-flash-exp",
-    displayName: "Gemini 2.0 Flash",
+    id: "gemini-3.7-flash",
+    displayName: "Gemini 3.7 Flash",
     role: "Primary",
     rpmCooldownMs: 60_000,
   },
   {
-    id: "gemini-2.0-flash",
-    displayName: "Gemini 2.0 Flash Stable",
+    id: "gemini-3.6-flash",
+    displayName: "Gemini 3.6 Flash",
     role: "Fallback 1",
     rpmCooldownMs: 60_000,
   },
   {
-    id: "gemini-1.5-flash",
-    displayName: "Gemini 1.5 Flash",
+    id: "gemini-3.5-flash",
+    displayName: "Gemini 3.5 Flash",
     role: "Fallback 2",
     rpmCooldownMs: 60_000,
   },
   {
-    id: "gemini-1.5-flash-8b",
-    displayName: "Gemini 1.5 Flash 8B",
+    id: "gemini-3.5-flash-lite",
+    displayName: "Gemini 3.5 Flash Lite",
     role: "Fallback 3",
     rpmCooldownMs: 60_000,
   },
   {
-    id: "gemini-1.0-pro",
-    displayName: "Gemini 1.0 Pro",
+    id: "gemini-3.1-flash-lite",
+    displayName: "Gemini 3.1 Flash Lite",
     role: "Fallback 4",
     rpmCooldownMs: 60_000,
   },

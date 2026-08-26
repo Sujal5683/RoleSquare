@@ -230,6 +230,8 @@ export function ColumnMapping({
 }: ColumnMappingProps) {
   // Initialize mappings from AI suggestions or empty
   useEffect(() => {
+    const isCreatingNewDataset = appColumns.length === 0;
+
     if (aiSuggestions.length > 0 && value.length === 0) {
       const initial: ColumnMappingEntry[] = sheetHeaders.map((header) => {
         const suggestion = aiSuggestions.find((s) => s.sheetHeader === header);
@@ -245,7 +247,9 @@ export function ColumnMapping({
         return {
           sheetHeader: header,
           columnId: null,
-          isNewColumn: false,
+          isNewColumn: isCreatingNewDataset,
+          newColumnName: isCreatingNewDataset ? header : undefined,
+          newColumnType: isCreatingNewDataset ? (suggestion?.suggestedDataType || "text") : undefined,
         };
       });
       onChange(initial);
@@ -260,7 +264,9 @@ export function ColumnMapping({
           columnId: exact?.columnId ?? null,
           columnName: exact?.name,
           dataType: exact?.dataType,
-          isNewColumn: false,
+          isNewColumn: isCreatingNewDataset,
+          newColumnName: isCreatingNewDataset ? header : undefined,
+          newColumnType: isCreatingNewDataset ? "text" : undefined,
         };
       });
       onChange(initial);

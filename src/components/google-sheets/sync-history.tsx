@@ -67,7 +67,8 @@ const STATUS_ICON = {
 };
 
 interface SyncHistoryProps {
-  sheetMappingId: string;
+  sheetMappingId?: string;
+  datasetId?: string;
   className?: string;
 }
 
@@ -261,14 +262,19 @@ function SyncEventCard({ event }: { event: SyncEvent }) {
 
 // ── Main component ────────────────────────────────────────────────────────────
 
-export function SyncHistory({ sheetMappingId, className }: SyncHistoryProps) {
+export function SyncHistory({ sheetMappingId, datasetId, className }: SyncHistoryProps) {
   const { data, isLoading } = useQuery<{
     events: SyncEvent[];
     total: number;
   }>({
-    queryKey: ["sync-history", sheetMappingId],
-    queryFn: () =>
-      api.get(`/api/google-sheets/mappings/${sheetMappingId}/history?limit=20&offset=0`),
+    queryKey: ["sync-history", sheetMappingId || datasetId],
+    queryFn: () => {
+      if (sheetMappingId) {
+        return api.get(`/api/google-sheets/mappings/${sheetMappingId}/history?limit=20&offset=0`);
+      }
+      return api.get(`/api/datasets/${datasetId}/import-history?limit=20&offset=0`);
+    },
+    enabled: !!sheetMappingId || !!datasetId,
     refetchInterval: 30_000,
   });
 

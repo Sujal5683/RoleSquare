@@ -120,6 +120,7 @@ export function ImportWizard({
   const queryClient = useQueryClient();
   const [step, setStep] = useState(0);
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [importJobId, setImportJobId] = useState<string | null>(null);
   const [state, setState] = useState<WizardState>({
     sheetsAccountId: "",
     spreadsheetId: "",
@@ -137,10 +138,41 @@ export function ImportWizard({
   const [sheetHeaders, setSheetHeaders] = useState<string[]>([]);
   const [sampleRows, setSampleRows] = useState<string[][]>([]);
 
+  const isNewDataset = state.destinationType === "new";
+  // For new datasets, skip the "Import Mode" step (step 4) — always append
+  const effectiveSteps = isNewDataset
+    ? STEPS.filter((s) => s !== "Import Mode")
+    : STEPS;
+
   const selectedDataset = datasets.find((d) => d.id === state.datasetId);
   const appColumns: AppColumn[] = selectedDataset?.appColumns ?? [];
 
-  // AI suggestions
+  // Poll import job progress while running
+  const progressQuery = useQuery<{
+    status: string;
+    totalRows: number;
+    processedRows: number;
+    insertedRows: number;
+    updatedRows: number;
+    errorRows: number;
+    progressPercent: number | null;
+    errors: Array<{ row: number; message: string }>;
+  }>({
+    queryKey: ["import-job", importJobId],
+    queryFn: () => api.get(`/api/google-sheets/import/${importJobId}`),
+    enabled: !!importJobId,
+    refetchInterval: (query) => {
+      const status = query.state.data?.status;
+      return status === "running" || status === "pending" ? 1500 : false;
+    },
+  });
+
+  const isDone = progressQuery.data?.status === "success" ||
+    progressQuery.data?.status === "failed" ||
+    progressQuery.data?.status === "partial";
+
+  const isProgressView = step === effectiveSteps.length;
+
   const aiQuery = useQuery<{ mappings: Array<{
     sheetHeader: string;
     appColumnId: string | null;
@@ -165,7 +197,8 @@ export function ImportWizard({
         sampleRows,
         datasetId: state.datasetId || undefined,
       }),
-    enabled: step === 5 && sheetHeaders.length > 0,
+    // Columns step = effectiveSteps.length - 2 (second to last before Confirm)
+    enabled: step === effectiveSteps.length - 2 && sheetHeaders.length > 0,
     retry: false,
   });
 
@@ -184,22 +217,30 @@ export function ImportWizard({
         datasetId: state.destinationType === "existing" ? state.datasetId : null,
         newDatasetName:
           state.destinationType === "new" ? state.newDatasetName : null,
-        importMode: state.importMode,
+        importMode: isNewDataset ? "append" : state.importMode,
         matchField: state.matchField || null,
         columnMappings: state.columnMappings,
       }),
     onSuccess: (data: { importJobId: string }) => {
-      toast.success("Import started — processing in the background");
-      queryClient.invalidateQueries({ queryKey: ["datasets"] });
-      onSuccess?.(data.importJobId);
-      onOpenChange(false);
-      setStep(0);
+      toast.success("Import started");
+      setImportJobId(data.importJobId);
+      setStep(effectiveSteps.length); // advance to progress view
     },
     onError: (err: Error) => toast.error(err.message || "Failed to start import"),
   });
 
+  const handleClose = () => {
+    onOpenChange(false);
+    setStep(0);
+    setImportJobId(null);
+    if (isDone) {
+      queryClient.invalidateQueries({ queryKey: ["datasets"] });
+      onSuccess?.(importJobId!);
+    }
+  };
+
   const handleConfirm = () => {
-    if (state.importMode === "replace") {
+    if (state.importMode === "replace" && !isNewDataset) {
       setConfirmOpen(true);
     } else {
       importMutation.mutate();
@@ -207,15 +248,17 @@ export function ImportWizard({
   };
 
   const canNext = () => {
-    switch (step) {
-      case 0: return !!state.sheetsAccountId;
-      case 1: return !!state.spreadsheetId;
-      case 2: return !!state.sheetName;
-      case 3:
+    // Map wizard step to effective step label
+    const stepLabel = effectiveSteps[step];
+    switch (stepLabel) {
+      case "Account": return !!state.sheetsAccountId;
+      case "Spreadsheet": return !!state.spreadsheetId;
+      case "Tab": return !!state.sheetName;
+      case "Destination":
         return state.destinationType === "new"
           ? !!state.newDatasetName.trim()
           : !!state.datasetId;
-      case 4:
+      case "Import Mode":
         return (
           state.importMode !== "update_existing" &&
           state.importMode !== "append_update"
@@ -226,41 +269,47 @@ export function ImportWizard({
 
   return (
     <>
-      <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-2xl">
+      <Dialog open={open} onOpenChange={isProgressView ? handleClose : onOpenChange}>
+        <DialogContent className="max-w-3xl">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Upload className="h-5 w-5 text-blue-400" />
               Import from Google Sheets
             </DialogTitle>
             <DialogDescription>
-              Step {step + 1} of {STEPS.length} — {STEPS[step]}
+              {isProgressView
+                ? "Import in progress"
+                : `Step ${step + 1} of ${effectiveSteps.length} — ${effectiveSteps[step]}`}
             </DialogDescription>
           </DialogHeader>
 
-          {/* Progress */}
-          <div className="flex gap-1">
-            {STEPS.map((_, i) => (
-              <div
-                key={i}
-                className={cn(
-                  "h-1 flex-1 rounded-full transition-colors",
-                  i <= step ? "bg-blue-500" : "bg-muted"
-                )}
-              />
-            ))}
-          </div>
+          {/* Step progress bar — hide in progress view */}
+          {!isProgressView && (
+            <div className="flex gap-1">
+              {effectiveSteps.map((_, i) => (
+                <div
+                  key={i}
+                  className={cn(
+                    "h-1 flex-1 rounded-full transition-colors",
+                    i <= step ? "bg-blue-500" : "bg-muted"
+                  )}
+                />
+              ))}
+            </div>
+          )}
 
           {/* Content */}
           <div className="min-h-[260px]">
-            {step === 0 && (
+            {/* Step 0: Account */}
+            {!isProgressView && effectiveSteps[step] === "Account" && (
               <GoogleSheetsAccountSelector
                 value={state.sheetsAccountId}
                 onSelect={(id) => update({ sheetsAccountId: id })}
               />
             )}
 
-            {step === 1 && (
+            {/* Step 1: Spreadsheet */}
+            {!isProgressView && effectiveSteps[step] === "Spreadsheet" && (
               <SpreadsheetSelector
                 sheetsAccountId={state.sheetsAccountId}
                 value={state.spreadsheetId}
@@ -270,7 +319,8 @@ export function ImportWizard({
               />
             )}
 
-            {step === 2 && (
+            {/* Step 2: Tab */}
+            {!isProgressView && effectiveSteps[step] === "Tab" && (
               <div className="space-y-3">
                 <TabSelector
                   sheetsAccountId={state.sheetsAccountId}
@@ -278,7 +328,6 @@ export function ImportWizard({
                   value={state.sheetName}
                   onSelect={async (title) => {
                     update({ sheetName: title });
-                    // Pre-fetch headers for AI mapping
                     try {
                       const preview = await api.get<{ headers: string[]; rows: string[][]; totalRowsEstimate: number }>(
                         `/api/google-sheets/spreadsheets/${state.spreadsheetId}/preview` +
@@ -303,7 +352,8 @@ export function ImportWizard({
               </div>
             )}
 
-            {step === 3 && (
+            {/* Step 3: Destination */}
+            {!isProgressView && effectiveSteps[step] === "Destination" && (
               <div className="space-y-4">
                 <RadioGroup
                   value={state.destinationType}
@@ -379,7 +429,8 @@ export function ImportWizard({
               </div>
             )}
 
-            {step === 4 && (
+            {/* Step 4 (existing only): Import Mode */}
+            {!isProgressView && effectiveSteps[step] === "Import Mode" && (
               <div className="space-y-4">
                 <RadioGroup
                   value={state.importMode}
@@ -443,7 +494,8 @@ export function ImportWizard({
               </div>
             )}
 
-            {step === 5 && (
+            {/* Columns mapping step */}
+            {!isProgressView && effectiveSteps[step] === "Columns" && (
               <ColumnMapping
                 sheetHeaders={sheetHeaders}
                 appColumns={appColumns}
@@ -454,7 +506,8 @@ export function ImportWizard({
               />
             )}
 
-            {step === 6 && (
+            {/* Confirm step */}
+            {!isProgressView && effectiveSteps[step] === "Confirm" && (
               <div className="space-y-3">
                 <div className="rounded-lg border divide-y">
                   <SummaryRow label="Source" value={`${state.spreadsheetName} / ${state.sheetName}`} />
@@ -466,13 +519,13 @@ export function ImportWizard({
                         : selectedDataset?.name ?? ""
                     }
                   />
-                  <SummaryRow label="Mode" value={MODE_DESCRIPTIONS[state.importMode].label} />
+                  <SummaryRow label="Mode" value={isNewDataset ? "Append" : MODE_DESCRIPTIONS[state.importMode].label} />
                   <SummaryRow
                     label="Columns"
                     value={`${state.columnMappings.filter((m) => m.columnId || m.isNewColumn).length} mapped`}
                   />
                 </div>
-                {state.importMode === "replace" && (
+                {!isNewDataset && state.importMode === "replace" && (
                   <div className="flex gap-2 rounded-md border border-red-500/30 bg-red-500/10 p-3 text-xs text-red-400">
                     <AlertTriangle className="h-4 w-4 shrink-0" />
                     All existing records will be deleted before import. You will be asked to confirm.
@@ -480,39 +533,133 @@ export function ImportWizard({
                 )}
               </div>
             )}
+
+            {/* Progress view — shown after job is started */}
+            {isProgressView && (
+              <div className="space-y-4 py-2">
+                <div className="flex items-center gap-3">
+                  {isDone ? (
+                    progressQuery.data?.status === "failed" ? (
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-red-500/15">
+                        <AlertTriangle className="h-5 w-5 text-red-400" />
+                      </div>
+                    ) : (
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-emerald-500/15">
+                        <Upload className="h-5 w-5 text-emerald-400" />
+                      </div>
+                    )
+                  ) : (
+                    <Loader2 className="h-8 w-8 animate-spin text-blue-400 shrink-0" />
+                  )}
+                  <div>
+                    <p className="font-medium text-sm">
+                      {isDone
+                        ? progressQuery.data?.status === "failed"
+                          ? "Import failed"
+                          : progressQuery.data?.status === "partial"
+                            ? "Import partially complete"
+                            : "Import complete!"
+                        : "Importing rows…"}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {progressQuery.data
+                        ? `${progressQuery.data.processedRows ?? 0} / ${progressQuery.data.totalRows ?? "?"} rows processed`
+                        : "Starting…"}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Progress bar */}
+                {progressQuery.data && (
+                  <div className="w-full bg-muted rounded-full h-2">
+                    <div
+                      className={cn(
+                        "h-2 rounded-full transition-all duration-500",
+                        progressQuery.data.status === "failed" ? "bg-red-500" : "bg-blue-500"
+                      )}
+                      style={{ width: `${progressQuery.data.progressPercent ?? 0}%` }}
+                    />
+                  </div>
+                )}
+
+                {/* Stats */}
+                {progressQuery.data && (
+                  <div className="grid grid-cols-3 gap-3">
+                    {[
+                      { label: "Inserted", value: progressQuery.data.insertedRows ?? 0, color: "text-emerald-400" },
+                      { label: "Updated", value: progressQuery.data.updatedRows ?? 0, color: "text-blue-400" },
+                      { label: "Errors", value: progressQuery.data.errorRows ?? 0, color: "text-red-400" },
+                    ].map((s) => (
+                      <div key={s.label} className="rounded-lg border bg-muted/30 p-3 text-center">
+                        <p className={cn("text-xl font-bold", s.color)}>{s.value}</p>
+                        <p className="text-xs text-muted-foreground">{s.label}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Error list */}
+                {progressQuery.data?.errors && progressQuery.data.errors.length > 0 && (
+                  <div className="rounded-md border border-red-500/20 bg-red-500/5 p-3 space-y-1 max-h-32 overflow-y-auto">
+                    {progressQuery.data.errors.slice(0, 10).map((e, i) => (
+                      <p key={i} className="text-xs text-red-400">
+                        Row {e.row}: {e.message}
+                      </p>
+                    ))}
+                    {progressQuery.data.errors.length > 10 && (
+                      <p className="text-xs text-muted-foreground">
+                        +{progressQuery.data.errors.length - 10} more errors…
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           <DialogFooter className="gap-2">
-            <Button
-              variant="outline"
-              onClick={() => (step === 0 ? onOpenChange(false) : setStep(step - 1))}
-              disabled={importMutation.isPending}
-            >
-              <ChevronLeft className="mr-1 h-4 w-4" />
-              {step === 0 ? "Cancel" : "Back"}
-            </Button>
-            {step < STEPS.length - 1 ? (
-              <Button onClick={() => setStep(step + 1)} disabled={!canNext()}>
-                Next
-                <ChevronRight className="ml-1 h-4 w-4" />
+            {isProgressView ? (
+              <Button
+                variant={isDone ? "default" : "outline"}
+                onClick={handleClose}
+                disabled={!isDone && progressQuery.isFetching}
+              >
+                {isDone ? "Done" : "Running…"}
               </Button>
             ) : (
-              <Button
-                onClick={handleConfirm}
-                disabled={importMutation.isPending}
-                className={
-                  state.importMode === "replace"
-                    ? "bg-red-600 hover:bg-red-700"
-                    : "bg-blue-600 hover:bg-blue-700"
-                }
-              >
-                {importMutation.isPending ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              <>
+                <Button
+                  variant="outline"
+                  onClick={() => (step === 0 ? onOpenChange(false) : setStep(step - 1))}
+                  disabled={importMutation.isPending}
+                >
+                  <ChevronLeft className="mr-1 h-4 w-4" />
+                  {step === 0 ? "Cancel" : "Back"}
+                </Button>
+                {step < effectiveSteps.length - 1 ? (
+                  <Button onClick={() => setStep(step + 1)} disabled={!canNext()}>
+                    Next
+                    <ChevronRight className="ml-1 h-4 w-4" />
+                  </Button>
                 ) : (
-                  <Upload className="mr-2 h-4 w-4" />
+                  <Button
+                    onClick={handleConfirm}
+                    disabled={importMutation.isPending}
+                    className={
+                      !isNewDataset && state.importMode === "replace"
+                        ? "bg-red-600 hover:bg-red-700"
+                        : "bg-blue-600 hover:bg-blue-700"
+                    }
+                  >
+                    {importMutation.isPending ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <Upload className="mr-2 h-4 w-4" />
+                    )}
+                    Start Import
+                  </Button>
                 )}
-                Start Import
-              </Button>
+              </>
             )}
           </DialogFooter>
         </DialogContent>

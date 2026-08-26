@@ -12,6 +12,7 @@ import type {
   DatasetValueDTO,
   RecordStatus,
   FieldType,
+  SchemaDTO,
 } from "@/lib/types";
 import {
   EmptyState,
@@ -68,6 +69,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
@@ -106,9 +108,11 @@ import {
   Sparkles,
   Zap,
   AlertTriangle,
+  MoreHorizontal,
+  FileCode2,
 } from "lucide-react";
-import type { SchemaDTO } from "@/lib/types";
 import { NewShareRequestDialog } from "@/components/sharing/new-share-request-dialog";
+import { AssignSchemaDialog } from "@/components/datasets/assign-schema-dialog";
 
 
 // ── Helpers ──────────────────────────────────────────────────────────────
@@ -245,6 +249,7 @@ export function DatasetDetailView() {
   const [extractSchemaId, setExtractSchemaId] = useState("");
   const [extractDatasetName, setExtractDatasetName] = useState("");
   const [shareOpen, setShareOpen] = useState(false);
+  const [assignSchemaOpen, setAssignSchemaOpen] = useState(false);
 
   // Inline Record Editing state
   const [editValue, setEditValue] = useState<DatasetValueDTO | null>(null);
@@ -573,6 +578,7 @@ export function DatasetDetailView() {
         onExport={(f) => exportMutation.mutate({ format: f })}
         exporting={exportMutation.isPending}
         onShare={() => setShareOpen(true)}
+        onAssignSchema={() => setAssignSchemaOpen(true)}
       />
 
       {/* Inline share dialog */}
@@ -593,12 +599,19 @@ export function DatasetDetailView() {
             variant="outline"
             size="sm"
             className="ml-auto shrink-0 border-amber-500/40 text-amber-300 hover:bg-amber-500/20"
-            onClick={() => setView("schema-builder")}
+            onClick={() => setAssignSchemaOpen(true)}
           >
             Assign Schema
           </Button>
         </div>
       )}
+
+      {/* Assign Schema Dialog */}
+      <AssignSchemaDialog
+        dataset={dataset}
+        open={assignSchemaOpen}
+        onOpenChange={setAssignSchemaOpen}
+      />
 
       {/* Saved views bar */}
       {savedViews.length > 0 && (
@@ -1238,6 +1251,7 @@ function DetailTopBar({
   onExport,
   exporting,
   onShare,
+  onAssignSchema,
 }: {
   dataset: DatasetDTO | null;
   onBack: () => void;
@@ -1246,8 +1260,8 @@ function DetailTopBar({
   onExport: (format: "csv" | "json") => void;
   exporting: boolean;
   onShare?: () => void;
+  onAssignSchema?: () => void;
 }) {
-  const setView = useAppStore((s) => s.setView);
   return (
     <div className="flex flex-col gap-3 border-b pb-4 sm:flex-row sm:items-center sm:justify-between">
       <div className="flex items-start gap-3">
@@ -1320,6 +1334,21 @@ function DetailTopBar({
             <DropdownMenuItem onClick={() => onExport("json")}>
               <FileJson className="mr-2 h-4 w-4" />
               Export JSON
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+        {/* Three-dot actions menu */}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" size="icon" className="h-8 w-8 shrink-0">
+              <MoreHorizontal className="h-4 w-4" />
+              <span className="sr-only">More actions</span>
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-48">
+            <DropdownMenuItem onClick={() => onAssignSchema?.()}>
+              <FileCode2 className="mr-2 h-4 w-4" />
+              {dataset?.schema ? "Change Schema" : "Assign Schema"}
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
