@@ -420,6 +420,32 @@ export async function writeSheetHeaders(
   );
 }
 
+/**
+ * Renames a sheet tab. Used after creating a new spreadsheet to rename
+ * the default "Sheet1" tab to a meaningful name.
+ */
+export async function renameSheetTab(
+  sheetsAccountId: string,
+  spreadsheetId: string,
+  sheetId: number,
+  newTitle: string
+): Promise<void> {
+  const sheets = await getSheetsClient(sheetsAccountId);
+  await withRetry(() =>
+    sheets.spreadsheets.batchUpdate({
+      spreadsheetId,
+      requestBody: {
+        requests: [{
+          updateSheetProperties: {
+            properties: { sheetId, title: newTitle },
+            fields: "title",
+          },
+        }],
+      },
+    })
+  );
+}
+
 // ── Formula detection ─────────────────────────────────────────────────────────
 
 /**

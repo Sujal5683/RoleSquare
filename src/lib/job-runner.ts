@@ -311,6 +311,10 @@ async function processGmailScan(
   });
   if (!source) throw new Error(`Source ${sourceId} not found`);
 
+  // FIX 1: Ensure default dataset exists immediately at scan start (idempotent).
+  // This means the source has a dataset from the very first scan, not after DETERMINISTIC_SYNC.
+  await ensureDefaultDataset(sourceId);
+
   await updateRunProgress(runId, 10, "connecting");
 
   // Build Gmail search query from SourceRules
@@ -859,8 +863,14 @@ async function processAiExtraction(
       },
     });
 
+    // FIX 3 (Mode A): Normalize field names before matching so LLM variations
+    // ("Invoice Number" vs "invoice_number") don't silently drop values.
+    const normFieldName = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
+
     for (const fieldResult of extractionResult.fields) {
-      const schemaField = source.schema!.fields.find((f) => f.name === fieldResult.fieldName);
+      const schemaField = source.schema!.fields.find(
+        (f) => normFieldName(f.name) === normFieldName(fieldResult.fieldName)
+      );
       if (!schemaField) continue;
 
       await db.datasetValue.create({
@@ -983,6 +993,12 @@ async function processTwoStepExtraction(
   let recordsExtracted = 0;
   let totalTokens = 0;
 
+  // FIX 3 (Mode B): Normalize field names so "Invoice Number" matches "invoice_number".
+  const normFieldName = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
+
+  const total = unprocessed.length;
+  let processed = 0;
+
   for (const sourceRecord of unprocessed) {
     const fieldIds = sourceRecord.values.map((v) => v.fieldId);
     const defaultFields = await db.schemaField.findMany({
@@ -991,6 +1007,7 @@ async function processTwoStepExtraction(
     });
     const nameById = new Map(defaultFields.map((f) => [f.id, f.name]));
 
+    // Build a richer labeled source text for better LLM context
     const textLines = sourceRecord.values
       .map((v) => {
         let val: unknown;
@@ -999,7 +1016,11 @@ async function processTwoStepExtraction(
       })
       .filter(Boolean);
 
-    const sourceText = (textLines as string[]).join("\n");
+    const sourceText = [
+      "=== EMAIL RECORD ===",
+      ...(textLines as string[]),
+      "=== END ===",
+    ].join("\n");
 
     let extractionResult;
     try {
@@ -1010,6 +1031,15 @@ async function processTwoStepExtraction(
       });
     } catch (err) {
       console.error(`[job-runner] Two-step extraction failed for record ${sourceRecord.id}:`, err);
+      processed++;
+      continue;
+    }
+
+    // FIX 3 (empty guard): Skip creating a record if LLM returned no fields.
+    // Without this, empty DatasetRecord rows appear in the UI as blank rows.
+    if (!extractionResult.fields.length) {
+      console.warn(`[job-runner] Two-step: LLM returned 0 fields for record ${sourceRecord.id} — skipping`);
+      processed++;
       continue;
     }
 
@@ -1022,8 +1052,12 @@ async function processTwoStepExtraction(
       },
     });
 
+    let valuesWritten = 0;
     for (const fieldResult of extractionResult.fields) {
-      const sf = schemaFields.find((f) => f.name === fieldResult.fieldName);
+      // FIX 3: Use normalized comparison instead of strict equality
+      const sf = schemaFields.find(
+        (f) => normFieldName(f.name) === normFieldName(fieldResult.fieldName)
+      );
       if (!sf) continue;
       await db.datasetValue.create({
         data: {
@@ -1037,10 +1071,26 @@ async function processTwoStepExtraction(
           promptVersion: extractionResult.promptVersion,
         },
       });
+      valuesWritten++;
+    }
+
+    // If still no values written after normalization, delete the empty record
+    if (valuesWritten === 0) {
+      await db.datasetRecord.delete({ where: { id: record.id } });
+      processed++;
+      continue;
     }
 
     recordsExtracted++;
     totalTokens += extractionResult.tokensUsed;
+
+    // Update progress so the UI progress bar moves
+    processed++;
+    const progress = Math.round((processed / Math.max(total, 1)) * 90);
+    await db.aiJob.update({
+      where: { id: job.id },
+      data: { progress },
+    });
 
     // Write AiOutput with accurate cost
     const costUsd = computeCost(
@@ -1060,7 +1110,7 @@ async function processTwoStepExtraction(
         costUsd,
       },
     });
-    await agentInfo(job.id, job.organizationId, "extractor", `Two-step: extracted ${extractionResult.fields.length} fields from record ${sourceRecord.id}`, { confidence: extractionResult.overallConfidence, tokens: extractionResult.tokensUsed, costUsd });
+    await agentInfo(job.id, job.organizationId, "extractor", `Two-step: extracted ${valuesWritten} fields from record ${sourceRecord.id}`, { confidence: extractionResult.overallConfidence, tokens: extractionResult.tokensUsed, costUsd });
   } // end for loop
 
   await db.dataset.update({ where: { id: targetDatasetId }, data: { recordCount: { increment: recordsExtracted } } });

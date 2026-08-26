@@ -393,18 +393,28 @@ async function createImportedSchema(
     },
   });
 
-  // Create SchemaField rows mirroring the DatasetColumnDef rows
-  await db.schemaField.createMany({
-    data: columns.map((col) => ({
-      schemaId: schema.id,
-      name: col.name,
-      type: col.dataType,
-      description: null,
-      required: col.required,
-      position: col.position,
-      confidenceThreshold: 0.7,
-    })),
-  });
+  // Create SchemaField rows mirroring the DatasetColumnDef rows.
+  // FIX 5 (Import ID alignment): We must set each SchemaField.id equal to the
+  // corresponding DatasetColumnDef.columnId. This is critical because DatasetValue
+  // rows are stored with fieldId = columnId (set during import), and the UI/API
+  // resolves values by matching v.fieldId === SchemaField.id. Without this,
+  // every imported cell appears blank in the dataset detail grid.
+  for (const col of columns) {
+    await db.schemaField.upsert({
+      where: { id: col.columnId },
+      create: {
+        id: col.columnId,
+        schemaId: schema.id,
+        name: col.name,
+        type: col.dataType,
+        description: null,
+        required: col.required,
+        position: col.position,
+        confidenceThreshold: 0.7,
+      },
+      update: {},
+    });
+  }
 
   // Link the schema to the dataset
   await db.dataset.update({
@@ -412,6 +422,7 @@ async function createImportedSchema(
     data: { schemaId: schema.id },
   });
 }
+
 
 // ── Finalize ──────────────────────────────────────────────────────────────────
 

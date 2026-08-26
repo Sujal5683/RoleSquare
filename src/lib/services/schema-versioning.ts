@@ -268,7 +268,9 @@ export async function initializeDatasetColumns(
   const { randomUUID } = await import("crypto");
 
   const columns: ColumnSpec[] = fields.map((f, i) => ({
-    columnId: `col_${randomUUID().replace(/-/g, "").slice(0, 12)}`,
+    // FIX 5: Use SchemaField.id as the columnId instead of generating a new one.
+    // DatasetValue.fieldId must match SchemaField.id to display correctly.
+    columnId: f.id,
     name: f.name,
     dataType: mapSchemaFieldType(f.type),
     position: i,

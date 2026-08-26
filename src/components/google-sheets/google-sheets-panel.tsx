@@ -18,7 +18,7 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -71,7 +71,6 @@ export function GoogleSheetsPanel({
   const [linkOpen, setLinkOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState("sync");
   const [linkedMappingId, setLinkedMappingId] = useState<string | null>(
     dataset.sheetMappingId ?? null
   );
@@ -105,125 +104,110 @@ export function GoogleSheetsPanel({
 
           <Separator className="my-5 opacity-50" />
 
-          {isLinked ? (
-            /* ── Linked state — show tabs ── */
-            <Tabs value={activeTab} onValueChange={setActiveTab}>
-              <TabsList className="w-full">
-                <TabsTrigger value="sync" className="flex-1 text-xs">
-                  <RefreshCw className="mr-1.5 h-3.5 w-3.5" />
-                  Sync
-                </TabsTrigger>
-                <TabsTrigger value="history" className="flex-1 text-xs">
-                  <History className="mr-1.5 h-3.5 w-3.5" />
-                  History
-                </TabsTrigger>
-                <TabsTrigger value="io" className="flex-1 text-xs">
-                  <Upload className="mr-1.5 h-3.5 w-3.5" />
-                  Import / Export
-                </TabsTrigger>
-              </TabsList>
+          <Accordion type="single" collapsible defaultValue="sync" className="w-full mt-4 space-y-4">
+            {/* ── Section 1: Two-Way Sync ── */}
+            <AccordionItem value="sync" className="border rounded-xl bg-card overflow-hidden">
+              <AccordionTrigger className="px-5 py-4 hover:bg-muted/50 transition-colors">
+                <div className="flex items-center gap-3 text-left">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-500">
+                    <RefreshCw className="h-4 w-4" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-semibold tracking-tight">Two-Way Sync</h3>
+                    <p className="text-xs text-muted-foreground font-normal">Real-time bi-directional synchronization</p>
+                  </div>
+                </div>
+              </AccordionTrigger>
+              <AccordionContent className="px-5 pb-5 pt-2">
+                {isLinked ? (
+                  <SyncDashboard
+                    sheetMappingId={linkedMappingId!}
+                    onUnlinked={() => setLinkedMappingId(null)}
+                  />
+                ) : (
+                  <div className="space-y-4 pt-2">
+                    <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-4 text-center">
+                      <Link2 className="h-6 w-6 text-emerald-500 mx-auto mb-2" />
+                      <p className="text-xs text-muted-foreground mb-4">
+                        Connect this dataset to a Google Sheet. Any changes made in either place will reflect instantly.
+                      </p>
+                      <Button
+                        size="sm"
+                        className="w-full bg-emerald-600 hover:bg-emerald-500 text-white"
+                        onClick={() => setLinkOpen(true)}
+                        id="link-sheet-btn"
+                      >
+                        <Link2 className="mr-2 h-3.5 w-3.5" /> Set up connection
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </AccordionContent>
+            </AccordionItem>
 
-              <TabsContent value="sync" className="mt-4">
-                <SyncDashboard
-                  sheetMappingId={linkedMappingId!}
-                  onUnlinked={() => setLinkedMappingId(null)}
-                />
-              </TabsContent>
-
-              <TabsContent value="history" className="mt-4">
-                <SyncHistory sheetMappingId={linkedMappingId!} />
-              </TabsContent>
-
-              <TabsContent value="io" className="mt-4 space-y-3">
-                <p className="text-xs text-muted-foreground">
-                  Import or export data independently of the continuous sync.
-                </p>
+            {/* ── Section 2: Import / Export ── */}
+            <AccordionItem value="io" className="border rounded-xl bg-card overflow-hidden">
+              <AccordionTrigger className="px-5 py-4 hover:bg-muted/50 transition-colors">
+                <div className="flex items-center gap-3 text-left">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-500/10 text-blue-500">
+                    <Upload className="h-4 w-4" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-semibold tracking-tight">One-Time Import & Export</h3>
+                    <p className="text-xs text-muted-foreground font-normal">Manual data transfers without linking</p>
+                  </div>
+                </div>
+              </AccordionTrigger>
+              <AccordionContent className="px-5 pb-5 pt-2 space-y-3">
                 <Button
                   variant="outline"
-                  className="w-full justify-start"
+                  className="w-full justify-start h-auto py-3 px-4 group hover:bg-blue-500/5 hover:border-blue-500/30 transition-all"
                   onClick={() => setImportOpen(true)}
                   id="import-btn"
                 >
-                  <Upload className="mr-2 h-4 w-4 text-blue-400" />
-                  Import from Google Sheets
+                  <Upload className="mr-3 h-4 w-4 text-blue-400 group-hover:text-blue-500 transition-colors" />
+                  <div className="text-left">
+                    <div className="text-sm font-medium">Import from Google Sheets</div>
+                    <div className="text-xs text-muted-foreground">Pull data in one go</div>
+                  </div>
                 </Button>
                 <Button
                   variant="outline"
-                  className="w-full justify-start"
+                  className="w-full justify-start h-auto py-3 px-4 group hover:bg-emerald-500/5 hover:border-emerald-500/30 transition-all"
                   onClick={() => setExportOpen(true)}
                   id="export-btn"
                 >
-                  <Download className="mr-2 h-4 w-4 text-emerald-400" />
-                  Export to Google Sheets
+                  <Download className="mr-3 h-4 w-4 text-emerald-400 group-hover:text-emerald-500 transition-colors" />
+                  <div className="text-left">
+                    <div className="text-sm font-medium">Export to Google Sheets</div>
+                    <div className="text-xs text-muted-foreground">Push data out one time</div>
+                  </div>
                 </Button>
-              </TabsContent>
-            </Tabs>
-          ) : (
-            /* ── Unlinked state — Premium CTA ── */
-            <div className="space-y-6 mt-4 pb-8">
-              <div className="relative overflow-hidden rounded-2xl border border-emerald-500/20 bg-card p-6 shadow-md shadow-emerald-500/5 transition-all hover:shadow-emerald-500/10">
-                <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/5 to-transparent pointer-events-none" />
-                <div className="relative z-10 flex flex-col items-center text-center space-y-4">
-                  <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-500/10 ring-1 ring-emerald-500/20 shadow-inner">
-                    <Link2 className="h-7 w-7 text-emerald-400" />
-                  </div>
-                  <div className="space-y-2">
-                    <h3 className="font-semibold text-lg tracking-tight text-foreground">
-                      Connect your dataset
-                    </h3>
-                    <p className="text-sm text-muted-foreground leading-relaxed px-2">
-                      Link this dataset to a Google Sheet for real-time two-way sync. Any changes made in the app or sheet will reflect instantly.
-                    </p>
-                  </div>
-                  <Button
-                    size="lg"
-                    className="w-full mt-4 bg-emerald-600 hover:bg-emerald-500 text-white shadow-md shadow-emerald-600/20 transition-all font-medium"
-                    onClick={() => setLinkOpen(true)}
-                    id="link-sheet-btn"
-                  >
-                    <Link2 className="mr-2 h-4 w-4" />
-                    Set up two-way sync
-                  </Button>
-                </div>
-              </div>
+              </AccordionContent>
+            </AccordionItem>
 
-              <div className="space-y-4 rounded-xl border bg-muted/30 p-5">
-                <div className="flex items-center gap-3">
-                  <div className="h-px flex-1 bg-border" />
-                  <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
-                    Or one-time operations
-                  </p>
-                  <div className="h-px flex-1 bg-border" />
+            {/* ── Section 3: History ── */}
+            <AccordionItem value="history" className="border rounded-xl bg-card overflow-hidden">
+              <AccordionTrigger className="px-5 py-4 hover:bg-muted/50 transition-colors">
+                <div className="flex items-center gap-3 text-left">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-orange-500/10 text-orange-500">
+                    <History className="h-4 w-4" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-semibold tracking-tight">Activity History</h3>
+                    <p className="text-xs text-muted-foreground font-normal">Past syncs and imports</p>
+                  </div>
                 </div>
-                
-                <div className="grid grid-cols-2 gap-3 pt-2">
-                  <Button
-                    variant="outline"
-                    className="h-auto flex-col py-4 px-3 gap-3 hover:bg-blue-500/5 hover:text-blue-500 hover:border-blue-500/30 transition-all"
-                    onClick={() => setImportOpen(true)}
-                    id="import-only-btn"
-                  >
-                    <Upload className="h-5 w-5 text-blue-400 mb-1" />
-                    <span className="text-xs font-semibold">Import Data</span>
-                  </Button>
-                  <Button
-                    variant="outline"
-                    className="h-auto flex-col py-4 px-3 gap-3 hover:bg-emerald-500/5 hover:text-emerald-500 hover:border-emerald-500/30 transition-all"
-                    onClick={() => setExportOpen(true)}
-                    id="export-only-btn"
-                  >
-                    <Download className="h-5 w-5 text-emerald-400 mb-1" />
-                    <span className="text-xs font-semibold">Export Data</span>
-                  </Button>
-                </div>
-              </div>
-
-              <div className="pt-2">
-                <h4 className="mb-3 text-sm font-semibold text-foreground">Import History</h4>
-                <SyncHistory datasetId={dataset.id} />
-              </div>
-            </div>
-          )}
+              </AccordionTrigger>
+              <AccordionContent className="px-5 pb-5 pt-2">
+                {isLinked ? (
+                  <SyncHistory sheetMappingId={linkedMappingId!} />
+                ) : (
+                  <SyncHistory datasetId={dataset.id} />
+                )}
+              </AccordionContent>
+            </AccordionItem>
+          </Accordion>
         </SheetContent>
       </Sheet>
 
@@ -236,7 +220,6 @@ export function GoogleSheetsPanel({
         onSuccess={(mappingId) => {
           setLinkedMappingId(mappingId);
           setLinkOpen(false);
-          setActiveTab("sync");
         }}
       />
 

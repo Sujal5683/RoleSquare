@@ -16,6 +16,7 @@ import {
   appendRowsToSheet,
   writeRowsToSheet,
   getSpreadsheetMeta,
+  renameSheetTab,
 } from "@/lib/services/sheet-discovery";
 import { getCurrentColumns } from "@/lib/services/schema-versioning";
 
@@ -115,16 +116,31 @@ export async function exportDataset(params: ExportParams): Promise<ExportResult>
         newSheetTitle || `${dataset.name} — ${new Date().toLocaleDateString()}`;
       const created = await createSpreadsheet(sheetsAccountId, title);
       targetSpreadsheetId = created.spreadsheetId;
-      targetSheetName = dataset.name.slice(0, 100); // Sheet tab title max 100 chars
       spreadsheetUrl = created.spreadsheetUrl;
 
-      // Rename the default "Sheet1" tab
-      const meta = await getSpreadsheetMeta(sheetsAccountId, targetSpreadsheetId);
-      if (meta.tabs[0]?.title === "Sheet1") {
-        // We'll just write to it
+      // FIX 4: The default tab is always named "Sheet1" on a new spreadsheet.
+      // Writing to dataset.name would cause "Unable to parse range" — it doesn't exist yet.
+      // We write all data to "Sheet1" first, then rename it to the dataset name.
+      const safeTabName = dataset.name.slice(0, 100);
+      targetSheetName = "Sheet1";
+
+      // Attempt to rename "Sheet1" → dataset name.
+      // This is done BEFORE writing so that the sheetName in the final result is accurate.
+      try {
+        const meta = await getSpreadsheetMeta(sheetsAccountId, targetSpreadsheetId);
+        const defaultTab = meta.tabs[0];
+        if (defaultTab?.title === "Sheet1" && defaultTab?.sheetId !== undefined) {
+          await renameSheetTab(sheetsAccountId, targetSpreadsheetId, defaultTab.sheetId, safeTabName);
+          targetSheetName = safeTabName;
+        }
+      } catch {
+        // Non-fatal — fall back to "Sheet1" tab name
+        console.warn("[export] Could not rename Sheet1 tab; writing to 'Sheet1'");
+        targetSheetName = "Sheet1";
       }
       break;
     }
+
 
     case "new_tab": {
       if (!spreadsheetId) throw new Error("spreadsheetId required for new_tab mode");

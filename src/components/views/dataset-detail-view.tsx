@@ -95,6 +95,7 @@ import {
   Pencil,
   CheckCircle2,
   ThumbsDown,
+  Trash2,
   Eye,
   ArrowLeft,
   Database,
@@ -452,6 +453,25 @@ export function DatasetDetailView() {
     onError: (err: unknown) => {
       const msg = err instanceof Error ? err.message : "Failed to update status";
       toast.error("Update failed", { description: msg });
+    },
+  });
+
+  // ── Record deletion mutation (Bulk) ───────────────────────────────────
+  const deleteMutation = useMutation({
+    mutationFn: (recordIds: string[]) =>
+      api.delete<{ deleted: number }>(`/api/datasets/${datasetId}/records/bulk`, {
+        data: { recordIds }
+      }),
+    onSuccess: (res) => {
+      toast.success(`Deleted ${res.deleted} record(s)`);
+      setSelectedRecords(new Set());
+      queryClient.invalidateQueries({ queryKey: ["dataset-records", datasetId] });
+      queryClient.invalidateQueries({ queryKey: ["dataset", datasetId] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+    },
+    onError: (err: unknown) => {
+      const msg = err instanceof Error ? err.message : "Failed to delete records";
+      toast.error("Delete failed", { description: msg });
     },
   });
 
@@ -851,6 +871,23 @@ export function DatasetDetailView() {
           >
             <ThumbsDown className="mr-1.5 h-3.5 w-3.5 text-destructive" />
             Reject
+          </Button>
+
+          <Separator orientation="vertical" className="h-4 bg-primary/20 mx-1" />
+
+          <Button 
+            variant="outline" 
+            size="sm" 
+            className="h-8 bg-destructive/10 text-destructive border-destructive/20 hover:bg-destructive/20 hover:text-destructive"
+            disabled={deleteMutation.isPending}
+            onClick={() => {
+              if (confirm(`Are you sure you want to delete ${selectedRecords.size} records?`)) {
+                deleteMutation.mutate(Array.from(selectedRecords));
+              }
+            }}
+          >
+            <Trash2 className="mr-1.5 h-3.5 w-3.5" />
+            Delete
           </Button>
         </div>
       )}
