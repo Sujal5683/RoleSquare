@@ -148,6 +148,7 @@ export function RequestsTab({ onRowClick }: RequestsTabProps) {
   const outgoing = data?.outgoing ?? [];
   const incoming = data?.incoming ?? [];
   const pendingIncoming = incoming.filter((r) => r.status === "pending");
+  const historyIncoming = incoming.filter((r) => r.status !== "pending");
 
   if (outgoing.length === 0 && incoming.length === 0) {
     return (
@@ -224,6 +225,52 @@ export function RequestsTab({ onRowClick }: RequestsTabProps) {
                           Reject
                         </Button>
                       </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </Card>
+        </div>
+      )}
+
+      {historyIncoming.length > 0 && (
+        <div>
+          <h3 className="text-sm font-semibold text-muted-foreground mb-2 flex items-center gap-2">
+            <Clock className="h-4 w-4" /> Incoming Request History
+          </h3>
+          <Card>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Type</TableHead>
+                  <TableHead>Dataset</TableHead>
+                  <TableHead>From</TableHead>
+                  <TableHead>Access</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Date</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {historyIncoming.map((r) => (
+                  <TableRow 
+                    key={r.id} 
+                    className="cursor-pointer hover:bg-muted/50" 
+                    onClick={() => onRowClick(r)}
+                  >
+                    <TableCell>
+                      <Badge variant="outline" className={r.shareType === "grant" ? "border-violet-200 text-violet-700 bg-violet-50" : "border-blue-200 text-blue-700 bg-blue-50"}>
+                        {r.shareType === "grant" ? "Offered Data" : "Data Request"}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="font-medium">{r.datasetName ?? r.datasetId ?? "—"}</TableCell>
+                    <TableCell>
+                      <div className="text-sm">{r.requesterName ?? r.requestedBy}</div>
+                    </TableCell>
+                    <TableCell><LevelBadge level={r.level} /></TableCell>
+                    <TableCell><StatusBadge status={r.status} /></TableCell>
+                    <TableCell className="text-sm text-muted-foreground">
+                      {formatDistanceToNow(new Date(r.createdAt), { addSuffix: true })}
                     </TableCell>
                   </TableRow>
                 ))}

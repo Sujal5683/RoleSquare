@@ -270,7 +270,7 @@ export function ImportWizard({
   return (
     <>
       <Dialog open={open} onOpenChange={isProgressView ? handleClose : onOpenChange}>
-        <DialogContent className="max-w-3xl">
+        <DialogContent className="max-w-4xl max-h-[85vh] flex flex-col overflow-hidden">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Upload className="h-5 w-5 text-blue-400" />
@@ -299,7 +299,7 @@ export function ImportWizard({
           )}
 
           {/* Content */}
-          <div className="min-h-[260px]">
+          <div className="flex-1 overflow-y-auto min-h-[260px] pr-2 -mr-2">
             {/* Step 0: Account */}
             {!isProgressView && effectiveSteps[step] === "Account" && (
               <GoogleSheetsAccountSelector

@@ -86,9 +86,11 @@ import {
 import {
   Sheet,
   SheetContent,
-  SheetHeader,
-  SheetTitle,
   SheetDescription,
+  SheetHeader,
+  SheetBody,
+  SheetFooter,
+  SheetTitle,
 } from "@/components/ui/sheet";
 
 // ── Helpers ──────────────────────────────────────────────────────────────
@@ -628,16 +630,16 @@ export function SourcesView() {
                       />
                     </TableHead>
                     <TableHead className="min-w-[200px]">Name</TableHead>
+                    <TableHead className="min-w-[160px]">Connection</TableHead>
                     <TableHead>Status</TableHead>
-                    <TableHead>Run state</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {filtered.map((s) => {
-                    const isBusy =
-                      s.runState !== "idle" || scanMutation.isPending;
+                    const isScanning = s.runState !== "idle";
                     const isSelected = selectedIds.has(s.id);
+                    const connectionEmail = s.googleConnection?.googleEmail ?? null;
                     return (
                       <TableRow
                         key={s.id}
@@ -674,10 +676,19 @@ export function SourcesView() {
                           </div>
                         </TableCell>
                         <TableCell>
-                          <StatusBadge status={s.status} />
+                          {connectionEmail ? (
+                            <span
+                              className="text-xs text-muted-foreground truncate block max-w-[160px]"
+                              title={connectionEmail}
+                            >
+                              {connectionEmail}
+                            </span>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">—</span>
+                          )}
                         </TableCell>
                         <TableCell>
-                          <StatusBadge status={s.runState} />
+                          <StatusBadge status={s.status} />
                         </TableCell>
                         <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
                           <div className="flex items-center justify-end gap-1.5">
@@ -695,14 +706,14 @@ export function SourcesView() {
                               size="sm"
                               className="h-8"
                               onClick={() => scanMutation.mutate(s.id)}
-                              disabled={isBusy || scanMutation.isPending}
+                              disabled={isScanning || scanMutation.isPending}
                             >
-                              {s.runState !== "idle" ? (
+                              {isScanning ? (
                                 <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
                               ) : (
                                 <Play className="mr-2 h-4 w-4" />
                               )}
-                              Scan
+                              {isScanning ? "Scanning…" : "Scan"}
                             </Button>
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
@@ -811,72 +822,95 @@ export function SourcesView() {
               
               <div className="space-y-6">
                 <div>
-                  <h4 className="text-sm font-medium mb-3">Status</h4>
-                  <div className="flex items-center gap-3">
-                    <StatusBadge status={detailsSource.status} />
-                    <StatusBadge status={detailsSource.runState} />
-                  </div>
-                </div>
-
-                <div>
-                  <h4 className="text-sm font-medium mb-3">Configuration</h4>
-                  <div className="space-y-3 text-sm">
-                    {detailsSource.schema && (
-                      <div className="flex justify-between py-2 border-b">
-                        <span className="text-muted-foreground">Schema</span>
-                        <span className="font-medium">{detailsSource.schema.name}</span>
-                      </div>
-                    )}
-                    {detailsSource.dataset && (
-                      <div className="flex justify-between py-2 border-b">
-                        <span className="text-muted-foreground">Dataset</span>
-                        <span className="font-medium">{detailsSource.dataset.name}</span>
-                      </div>
-                    )}
-                    {detailsSource.googleConnection && (
-                      <div className="flex justify-between py-2 border-b">
-                        <span className="text-muted-foreground">Connection</span>
-                        <span className="font-medium truncate max-w-[200px]" title={detailsSource.googleConnection.googleEmail}>
-                          {detailsSource.googleConnection.googleEmail}
+              <SheetBody>
+                <div className="space-y-6">
+                  <div>
+                    <h4 className="text-sm font-medium mb-3">Status & Run State</h4>
+                    <div className="flex items-center gap-3 flex-wrap">
+                      <StatusBadge status={detailsSource.status} />
+                      <StatusBadge status={detailsSource.runState} />
+                      {detailsSource.runState !== "idle" && (
+                        <span className="flex items-center gap-1.5 text-xs text-amber-600 dark:text-amber-400">
+                          <RefreshCw className="h-3 w-3 animate-spin" />
+                          Scanning in progress…
                         </span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                <div>
-                  <h4 className="text-sm font-medium mb-3">Schedule</h4>
-                  <div className="space-y-3 text-sm">
-                    <div className="flex justify-between py-2 border-b">
-                      <span className="text-muted-foreground">Mode</span>
-                      <span className="font-medium capitalize">{detailsSource.scheduleMode}</span>
+                      )}
                     </div>
-                    {detailsSource.scheduleExpr && (
+                  </div>
+
+                  <div>
+                    <h4 className="text-sm font-medium mb-3">Configuration</h4>
+                    <div className="space-y-3 text-sm">
+                      {detailsSource.schema && (
+                        <div className="flex justify-between py-2 border-b">
+                          <span className="text-muted-foreground">Schema</span>
+                          <span className="font-medium">{detailsSource.schema.name}</span>
+                        </div>
+                      )}
+                      {detailsSource.dataset && (
+                        <div className="flex justify-between py-2 border-b">
+                          <span className="text-muted-foreground">Dataset</span>
+                          <span className="font-medium">{detailsSource.dataset.name}</span>
+                        </div>
+                      )}
+                      {detailsSource.googleConnection && (
+                        <div className="flex justify-between py-2 border-b">
+                          <span className="text-muted-foreground">Connection</span>
+                          <span className="font-medium truncate max-w-[200px]" title={detailsSource.googleConnection.googleEmail}>
+                            {detailsSource.googleConnection.googleEmail}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div>
+                    <h4 className="text-sm font-medium mb-3">Schedule</h4>
+                    <div className="space-y-3 text-sm">
                       <div className="flex justify-between py-2 border-b">
-                        <span className="text-muted-foreground">Expression</span>
-                        <span className="font-mono bg-muted px-1.5 rounded">{detailsSource.scheduleExpr}</span>
+                        <span className="text-muted-foreground">Mode</span>
+                        <span className="font-medium capitalize">{detailsSource.scheduleMode}</span>
                       </div>
-                    )}
-                    <div className="flex justify-between py-2 border-b">
-                      <span className="text-muted-foreground">Last Run</span>
-                      <span>{formatDate(detailsSource.lastRunAt)}</span>
-                    </div>
-                    <div className="flex justify-between py-2 border-b">
-                      <span className="text-muted-foreground">Next Run</span>
-                      <span>{formatDate(detailsSource.nextRunAt)}</span>
+                      {detailsSource.scheduleExpr && (
+                        <div className="flex justify-between py-2 border-b">
+                          <span className="text-muted-foreground">Expression</span>
+                          <span className="font-mono bg-muted px-1.5 rounded">{detailsSource.scheduleExpr}</span>
+                        </div>
+                      )}
+                      <div className="flex justify-between py-2 border-b">
+                        <span className="text-muted-foreground">Last Run</span>
+                        <span>{formatDate(detailsSource.lastRunAt)}</span>
+                      </div>
+                      <div className="flex justify-between py-2 border-b">
+                        <span className="text-muted-foreground">Next Run</span>
+                        <span>{formatDate(detailsSource.nextRunAt)}</span>
+                      </div>
                     </div>
                   </div>
                 </div>
+              </SheetBody>
 
-                <div className="flex gap-2 pt-4">
-                  <Button className="w-full" onClick={() => {
-                    openSource(detailsSource.id, detailsSource.name);
-                    setDetailsSource(null);
-                  }}>
-                    Edit Configuration
-                  </Button>
-                </div>
-              </div>
+              <SheetFooter>
+                <Button
+                  variant="outline"
+                  className="flex-1"
+                  onClick={() => scanMutation.mutate(detailsSource.id)}
+                  disabled={detailsSource.runState !== "idle" || scanMutation.isPending}
+                >
+                  {detailsSource.runState !== "idle" ? (
+                    <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <Play className="mr-2 h-4 w-4" />
+                  )}
+                  {detailsSource.runState !== "idle" ? "Scanning…" : "Scan Now"}
+                </Button>
+                <Button className="flex-1" onClick={() => {
+                  openSource(detailsSource.id, detailsSource.name);
+                  setDetailsSource(null);
+                }}>
+                  Edit Configuration
+                </Button>
+              </SheetFooter>
             </>
           )}
         </SheetContent>

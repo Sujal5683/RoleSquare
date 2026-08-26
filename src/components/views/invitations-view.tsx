@@ -7,6 +7,7 @@ import { formatDistanceToNow, isPast } from "date-fns";
 import {
   MailOpen, Building2, User, RefreshCw, Send, Check, X,
   Shield, Clock, SendHorizonal, AlertCircle, ChevronRight,
+  LayoutGrid, List
 } from "lucide-react";
 import { api } from "@/lib/api-client";
 import { useActiveOrg } from "@/hooks/use-active-org";
@@ -57,6 +58,7 @@ import { UserPlus } from "lucide-react";
 export function InvitationsView() {
   const queryClient = useQueryClient();
   const [tab, setTab] = useState<"incoming" | "outgoing">("incoming");
+  const [viewMode, setViewMode] = useState<"card" | "list">("list");
   const [inviteOpen, setInviteOpen] = useState(false);
   const [selectedInvite, setSelectedInvite] = useState<InvitationDTO | null>(null);
 
@@ -120,23 +122,44 @@ export function InvitationsView() {
       <InviteMemberDialog open={inviteOpen} onClose={() => setInviteOpen(false)} />
 
       <Tabs value={tab} onValueChange={(v) => setTab(v as any)} className="space-y-4">
-        <TabsList>
-          <TabsTrigger value="incoming">
-            <MailOpen className="mr-2 h-4 w-4" />
-            Incoming
-          </TabsTrigger>
-          <TabsTrigger value="outgoing">
-            <SendHorizonal className="mr-2 h-4 w-4" />
-            Outgoing
-          </TabsTrigger>
-        </TabsList>
+        <div className="flex items-center justify-between">
+          <TabsList>
+            <TabsTrigger value="incoming">
+              <MailOpen className="mr-2 h-4 w-4" />
+              Incoming
+            </TabsTrigger>
+            <TabsTrigger value="outgoing">
+              <SendHorizonal className="mr-2 h-4 w-4" />
+              Outgoing
+            </TabsTrigger>
+          </TabsList>
+          
+          <div className="flex items-center rounded-md border p-1 bg-muted/20">
+            <Button
+              variant={viewMode === "card" ? "secondary" : "ghost"}
+              size="sm"
+              className="h-7 px-2"
+              onClick={() => setViewMode("card")}
+            >
+              <LayoutGrid className="h-4 w-4" />
+            </Button>
+            <Button
+              variant={viewMode === "list" ? "secondary" : "ghost"}
+              size="sm"
+              className="h-7 px-2"
+              onClick={() => setViewMode("list")}
+            >
+              <List className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
 
         <TabsContent value="incoming">
-          <IncomingInvites onSelect={setSelectedInvite} />
+          <IncomingInvites onSelect={setSelectedInvite} viewMode={viewMode} />
         </TabsContent>
 
         <TabsContent value="outgoing">
-          <OutgoingInvites onSelect={setSelectedInvite} />
+          <OutgoingInvites onSelect={setSelectedInvite} viewMode={viewMode} />
         </TabsContent>
       </Tabs>
 
@@ -153,7 +176,7 @@ export function InvitationsView() {
 
 // ── Incoming ─────────────────────────────────────────────────────────────
 
-function IncomingInvites({ onSelect }: { onSelect: (inv: InvitationDTO) => void }) {
+function IncomingInvites({ onSelect, viewMode = "card" }: { onSelect: (inv: InvitationDTO) => void, viewMode?: "card" | "list" }) {
   const queryClient = useQueryClient();
 
   const { data: invitations, isLoading, isError, refetch } = useQuery({
@@ -173,6 +196,67 @@ function IncomingInvites({ onSelect }: { onSelect: (inv: InvitationDTO) => void 
         title="No pending invitations"
         description="When someone invites you to an organization, it will appear here."
       />
+    );
+  }
+
+  if (viewMode === "list") {
+    return (
+      <Card>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Organization</TableHead>
+              <TableHead>Role</TableHead>
+              <TableHead>Invited By</TableHead>
+              <TableHead>Expires</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {pendingInvites.map((invite) => {
+              const expired = isPast(new Date(invite.expiresAt));
+              return (
+                <TableRow
+                  key={invite.id}
+                  className="cursor-pointer hover:bg-accent/50"
+                  onClick={() => onSelect(invite)}
+                >
+                  <TableCell>
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-8 w-8 items-center justify-center rounded bg-primary/10 text-primary">
+                        <Building2 className="h-4 w-4" />
+                      </div>
+                      <div className="font-medium">
+                        {invite.organizationName ?? "Organization"}
+                      </div>
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-2">
+                      <Badge variant="outline" className="capitalize">
+                        {invite.role}
+                      </Badge>
+                      {expired && <Badge variant="destructive">Expired</Badge>}
+                    </div>
+                  </TableCell>
+                  <TableCell className="text-sm text-muted-foreground">
+                    {invite.inviterName ?? "Someone"}
+                  </TableCell>
+                  <TableCell className="text-sm text-muted-foreground">
+                    {!expired ? (
+                      <div className="flex items-center gap-1">
+                        <Clock className="h-3 w-3" />
+                        {formatDistanceToNow(new Date(invite.expiresAt), { addSuffix: true })}
+                      </div>
+                    ) : (
+                      "Expired"
+                    )}
+                  </TableCell>
+                </TableRow>
+              );
+            })}
+          </TableBody>
+        </Table>
+      </Card>
     );
   }
 
@@ -229,7 +313,7 @@ function IncomingInvites({ onSelect }: { onSelect: (inv: InvitationDTO) => void 
 
 // ── Outgoing ─────────────────────────────────────────────────────────────
 
-function OutgoingInvites({ onSelect }: { onSelect: (inv: InvitationDTO) => void }) {
+function OutgoingInvites({ onSelect, viewMode = "list" }: { onSelect: (inv: InvitationDTO) => void, viewMode?: "card" | "list" }) {
   const queryClient = useQueryClient();
   const activeOrgId = useActiveOrg();
 
@@ -288,6 +372,84 @@ function OutgoingInvites({ onSelect }: { onSelect: (inv: InvitationDTO) => void 
         title="No pending outgoing invitations"
         description="Invitations you send to new members will appear here until they accept."
       />
+    );
+  }
+
+  if (viewMode === "card") {
+    return (
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {pending.map((inv) => {
+          const expired = isPast(new Date(inv.expiresAt));
+          return (
+            <Card
+              key={inv.id}
+              className="flex flex-col gap-3 p-4 transition-shadow hover:shadow-md cursor-pointer hover:border-primary/50 relative"
+              onClick={() => onSelect(inv)}
+            >
+              <div className="absolute top-2 right-2" onClick={(e) => e.stopPropagation()}>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="icon" className="h-8 w-8 opacity-50 hover:opacity-100">
+                      <MoreHorizontal className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem
+                      onClick={() =>
+                        resendMutation.mutate({
+                          orgId: activeOrgId,
+                          email: inv.email,
+                          role: inv.role,
+                        })
+                      }
+                      disabled={resendMutation.isPending}
+                    >
+                      <RefreshCw className="mr-2 h-4 w-4" />
+                      Resend Invite
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      className="text-destructive focus:text-destructive"
+                      onClick={() => cancelMutation.mutate(inv.token)}
+                      disabled={cancelMutation.isPending}
+                    >
+                      <X className="mr-2 h-4 w-4" />
+                      Cancel Invite
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+
+              <div className="flex items-start justify-between gap-2 pt-2">
+                <div className="flex min-w-0 items-start gap-3">
+                  <div className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                    <User className="h-5 w-5" />
+                  </div>
+                  <div className="min-w-0 space-y-1 pr-6">
+                    <div className="text-base font-semibold leading-tight truncate">
+                      {inv.email}
+                    </div>
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <Badge variant="outline" className="capitalize text-xs">
+                        {inv.role}
+                      </Badge>
+                      {expired && (
+                        <Badge variant="destructive" className="text-xs">
+                          Expired
+                        </Badge>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-1 text-xs text-muted-foreground mt-auto pt-2">
+                <Clock className="h-3 w-3" />
+                Sent {formatDistanceToNow(new Date(inv.createdAt), { addSuffix: true })}
+              </div>
+            </Card>
+          );
+        })}
+      </div>
     );
   }
 

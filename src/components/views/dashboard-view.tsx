@@ -315,45 +315,78 @@ export function DashboardView() {
             <Card className="lg:col-span-2">
               <CardHeader className="pb-3">
                 <CardTitle className="text-base flex items-center gap-2">
-                  <Activity className="h-4 w-4" /> Queue health
+                  <Activity className="h-4 w-4" /> Queue Health
                 </CardTitle>
               </CardHeader>
-              <CardContent>
+              <CardContent className="pt-0">
                 {data.queueHealth.length === 0 ? (
                   <EmptyState title="No jobs" description="No AI jobs have run yet." />
-                ) : (
-                  <div className="space-y-3">
-                    {data.queueHealth.map((q, i) => (
-                      <div key={`${q.type}-${q.status}-${i}`} className="flex items-center gap-3">
-                        <div className="w-40 shrink-0">
-                          <JobTypeBadge type={q.type as any} />
-                        </div>
-                        <div className="flex-1">
-                          <div className="flex items-center justify-between text-xs mb-1">
-                            <span className="text-muted-foreground">
-                              {q.status === "success" ? "Completed" : q.status === "failed" ? "Failed" : q.status === "running" ? "In progress" : "Queued"}
-                            </span>
-                            <span className="font-medium tabular-nums">{q.count}</span>
-                          </div>
-                          <div className="h-1.5 rounded-full bg-muted overflow-hidden">
-                            <div
-                              className={`h-full ${
-                                q.status === "success"
-                                  ? "bg-emerald-500"
-                                  : q.status === "failed"
-                                  ? "bg-destructive"
-                                  : q.status === "running"
-                                  ? "bg-amber-500"
-                                  : "bg-muted-foreground"
-                              }`}
-                              style={{ width: `${Math.min(100, q.count * 15)}%` }}
-                            />
-                          </div>
+                ) : (() => {
+                  // Aggregate counts by status
+                  const byStatus: Record<string, { count: number; types: string[] }> = {};
+                  for (const q of data.queueHealth) {
+                    if (!byStatus[q.status]) byStatus[q.status] = { count: 0, types: [] };
+                    byStatus[q.status].count += q.count;
+                    if (!byStatus[q.status].types.includes(q.type)) byStatus[q.status].types.push(q.type);
+                  }
+                  const total = Object.values(byStatus).reduce((s, v) => s + v.count, 0);
+                  const statusConfig: Record<string, { label: string; color: string; bg: string; ring: string; bar: string }> = {
+                    success:  { label: "Completed",   color: "text-emerald-700 dark:text-emerald-400", bg: "bg-emerald-50 dark:bg-emerald-950/40",  ring: "ring-emerald-200 dark:ring-emerald-800",  bar: "bg-emerald-500" },
+                    running:  { label: "In Progress",  color: "text-amber-700 dark:text-amber-400",    bg: "bg-amber-50 dark:bg-amber-950/40",         ring: "ring-amber-200 dark:ring-amber-800",      bar: "bg-amber-500" },
+                    failed:   { label: "Failed",       color: "text-red-700 dark:text-red-400",         bg: "bg-red-50 dark:bg-red-950/40",             ring: "ring-red-200 dark:ring-red-800",          bar: "bg-red-500" },
+                    pending:  { label: "Queued",       color: "text-slate-600 dark:text-slate-400",     bg: "bg-slate-50 dark:bg-slate-900/40",         ring: "ring-slate-200 dark:ring-slate-700",      bar: "bg-slate-400" },
+                  };
+                  return (
+                    <div className="space-y-4">
+                      {/* Status summary cards */}
+                      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                        {(["success", "running", "failed", "pending"] as const).map((s) => {
+                          const cfg = statusConfig[s];
+                          const entry = byStatus[s];
+                          const count = entry?.count ?? 0;
+                          return (
+                            <div key={s} className={`rounded-xl p-3 ring-1 ${cfg.bg} ${cfg.ring} flex flex-col gap-1`}>
+                              <span className={`text-2xl font-bold tabular-nums ${cfg.color}`}>{count}</span>
+                              <span className={`text-xs font-medium ${cfg.color}`}>{cfg.label}</span>
+                              {count > 0 && (
+                                <div className="h-1 rounded-full bg-black/10 dark:bg-white/10 overflow-hidden mt-1">
+                                  <div className={`h-full ${cfg.bar} rounded-full`} style={{ width: `${Math.min(100, (count / Math.max(total, 1)) * 100)}%` }} />
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+
+                      {/* Per-job-type breakdown */}
+                      <div className="space-y-2">
+                        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">By Job Type</p>
+                        <div className="space-y-2">
+                          {data.queueHealth.map((q, i) => {
+                            const cfg = statusConfig[q.status] ?? statusConfig.pending;
+                            const pct = total > 0 ? Math.round((q.count / total) * 100) : 0;
+                            return (
+                              <div key={`${q.type}-${q.status}-${i}`} className="flex items-center gap-3">
+                                <div className="w-36 shrink-0">
+                                  <JobTypeBadge type={q.type as any} />
+                                </div>
+                                <div className="flex-1">
+                                  <div className="h-1.5 rounded-full bg-muted overflow-hidden">
+                                    <div className={`h-full rounded-full transition-all ${cfg.bar}`} style={{ width: `${Math.min(100, Math.max(4, pct))}%` }} />
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-2 shrink-0 w-24 justify-end">
+                                  <span className={`text-[10px] font-medium ${cfg.color}`}>{cfg.label}</span>
+                                  <span className="text-xs font-semibold tabular-nums">{q.count}</span>
+                                </div>
+                              </div>
+                            );
+                          })}
                         </div>
                       </div>
-                    ))}
-                  </div>
-                )}
+                    </div>
+                  );
+                })()}
               </CardContent>
             </Card>
 

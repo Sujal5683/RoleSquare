@@ -16,6 +16,7 @@ import {
   SheetDescription,
   SheetHeader,
   SheetTitle,
+  SheetBody,
 } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
@@ -102,11 +103,12 @@ export function GoogleSheetsPanel({
             </SheetDescription>
           </SheetHeader>
 
-          <Separator className="my-5 opacity-50" />
+          <SheetBody>
+            <Separator className="my-5 opacity-50" />
 
-          <Accordion type="single" collapsible defaultValue="sync" className="w-full mt-4 space-y-4">
-            {/* ── Section 1: Two-Way Sync ── */}
-            <AccordionItem value="sync" className="border rounded-xl bg-card overflow-hidden">
+            <Accordion type="single" collapsible defaultValue="sync" className="w-full mt-4 space-y-4">
+              {/* ── Section 1: Two-Way Sync ── */}
+              <AccordionItem value="sync" className="border rounded-xl bg-card overflow-hidden">
               <AccordionTrigger className="px-5 py-4 hover:bg-muted/50 transition-colors">
                 <div className="flex items-center gap-3 text-left">
                   <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-500">
@@ -208,6 +210,7 @@ export function GoogleSheetsPanel({
               </AccordionContent>
             </AccordionItem>
           </Accordion>
+          </SheetBody>
         </SheetContent>
       </Sheet>
 

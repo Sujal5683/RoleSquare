@@ -15,21 +15,21 @@ export function PageHeader({
   icon?: React.ReactNode;
 }) {
   return (
-    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between border-b pb-4">
-      <div className="flex items-start gap-3">
+    <div className="sticky top-0 z-10 -mx-4 -mt-4 mb-4 px-4 pt-4 sm:-mx-4 sm:-mt-4 sm:px-4 lg:-mx-6 lg:-mt-6 lg:px-6 lg:pt-6 pb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
+      <div className="flex items-center gap-3">
         {icon && (
-          <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
             {icon}
           </div>
         )}
-        <div className="space-y-1">
-          <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
+        <div className="space-y-0.5">
+          <h1 className="text-xl font-semibold tracking-tight leading-none">{title}</h1>
           {description && (
-            <p className="text-sm text-muted-foreground max-w-2xl">{description}</p>
+            <p className="text-xs text-muted-foreground max-w-2xl line-clamp-1" title={description}>{description}</p>
           )}
         </div>
       </div>
-      {actions && <div className="flex items-center gap-2">{actions}</div>}
+      {actions && <div className="flex items-center gap-2 shrink-0">{actions}</div>}
     </div>
   );
 }

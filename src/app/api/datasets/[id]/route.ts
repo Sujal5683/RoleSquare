@@ -30,7 +30,7 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
-    const { user, organizationId } = await requireOrgContext(req);
+    const { user, organizationId, membership } = await requireOrgContext(req);
     const dataset = await requireDataset(id, organizationId, user.id);
     if (!dataset) {
       return NextResponse.json(
@@ -38,7 +38,50 @@ export async function GET(
         { status: 404 }
       );
     }
-    return NextResponse.json(serializeDataset(dataset));
+    
+    let accessLevel = "read";
+    let isShared = false;
+    let ownerOrgName = undefined;
+
+    if (dataset.organizationId === organizationId) {
+      // If they belong to the org, map their org role to an access level.
+      // Owner/Admin/Manager -> owner or edit. Let's just say owner.
+      if (["owner", "admin", "manager"].includes(membership.role)) {
+        accessLevel = "owner";
+      } else if (membership.role === "member") {
+        accessLevel = "edit";
+      } else {
+        accessLevel = "read"; // viewer
+      }
+    } else {
+      // It's a shared dataset
+      isShared = true;
+      const ownerOrg = await db.organization.findUnique({ where: { id: dataset.organizationId }});
+      ownerOrgName = ownerOrg?.name;
+      
+      const access = await db.datasetAccess.findFirst({
+        where: {
+          datasetId: dataset.id,
+          status: "active",
+          OR: [
+            { granteeOrgId: organizationId },
+            { granteeUserId: user.id }
+          ]
+        },
+        orderBy: { level: 'desc' }
+      });
+      if (access) {
+        accessLevel = access.level;
+      }
+    }
+
+    const serialized = serializeDataset(dataset);
+    return NextResponse.json({
+      ...serialized,
+      accessLevel,
+      isShared,
+      ownerOrgName,
+    });
   } catch (err) {
     if (err instanceof AuthError) return authErrorResponse(err);
     return NextResponse.json(

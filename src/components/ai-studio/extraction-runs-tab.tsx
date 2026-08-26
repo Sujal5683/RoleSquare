@@ -77,7 +77,7 @@ export function ExtractionRunsTab() {
     queryKey: ["ai-jobs", "AI_EXTRACTION", page],
     queryFn: () =>
       api.get<JobListResponse>(`/api/ai-jobs?type=AI_EXTRACTION&page=${page}&pageSize=50`),
-    refetchInterval: 5000,
+    refetchInterval: 2000,
   });
 
   const { data: outputsResp, isLoading: outputsLoading } = useQuery<OutputListResponse>({
@@ -85,7 +85,7 @@ export function ExtractionRunsTab() {
     queryFn: () =>
       api.get<OutputListResponse>(`/api/ai-jobs/${selectedJobId}/outputs`),
     enabled: !!selectedJobId,
-    refetchInterval: selectedJobId ? 8000 : false,
+    refetchInterval: selectedJobId ? 2000 : false,
   });
 
   const { data: datasets } = useQuery({
@@ -107,7 +107,7 @@ export function ExtractionRunsTab() {
   const totalOutputs = outputs.length;
 
   return (
-    <div className="flex h-full gap-4 overflow-hidden">
+    <div className="flex gap-4 overflow-hidden h-[calc(100vh-280px)] min-h-[500px]">
       {/* Left — job list */}
       <div className="w-72 flex-shrink-0 flex flex-col gap-2 overflow-y-auto">
         <div className="flex items-center justify-between sticky top-0 bg-background pb-2 pt-1">

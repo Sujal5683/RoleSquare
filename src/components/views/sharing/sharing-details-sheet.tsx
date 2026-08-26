@@ -7,6 +7,8 @@ import {
   SheetContent,
   SheetDescription,
   SheetHeader,
+  SheetBody,
+  SheetFooter,
   SheetTitle,
 } from "@/components/ui/sheet";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -64,7 +66,7 @@ export function SharingDetailsSheet({ open, onOpenChange, data, type }: SharingD
           </div>
         </SheetHeader>
 
-        <div className="flex flex-col gap-6">
+        <SheetBody className="flex flex-col gap-6">
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-sm font-semibold flex items-center gap-2">
@@ -99,20 +101,19 @@ export function SharingDetailsSheet({ open, onOpenChange, data, type }: SharingD
                 <Info className="h-4 w-4" /> Participants
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4 text-sm">
+            <CardContent className="space-y-3 text-sm">
               {isRequest ? (
                 <>
                   <div className="flex flex-col sm:flex-row gap-1 sm:gap-4">
-                    <span className="text-muted-foreground sm:w-1/3">Requester:</span>
-                    <span className="font-medium sm:w-2/3 break-words">
-                      {req.requesterName || req.requestedBy}
-                      {req.requesterEmail && <span className="block text-xs font-normal text-muted-foreground mt-0.5">{req.requesterEmail}</span>}
-                    </span>
+                    <span className="text-muted-foreground sm:w-1/3">Target Org:</span>
+                    <span className="font-medium sm:w-2/3 break-words">{req.ownerOrgName || req.ownerOrgId}</span>
                   </div>
                   <div className="flex flex-col sm:flex-row gap-1 sm:gap-4">
-                    <span className="text-muted-foreground sm:w-1/3">Target:</span>
+                    <span className="text-muted-foreground sm:w-1/3">Requester:</span>
                     <span className="font-medium sm:w-2/3 break-words">
-                      {req.targetOrganizationName || req.targetOrganizationId || req.targetEmail || req.targetUserId || "Unknown"}
+                      {req.shareType === "request" 
+                        ? (req.requesterName || req.requestedBy) 
+                        : (req.granteeOrgName || "Unknown Org")}
                     </span>
                   </div>
                 </>
@@ -149,15 +150,15 @@ export function SharingDetailsSheet({ open, onOpenChange, data, type }: SharingD
               </CardContent>
             </Card>
           )}
+        </SheetBody>
 
-          {datasetId && status === "active" && !isRequest && (
-            <div className="pt-2">
-              <Button onClick={handleOpenDataset} className="w-full">
-                Open Dataset <ExternalLink className="ml-2 h-4 w-4" />
-              </Button>
-            </div>
-          )}
-        </div>
+        {datasetId && status === "active" && !isRequest && (
+          <SheetFooter>
+            <Button onClick={handleOpenDataset} className="w-full">
+              Open Dataset <ExternalLink className="ml-2 h-4 w-4" />
+            </Button>
+          </SheetFooter>
+        )}
       </SheetContent>
     </Sheet>
   );

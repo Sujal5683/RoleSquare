@@ -163,7 +163,14 @@ export function ReceivedTab({ onRowClick }: ReceivedTabProps) {
                 </div>
               </TableCell>
               <TableCell>
-                <LevelBadge level={access.level} />
+                <div className="flex items-center gap-2">
+                  <LevelBadge level={access.level} />
+                  {access.status === "pending" && (
+                    <Badge variant="secondary" className="bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                      Pending Accept
+                    </Badge>
+                  )}
+                </div>
               </TableCell>
               <TableCell className="text-sm text-muted-foreground">
                 {formatDistanceToNow(new Date(access.createdAt), { addSuffix: true })}
@@ -176,14 +183,35 @@ export function ReceivedTab({ onRowClick }: ReceivedTabProps) {
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
-                    <DropdownMenuItem
-                      className="text-destructive focus:text-destructive"
-                      onClick={() => revokeMutation.mutate(access.id)}
-                      disabled={revokeMutation.isPending}
-                    >
-                      <Trash2 className="mr-2 h-4 w-4" />
-                      Decline / Revoke access
-                    </DropdownMenuItem>
+                    {access.status === "pending" ? (
+                      <>
+                        <DropdownMenuItem
+                          onClick={() => {
+                            api.patch('/api/sharing/permissions', { id: access.id, status: 'active' })
+                               .then(() => queryClient.invalidateQueries({ queryKey: ["sharing-permissions"] }))
+                               .catch(() => toast.error("Failed to accept share"));
+                          }}
+                        >
+                          Accept
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          className="text-destructive focus:text-destructive"
+                          onClick={() => revokeMutation.mutate(access.id)}
+                          disabled={revokeMutation.isPending}
+                        >
+                          Decline
+                        </DropdownMenuItem>
+                      </>
+                    ) : (
+                      <DropdownMenuItem
+                        className="text-destructive focus:text-destructive"
+                        onClick={() => revokeMutation.mutate(access.id)}
+                        disabled={revokeMutation.isPending}
+                      >
+                        <Trash2 className="mr-2 h-4 w-4" />
+                        Remove access
+                      </DropdownMenuItem>
+                    )}
                   </DropdownMenuContent>
                 </DropdownMenu>
               </TableCell>

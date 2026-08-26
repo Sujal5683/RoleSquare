@@ -114,6 +114,13 @@ export function NewShareRequestDialog({
     enabled: open && !dataset && !!activeOrgId,
   });
 
+  const { data: session } = useQuery({
+    queryKey: ["session"],
+    queryFn: () => api.get<{ organizations: Array<{ id: string; role: string }> }>("/api/session"),
+  });
+  const myRole = session?.organizations?.find((o) => o.id === activeOrgId)?.role;
+  const isOwnerOrAdmin = myRole === "owner" || myRole === "admin";
+
   const myDatasets = (datasets ?? []).filter(d => !d.isShared);
 
   // Debounced search across users + orgs
@@ -473,7 +480,7 @@ export function NewShareRequestDialog({
                 </SelectValue>
               </SelectTrigger>
               <SelectContent>
-                {ACCESS_LEVELS.map((level) => (
+                {ACCESS_LEVELS.filter((level) => isOwnerOrAdmin || level.value !== "edit").map((level) => (
                   <SelectItem key={level.value} value={level.value}>
                     <div className="flex items-center gap-2">
                       <level.icon className="h-4 w-4 text-muted-foreground" />

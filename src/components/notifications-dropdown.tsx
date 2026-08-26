@@ -33,7 +33,7 @@ interface Notification {
   title: string;
   description: string;
   timestamp: string;
-  action?: { label: string; view: "dashboard" | "sources" | "datasets" | "sharing" | "ai-studio" };
+  action?: { label: string; view: "dashboard" | "sources" | "datasets" | "sharing" | "ai-studio" | "organizations" };
   read: boolean;
 }
 
@@ -136,6 +136,29 @@ export function NotificationsDropdown() {
         action: { label: "View request", view: "sharing" },
         read: false,
       });
+    }
+  }
+
+  // Pending Invitations
+  const { data: session } = useQuery({
+    queryKey: ["session"],
+    queryFn: () => api.get<{ organizations: Array<{ id: string; name: string; userStatus: string; createdAt?: string }> }>("/api/session"),
+  });
+  
+  if (session?.organizations) {
+    for (const org of session.organizations) {
+      if (org.userStatus === "invited") {
+        notifications.push({
+          id: `invite-${org.id}`,
+          type: "info",
+          icon: Bell,
+          title: "Organization Invitation",
+          description: `You've been invited to join ${org.name}.`,
+          timestamp: org.createdAt || new Date().toISOString(),
+          action: { label: "View invitations", view: "organizations" },
+          read: false,
+        });
+      }
     }
   }
 

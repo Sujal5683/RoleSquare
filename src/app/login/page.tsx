@@ -3,7 +3,8 @@
 import { useState, useEffect, Suspense } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Zap, Mail, Lock, Eye, EyeOff, ArrowRight, Loader2, AlertCircle } from "lucide-react";
+import { Zap, Mail, Lock, Eye, EyeOff, ArrowRight, Loader2, AlertCircle, ArrowLeft } from "lucide-react";
+import Link from "next/link";
 
 type Mode = "login" | "signup" | "forgot";
 
@@ -103,11 +104,22 @@ function LoginPageContent() {
       </div>
 
       <div className="relative w-full max-w-md space-y-8">
+        {/* Back to Home Button */}
+        <Link 
+          href="/" 
+          className="absolute -top-16 left-0 flex items-center text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+        >
+          <ArrowLeft className="mr-2 h-4 w-4" />
+          Back to Home
+        </Link>
+
         {/* Logo */}
         <div className="text-center">
-          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-lg">
-            <Zap className="h-6 w-6" />
-          </div>
+          <Link href="/" className="inline-block">
+            <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-lg hover:scale-105 transition-transform">
+              <Zap className="h-6 w-6" />
+            </div>
+          </Link>
           <h1 className="text-2xl font-bold tracking-tight text-foreground">
             {TITLES[mode]}
           </h1>

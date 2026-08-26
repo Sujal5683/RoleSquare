@@ -58,7 +58,7 @@ export function OwnedTab({ onRowClick }: OwnedTabProps) {
   if (isLoading) return <LoadingState rows={4} />;
   if (isError) return <ErrorState message="Failed to load shared-out datasets" onRetry={() => refetch()} />;
 
-  const owned = (data?.owned ?? []).filter((a) => a.status === "active");
+  const owned = data?.owned ?? [];
 
   if (owned.length === 0) {
     return (
@@ -78,14 +78,6 @@ export function OwnedTab({ onRowClick }: OwnedTabProps) {
     }
   };
 
-  const toggleOne = (e: React.MouseEvent, id: string) => {
-    e.stopPropagation();
-    const next = new Set(selectedIds);
-    if (next.has(id)) next.delete(id);
-    else next.add(id);
-    setSelectedIds(next);
-  };
-
   return (
     <Card>
       {selectedIds.size > 0 && (
@@ -98,42 +90,37 @@ export function OwnedTab({ onRowClick }: OwnedTabProps) {
             size="sm"
             onClick={() => {
               if (window.confirm(`Revoke ${selectedIds.size} permissions?`)) {
-                Promise.all(Array.from(selectedIds).map(id => api.delete("/api/sharing/permissions", { id })))
-                  .then(() => {
-                    toast.success("Access revoked");
-                    queryClient.invalidateQueries({ queryKey: ["sharing-permissions"] });
-                    setSelectedIds(new Set());
-                  })
-                  .catch(() => toast.error("Failed to revoke some permissions"));
+                selectedIds.forEach((id) => revokeMutation.mutate(id));
+                setSelectedIds(new Set());
               }
             }}
           >
-            <Trash2 className="mr-2 h-3.5 w-3.5" />
-            Revoke Access
+            <Trash2 className="mr-2 h-4 w-4" />
+            Revoke Selected
           </Button>
         </div>
       )}
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead className="w-[40px]">
+            <TableHead className="w-12">
               <Checkbox 
-                checked={owned.length > 0 && selectedIds.size === owned.length}
+                checked={selectedIds.size > 0 && selectedIds.size === owned.length}
                 onCheckedChange={toggleAll}
               />
             </TableHead>
             <TableHead>Dataset</TableHead>
-            <TableHead>Shared with</TableHead>
-            <TableHead>Access</TableHead>
-            <TableHead>Granted</TableHead>
-            <TableHead className="w-[50px]"></TableHead>
+            <TableHead>Shared With</TableHead>
+            <TableHead>Access Level</TableHead>
+            <TableHead>Shared</TableHead>
+            <TableHead className="w-12"></TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {owned.map((access) => (
             <TableRow 
               key={access.id} 
-              className="cursor-pointer hover:bg-accent/50"
+              className="cursor-pointer hover:bg-muted/50"
               onClick={() => onRowClick(access)}
             >
               <TableCell onClick={(e) => e.stopPropagation()}>
@@ -159,6 +146,11 @@ export function OwnedTab({ onRowClick }: OwnedTabProps) {
               <TableCell>
                 <div className="flex items-center gap-2">
                   <LevelBadge level={access.level} />
+                  {access.status === "pending" && (
+                    <Badge variant="secondary" className="bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                      Pending Accept
+                    </Badge>
+                  )}
                   {access.isPaused && (
                     <Badge variant="secondary" className="bg-amber-500/15 text-amber-600 dark:text-amber-400">
                       Paused
@@ -186,6 +178,18 @@ export function OwnedTab({ onRowClick }: OwnedTabProps) {
                     >
                       {access.isPaused ? "Resume access" : "Pause access"}
                     </DropdownMenuItem>
+                    {["read", "comment", "edit"].map((lvl) => (
+                      <DropdownMenuItem
+                        key={lvl}
+                        onClick={() => {
+                          api.patch('/api/sharing/permissions', { id: access.id, level: lvl })
+                             .then(() => queryClient.invalidateQueries({ queryKey: ["sharing-permissions"] }))
+                             .catch(() => toast.error("Failed to change level"));
+                        }}
+                      >
+                        Change to {lvl === "read" ? "Viewer" : lvl === "comment" ? "Commenter" : "Editor"}
+                      </DropdownMenuItem>
+                    ))}
                     <DropdownMenuItem
                       className="text-destructive focus:text-destructive"
                       onClick={() => revokeMutation.mutate(access.id)}

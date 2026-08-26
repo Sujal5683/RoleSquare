@@ -64,6 +64,8 @@ import {
   Calendar,
   Search,
   FileSpreadsheet,
+  LayoutGrid,
+  LayoutList,
 } from "lucide-react";
 
 // ── Helpers ──────────────────────────────────────────────────────────────
@@ -174,6 +176,7 @@ export function OrganizationsView() {
   const selectedOrganizationId = useAppStore((s) => s.selectedOrganizationId);
 
   const [search, setSearch] = useState("");
+  const [viewMode, setViewMode] = useState<"card" | "list">("card");
   const [createOpen, setCreateOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<OrganizationDTO | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<OrganizationDTO | null>(null);
@@ -339,6 +342,27 @@ export function OrganizationsView() {
                 <SelectItem value="enterprise">Enterprise</SelectItem>
               </SelectContent>
             </Select>
+
+            <div className="flex items-center rounded-md border p-1 ml-auto shrink-0 bg-muted/20">
+              <Button
+                variant={viewMode === "card" ? "secondary" : "ghost"}
+                size="icon"
+                className="h-8 w-8"
+                onClick={() => setViewMode("card")}
+                title="Card view"
+              >
+                <LayoutGrid className="h-4 w-4" />
+              </Button>
+              <Button
+                variant={viewMode === "list" ? "secondary" : "ghost"}
+                size="icon"
+                className="h-8 w-8"
+                onClick={() => setViewMode("list")}
+                title="List view"
+              >
+                <LayoutList className="h-4 w-4" />
+              </Button>
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -374,7 +398,7 @@ export function OrganizationsView() {
           }
         />
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className={viewMode === "list" ? "flex flex-col gap-3" : "grid gap-4 sm:grid-cols-2 lg:grid-cols-3"}>
           {filtered.map((org) => {
             const members = membersByOrg?.[org.id] ?? [];
             const firstThree = members.slice(0, 3);
@@ -383,171 +407,231 @@ export function OrganizationsView() {
               <Card
                 key={org.id}
                 onClick={() => setOrganization(org.id)}
-                className={`flex flex-col gap-3 p-4 transition-all hover:shadow-md cursor-pointer ${
+                className={`flex p-4 transition-all hover:shadow-md cursor-pointer ${
                   selectedOrganizationId === org.id
                     ? "border-primary ring-1 ring-primary shadow-sm"
                     : ""
-                }`}
+                } ${viewMode === "list" ? "flex-row gap-4" : "flex-col gap-3"}`}
               >
-                {/* Header */}
-                <div className="flex items-start justify-between gap-2">
-                  <div className="flex min-w-0 items-start gap-3">
-                    <div className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                      <Building2 className="h-5 w-5" />
+                <div className="flex flex-1 min-w-0 gap-3">
+                  <div className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                    <Building2 className="h-5 w-5" />
+                  </div>
+                  <div className="flex-1 min-w-0 space-y-2">
+                    <div className="flex items-start justify-between">
+                      <div className="min-w-0 w-full">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleOpen(org);
+                          }}
+                          className="block text-left text-base font-semibold leading-tight truncate hover:underline w-full"
+                          title={org.name}
+                        >
+                          {org.name}
+                        </button>
+                        <div className="flex items-center gap-2 flex-wrap mt-1">
+                          {selectedOrganizationId === org.id && (
+                            <Badge variant="secondary" className="font-normal text-[10px] px-1.5 py-0 h-5 bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
+                              Active
+                            </Badge>
+                          )}
+                          <PlanBadge plan={org.plan} />
+                          <code className="text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
+                            {org.slug}
+                          </code>
+                          {org.userStatus === "invited" && (
+                            <span className="text-[10px] font-medium text-amber-600 bg-amber-100 dark:text-amber-400 dark:bg-amber-900/30 px-1.5 py-0.5 rounded">
+                              Pending Invite
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      
+                      {/* Non-list right side actions */}
+                      {viewMode !== "list" && org.userStatus !== "invited" && (
+                        <div onClick={(e) => e.stopPropagation()} className="flex items-center gap-1 shrink-0 ml-2">
+                          {/* Members icon */}
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 shrink-0"
+                            aria-label="View members"
+                            title="View members"
+                            onClick={() => {
+                              setOrganization(org.id);
+                              setView("members");
+                            }}
+                          >
+                            <Users className="h-4 w-4" />
+                          </Button>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" aria-label="Organization actions">
+                                <MoreHorizontal className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="w-56">
+                              <DropdownMenuItem onClick={() => setEditTarget(org)}>
+                                <Pencil className="mr-2 h-4 w-4" />
+                                Edit
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleOpen(org)}>
+                                <Users className="mr-2 h-4 w-4" />
+                                Members
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => setConnectSheetsOrg(org.id)}>
+                                <FileSpreadsheet className="mr-2 h-4 w-4" />
+                                Connect to Google Sheets
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => setDeleteTarget(org)}>
+                                <Trash2 className="mr-2 h-4 w-4" />
+                                Delete
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
+                      )}
                     </div>
-                    <div className="min-w-0 space-y-1">
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleOpen(org);
-                        }}
-                        className="block text-left text-base font-semibold leading-tight truncate hover:underline"
-                        title={org.name}
+
+                    {/* Member avatars */}
+                    <div className="flex items-center gap-2">
+                      {firstThree.length === 0 ? (
+                        <span className="text-xs text-muted-foreground">
+                          No members yet
+                        </span>
+                      ) : (
+                        <>
+                          <div className="flex -space-x-2">
+                            {firstThree.map((m) => (
+                              <Avatar
+                                key={m.id}
+                                className="relative h-7 w-7 border-2 border-background ring-1 ring-border/50 transition-transform hover:z-10 hover:scale-110"
+                                title={m.user.name ?? m.user.email}
+                              >
+                                <AvatarFallback className={`text-[10px] font-medium ${getAvatarColor(m.user.name ?? m.user.email)}`}>
+                                  {initials(m.user.name ?? m.user.email)}
+                                </AvatarFallback>
+                              </Avatar>
+                            ))}
+                          </div>
+                          {extra > 0 && (
+                            <span className="text-xs text-muted-foreground">
+                              +{extra} more
+                            </span>
+                          )}
+                        </>
+                      )}
+                    </div>
+
+                    {/* Meta */}
+                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                      <span className="inline-flex items-center gap-1">
+                        <Users className="h-3 w-3" />
+                        <span className="tabular-nums font-medium text-foreground">
+                          {org.memberCount ?? members.length}
+                        </span>{" "}
+                        member(s)
+                      </span>
+                      <span
+                        className="inline-flex items-center gap-1"
+                        title={formatDate(org.createdAt)}
                       >
-                        {org.name}
-                      </button>
-                      <div className="flex items-center gap-2 flex-wrap">
-                        {selectedOrganizationId === org.id && (
-                          <Badge variant="secondary" className="font-normal text-[10px] px-1.5 py-0 h-5 bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
-                            Active
-                          </Badge>
-                        )}
+                        <Calendar className="h-3 w-3" />
+                        {relativeTime(org.createdAt)}
+                      </span>
+                    </div>
+
+                    {/* Footer for non-list OR embedded inside for list */}
+                    <div className={`flex items-center justify-between ${viewMode === "list" ? "pt-1" : "border-t pt-3 w-full"}`}>
+                      <div>
                         {org.userRole && (
                           <Badge variant="outline" className="font-normal text-[10px] px-1.5 py-0 h-5 capitalize">
                             {org.userRole}
                           </Badge>
                         )}
-                        <PlanBadge plan={org.plan} />
-                        <code className="text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
-                          {org.slug}
-                        </code>
-                        {org.userStatus === "invited" && (
-                          <span className="text-[10px] font-medium text-amber-600 bg-amber-100 dark:text-amber-400 dark:bg-amber-900/30 px-1.5 py-0.5 rounded">
-                            Pending Invite
-                          </span>
-                        )}
                       </div>
+                      {viewMode !== "list" && (
+                        <div className="flex gap-2">
+                          {org.userStatus === "invited" ? (
+                            <>
+                              <Button variant="outline" size="sm" disabled={inviteMutation.isPending} onClick={(e) => { e.stopPropagation(); inviteMutation.mutate({ id: org.id, status: "rejected" }); }}>Decline</Button>
+                              <Button size="sm" disabled={inviteMutation.isPending} onClick={(e) => { e.stopPropagation(); inviteMutation.mutate({ id: org.id, status: "active" }); }}>Accept</Button>
+                            </>
+                          ) : (
+                            <Button variant="outline" size="sm" onClick={(e) => { e.stopPropagation(); handleOpen(org); }}>
+                              Open <ChevronRight className="ml-1.5 h-3.5 w-3.5" />
+                            </Button>
+                          )}
+                        </div>
+                      )}
                     </div>
                   </div>
-                  {org.userStatus !== "invited" && (
-                    <div onClick={(e) => e.stopPropagation()}>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
+                </div>
+
+                {/* Sidebar actions specifically for list view */}
+                {viewMode === "list" && (
+                  <div className="flex flex-col items-end justify-between shrink-0 pl-4 border-l" onClick={(e) => e.stopPropagation()}>
+                    {org.userStatus !== "invited" ? (
+                      <div className="flex items-center gap-1">
                         <Button
                           variant="ghost"
                           size="icon"
                           className="h-8 w-8 shrink-0"
-                          aria-label="Organization actions"
+                          aria-label="View members"
+                          title="View members"
+                          onClick={() => {
+                            setOrganization(org.id);
+                            setView("members");
+                          }}
                         >
-                          <MoreHorizontal className="h-4 w-4" />
+                          <Users className="h-4 w-4" />
                         </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="w-56">
-                        <DropdownMenuItem onClick={() => setEditTarget(org)}>
-                          <Pencil className="mr-2 h-4 w-4" />
-                          Edit
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleOpen(org)}>
-                          <Users className="mr-2 h-4 w-4" />
-                          Members
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => setConnectSheetsOrg(org.id)}>
-                          <FileSpreadsheet className="mr-2 h-4 w-4" />
-                          Connect to Google Sheets
-                        </DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem
-                          className="text-destructive focus:text-destructive"
-                          onClick={() => setDeleteTarget(org)}
-                        >
-                          <Trash2 className="mr-2 h-4 w-4" />
-                          Delete
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                    </div>
-                  )}
-                </div>
-
-                {/* Member avatars */}
-                <div className="flex items-center gap-2">
-                  {firstThree.length === 0 ? (
-                    <span className="text-xs text-muted-foreground">
-                      No members yet
-                    </span>
-                  ) : (
-                    <>
-                      <div className="flex -space-x-2">
-                        {firstThree.map((m) => (
-                          <Avatar
-                            key={m.id}
-                            className="relative h-7 w-7 border-2 border-background ring-1 ring-border/50 transition-transform hover:z-10 hover:scale-110"
-                            title={m.user.name ?? m.user.email}
-                          >
-                            <AvatarFallback className={`text-[10px] font-medium ${getAvatarColor(m.user.name ?? m.user.email)}`}>
-                              {initials(m.user.name ?? m.user.email)}
-                            </AvatarFallback>
-                          </Avatar>
-                        ))}
+                        <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" aria-label="Organization actions">
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-56">
+                          <DropdownMenuItem onClick={() => setEditTarget(org)}>
+                            <Pencil className="mr-2 h-4 w-4" />
+                            Edit
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleOpen(org)}>
+                            <Users className="mr-2 h-4 w-4" />
+                            Members
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => setConnectSheetsOrg(org.id)}>
+                            <FileSpreadsheet className="mr-2 h-4 w-4" />
+                            Connect to Google Sheets
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => setDeleteTarget(org)}>
+                            <Trash2 className="mr-2 h-4 w-4" />
+                            Delete
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                        </DropdownMenu>
                       </div>
-                      {extra > 0 && (
-                        <span className="text-xs text-muted-foreground">
-                          +{extra} more
-                        </span>
+                    ) : (
+                      <div />
+                    )}
+                    <div className="flex gap-2 mt-4">
+                      {org.userStatus === "invited" ? (
+                        <>
+                          <Button variant="outline" size="sm" disabled={inviteMutation.isPending} onClick={() => inviteMutation.mutate({ id: org.id, status: "rejected" })}>Decline</Button>
+                          <Button size="sm" disabled={inviteMutation.isPending} onClick={() => inviteMutation.mutate({ id: org.id, status: "active" })}>Accept</Button>
+                        </>
+                      ) : (
+                        <Button variant="outline" size="sm" onClick={() => handleOpen(org)}>
+                          Open <ChevronRight className="ml-1.5 h-3.5 w-3.5" />
+                        </Button>
                       )}
-                    </>
-                  )}
-                </div>
-
-                {/* Meta */}
-                <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
-                  <span className="inline-flex items-center gap-1">
-                    <Users className="h-3 w-3" />
-                    <span className="tabular-nums font-medium text-foreground">
-                      {org.memberCount ?? members.length}
-                    </span>{" "}
-                    member(s)
-                  </span>
-                  <span
-                    className="inline-flex items-center gap-1"
-                    title={formatDate(org.createdAt)}
-                  >
-                    <Calendar className="h-3 w-3" />
-                    {relativeTime(org.createdAt)}
-                  </span>
-                </div>
-
-                {/* Footer */}
-                <div className="mt-auto flex items-center justify-end gap-2 border-t pt-3">
-                  {org.userStatus === "invited" ? (
-                    <>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        disabled={inviteMutation.isPending}
-                        onClick={() => inviteMutation.mutate({ id: org.id, status: "rejected" })}
-                      >
-                        Decline
-                      </Button>
-                      <Button
-                        size="sm"
-                        disabled={inviteMutation.isPending}
-                        onClick={() => inviteMutation.mutate({ id: org.id, status: "active" })}
-                      >
-                        Accept
-                      </Button>
-                    </>
-                  ) : (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleOpen(org)}
-                    >
-                      Open
-                      <ChevronRight className="ml-1.5 h-3.5 w-3.5" />
-                    </Button>
-                  )}
-                </div>
+                    </div>
+                  </div>
+                )}
               </Card>
             );
           })}

@@ -90,7 +90,15 @@ import {
   ChevronDown,
   Building2,
   Plus,
+  LayoutGrid,
+  LayoutList,
 } from "lucide-react";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 // ── Helpers ──────────────────────────────────────────────────────────────
 
@@ -148,6 +156,38 @@ function initials(name: string | null | undefined): string {
 }
 
 const ROLES: Role[] = ["owner", "admin", "manager", "member", "viewer"];
+
+// Role rank: higher = more permissions
+const ROLE_RANK: Record<Role, number> = {
+  owner: 5,
+  admin: 4,
+  manager: 3,
+  member: 2,
+  viewer: 1,
+};
+
+// Can actorRole change targetRole's role?
+function canChangeRole(actorRole: Role | undefined, targetRole: Role, isSelf: boolean): boolean {
+  if (!actorRole) return false;
+  if (isSelf) return false; // no one can change their own role (enforced here; owner edge-case handled separately)
+  if (actorRole === "viewer") return false;
+  if (actorRole === "member") return false;
+  // actor must outrank target
+  return ROLE_RANK[actorRole] > ROLE_RANK[targetRole];
+}
+
+// Can actorRole assign a specific role to someone?
+function canAssignRole(actorRole: Role | undefined, roleToAssign: Role): boolean {
+  if (!actorRole) return false;
+  // Actors can only assign roles strictly below their own rank
+  return ROLE_RANK[actorRole] > ROLE_RANK[roleToAssign];
+}
+
+function roleTooltip(actorRole: Role | undefined, targetRole: Role, isSelf: boolean): string | undefined {
+  if (isSelf) return "You cannot change your own role";
+  if (!actorRole || ROLE_RANK[actorRole] <= ROLE_RANK[targetRole]) return "Ask an admin or owner to change this role";
+  return undefined;
+}
 
 const CAPABILITIES = [
   { key: "create_sources", label: "Create sources" },
@@ -253,6 +293,8 @@ export function MembersView() {
   });
 
   const activeOrg = session?.organizations?.find((o) => o.id === activeOrgId);
+  const currentUserId = session?.user?.id ?? null;
+  const myRole = (activeOrg?.role ?? null) as Role | null;
 
   // ── Mutations ──────────────────────────────────────────────────────────
   const changeRoleMutation = useMutation({
@@ -306,6 +348,7 @@ export function MembersView() {
   
   const [search, setSearch] = useState("");
   const [filterRole, setFilterRole] = useState("all");
+  const [viewMode, setViewMode] = useState<"list" | "card">("list");
 
   const filteredMembers = (members ?? []).filter((m) => {
     if (filterRole !== "all" && m.role !== filterRole) return false;
@@ -440,6 +483,26 @@ export function MembersView() {
                     ))}
                   </SelectContent>
                 </Select>
+                <div className="flex items-center rounded-md border p-1 shrink-0 bg-muted/20">
+                  <Button
+                    variant={viewMode === "list" ? "secondary" : "ghost"}
+                    size="icon"
+                    className="h-6 w-6"
+                    onClick={() => setViewMode("list")}
+                    title="List view"
+                  >
+                    <LayoutList className="h-3.5 w-3.5" />
+                  </Button>
+                  <Button
+                    variant={viewMode === "card" ? "secondary" : "ghost"}
+                    size="icon"
+                    className="h-6 w-6"
+                    onClick={() => setViewMode("card")}
+                    title="Card view"
+                  >
+                    <LayoutGrid className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
               </div>
             )}
           </div>
@@ -489,7 +552,7 @@ export function MembersView() {
               description="Try adjusting your search query."
               className="mx-4 mb-4"
             />
-          ) : (
+          ) : viewMode === "list" ? (
             <div className="max-h-[28rem] overflow-y-auto">
               <Table>
                 <TableHeader className="sticky top-0 bg-card z-10">
@@ -527,29 +590,55 @@ export function MembersView() {
                         </div>
                       </TableCell>
                       <TableCell>
-                        <Select
-                          value={m.role}
-                          onValueChange={(v) =>
-                            changeRoleMutation.mutate({
-                              memberId: m.id,
-                              role: v as Role,
-                            })
-                          }
-                          disabled={
-                            m.role === "owner" || changeRoleMutation.isPending
-                          }
-                        >
-                          <SelectTrigger className="h-8 w-32">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {ROLES.map((r) => (
-                              <SelectItem key={r} value={r} className="capitalize">
-                                {r}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                        {(() => {
+                          const isSelf = m.user.id === currentUserId;
+                          const canChange = canChangeRole(myRole ?? undefined, m.role, isSelf);
+                          const tip = roleTooltip(myRole ?? undefined, m.role, isSelf);
+                          return (
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <div>
+                                    <Select
+                                      value={m.role}
+                                      onValueChange={(v) =>
+                                        changeRoleMutation.mutate({
+                                          memberId: m.id,
+                                          role: v as Role,
+                                        })
+                                      }
+                                      disabled={!canChange || changeRoleMutation.isPending}
+                                    >
+                                      <SelectTrigger className="h-8 w-32">
+                                        <SelectValue />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        {ROLES.map((r) => {
+                                          const assignable = canAssignRole(myRole ?? undefined, r);
+                                          return (
+                                            <SelectItem
+                                              key={r}
+                                              value={r}
+                                              disabled={!assignable}
+                                              className="capitalize"
+                                            >
+                                              {r.charAt(0).toUpperCase() + r.slice(1)}
+                                            </SelectItem>
+                                          );
+                                        })}
+                                      </SelectContent>
+                                    </Select>
+                                  </div>
+                                </TooltipTrigger>
+                                {tip && (
+                                  <TooltipContent side="top">
+                                    <p className="text-xs">{tip}</p>
+                                  </TooltipContent>
+                                )}
+                              </Tooltip>
+                            </TooltipProvider>
+                          );
+                        })()}
                       </TableCell>
                       <TableCell>
                         <StatusBadge status={m.status} />
@@ -568,26 +657,30 @@ export function MembersView() {
                               size="icon"
                               className="h-8 w-8"
                               aria-label="Member actions"
-                              disabled={m.role === "owner"}
+                              disabled={!canChangeRole(myRole ?? undefined, m.role, m.user.id === currentUserId)}
                             >
                               <MoreHorizontal className="h-4 w-4" />
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end" className="w-48">
                             <DropdownMenuLabel>Change role</DropdownMenuLabel>
-                            {ROLES.filter((r) => r !== m.role).map((r) => (
-                              <DropdownMenuItem
-                                key={r}
-                                onClick={() =>
-                                  changeRoleMutation.mutate({
-                                    memberId: m.id,
-                                    role: r,
-                                  })
-                                }
-                              >
-                                <span className="capitalize">{r}</span>
-                              </DropdownMenuItem>
-                            ))}
+                            {ROLES.filter((r) => r !== m.role).map((r) => {
+                              const assignable = canAssignRole(myRole ?? undefined, r);
+                              return (
+                                <DropdownMenuItem
+                                  key={r}
+                                  disabled={!assignable}
+                                  onClick={() =>
+                                    assignable && changeRoleMutation.mutate({
+                                      memberId: m.id,
+                                      role: r,
+                                    })
+                                  }
+                                >
+                                  <span className="capitalize">{r.charAt(0).toUpperCase() + r.slice(1)}</span>
+                                </DropdownMenuItem>
+                              );
+                            })}
                             <DropdownMenuSeparator />
                             <DropdownMenuItem
                               className="text-destructive focus:text-destructive"
@@ -603,6 +696,128 @@ export function MembersView() {
                   ))}
                 </TableBody>
               </Table>
+            </div>
+          ) : (
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 p-4">
+              {filteredMembers.map((m) => (
+                <Card key={m.id} className="flex flex-col p-4 shadow-sm">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <Avatar className="h-10 w-10 shrink-0">
+                        <AvatarFallback className={`text-sm font-medium ${getAvatarColor(m.user.name ?? m.user.email)}`}>
+                          {initials(m.user.name ?? m.user.email)}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-1.5">
+                          <span className="font-medium truncate text-base">
+                            {m.user.name ?? m.user.email.split("@")[0]}
+                          </span>
+                          {m.role === "owner" && (
+                            <Crown className="h-3.5 w-3.5 text-amber-500 shrink-0" />
+                          )}
+                        </div>
+                        <div className="text-sm text-muted-foreground truncate">
+                          {m.user.email}
+                        </div>
+                      </div>
+                    </div>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 shrink-0 -mr-2 -mt-2"
+                          disabled={m.role === "owner"}
+                        >
+                          <MoreHorizontal className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="w-48">
+                        <DropdownMenuLabel>Change role</DropdownMenuLabel>
+                        {ROLES.filter((r) => r !== m.role).map((r) => (
+                          <DropdownMenuItem
+                            key={r}
+                            onClick={() =>
+                              changeRoleMutation.mutate({
+                                memberId: m.id,
+                                role: r,
+                              })
+                            }
+                          >
+                            <span className="capitalize">{r}</span>
+                          </DropdownMenuItem>
+                        ))}
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          className="text-destructive focus:text-destructive"
+                          onClick={() => setRemoveTarget(m)}
+                        >
+                          <Trash2 className="mr-2 h-4 w-4" />
+                          Remove member
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+                  <div className="mt-4 space-y-3">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground">Role</span>
+                      {(() => {
+                        const isSelf = m.user.id === currentUserId;
+                        const canChange = canChangeRole(myRole ?? undefined, m.role, isSelf);
+                        const tip = roleTooltip(myRole ?? undefined, m.role, isSelf);
+                        return (
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <div>
+                                  <Select
+                                    value={m.role}
+                                    onValueChange={(v) =>
+                                      changeRoleMutation.mutate({
+                                        memberId: m.id,
+                                        role: v as Role,
+                                      })
+                                    }
+                                    disabled={!canChange || changeRoleMutation.isPending}
+                                  >
+                                    <SelectTrigger className="h-7 w-28 text-xs">
+                                      <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      {ROLES.map((r) => {
+                                        const assignable = canAssignRole(myRole ?? undefined, r);
+                                        return (
+                                          <SelectItem key={r} value={r} disabled={!assignable} className="capitalize text-xs">
+                                            {r.charAt(0).toUpperCase() + r.slice(1)}
+                                          </SelectItem>
+                                        );
+                                      })}
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+                              </TooltipTrigger>
+                              {tip && (
+                                <TooltipContent side="top">
+                                  <p className="text-xs">{tip}</p>
+                                </TooltipContent>
+                              )}
+                            </Tooltip>
+                          </TooltipProvider>
+                        );
+                      })()}
+                    </div>
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground">Status</span>
+                      <StatusBadge status={m.status} />
+                    </div>
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground">Joined</span>
+                      <span className="text-xs">{formatDate(m.createdAt)}</span>
+                    </div>
+                  </div>
+                </Card>
+              ))}
             </div>
           )}
         </CardContent>

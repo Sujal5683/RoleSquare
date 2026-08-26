@@ -51,7 +51,7 @@ import {
   Cpu,
   Plus,
   AlertCircle,
-} from "lucide-react";
+Copy, } from "lucide-react";
 
 // ── Helpers ──────────────────────────────────────────────────────────────
 
@@ -433,33 +433,33 @@ export function AuditView() {
                       >
                         <span className="block h-1.5 w-1.5 rounded-full bg-current" />
                       </div>
-                      <div className="rounded-lg border p-4 transition-colors hover:bg-muted/30">
+                      <div className="rounded-lg border p-2 transition-colors hover:bg-muted/30">
                         {/* Top row */}
                         <div className="flex flex-wrap items-start justify-between gap-2">
                           <div className="flex items-center gap-2">
-                            <Avatar className="h-7 w-7">
-                              <AvatarFallback className="text-[10px] font-medium">
+                            <Avatar className="h-6 w-6">
+                              <AvatarFallback className="text-[9px] font-medium">
                                 {initials(log.actorName)}
                               </AvatarFallback>
                             </Avatar>
                             <div>
                               <div className="flex items-center gap-2 flex-wrap">
-                                <span className="text-sm font-medium">
+                                <span className="text-xs font-medium">
                                   {log.actorName ?? "Unknown actor"}
                                 </span>
                                 <span
-                                  className={`inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide ${actorStyle.className}`}
+                                  className={`inline-flex items-center gap-1 rounded px-1 py-0 text-[9px] font-medium uppercase tracking-wide ${actorStyle.className}`}
                                 >
                                   {actorStyle.icon}
                                   {actorStyle.label}
                                 </span>
                                 <span
-                                  className={`inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide ${actionStyle}`}
+                                  className={`inline-flex items-center rounded px-1 py-0 text-[9px] font-medium uppercase tracking-wide ${actionStyle}`}
                                 >
                                   {log.action}
                                 </span>
                               </div>
-                              <p className="text-xs text-muted-foreground mt-0.5">
+                              <p className="text-[10px] text-muted-foreground mt-0.5">
                                 {relativeTime(log.createdAt)} ·{" "}
                                 <span title={formatDateTime(log.createdAt)}>
                                   {formatDateTime(log.createdAt)}
@@ -470,18 +470,27 @@ export function AuditView() {
                           <div className="flex items-center gap-2 max-w-full">
                             <Badge
                               variant="outline"
-                              className="font-normal capitalize shrink-0"
+                              className="font-normal capitalize shrink-0 text-[10px] px-1 py-0 h-4"
                             >
                               {log.entity}
                             </Badge>
                             {log.entityName ? (
-                              <span className="text-sm font-medium truncate" title={log.entityName}>
+                              <span className="text-xs font-medium truncate" title={log.entityName}>
                                 {log.entityName}
                               </span>
                             ) : (
-                              <code className="text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded truncate">
-                                {truncateId(log.entityId, 10)}
-                              </code>
+                              <div className="flex items-center gap-1">
+                                <code className="text-[10px] text-muted-foreground bg-muted px-1 py-0.5 rounded truncate">
+                                  {truncateId(log.entityId, 10)}
+                                </code>
+                                <button
+                                  className="text-muted-foreground hover:text-foreground p-0.5 rounded-sm hover:bg-muted"
+                                  onClick={() => navigator.clipboard.writeText(log.entityId ?? "")}
+                                  title="Copy ID"
+                                >
+                                  <Copy className="h-3 w-3" />
+                                </button>
+                              </div>
                             )}
                           </div>
                         </div>
@@ -501,7 +510,7 @@ export function AuditView() {
                           <div className="mt-2">
                             <button
                               onClick={() => setDiffDialog(log)}
-                              className="inline-flex items-center gap-1 rounded-md bg-muted px-2 py-1 text-xs font-medium text-muted-foreground hover:bg-muted/70 transition-colors"
+                              className="inline-flex items-center gap-1 rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground hover:bg-muted/70 transition-colors"
                             >
                               <ChevronRight className="h-3 w-3" />
                               View change diff

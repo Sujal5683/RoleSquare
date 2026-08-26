@@ -50,7 +50,7 @@ export async function POST(
     }
 
     const body = await req.json();
-    const { name, type = "text", required = false, options = [] } = body;
+    const { name, type = "text", required = false, options = [], position } = body;
 
     if (!name) {
       return NextResponse.json({ error: "Column name is required" }, { status: 400 });
@@ -63,7 +63,35 @@ export async function POST(
       options: options.length ? JSON.stringify(options) : null,
     }]);
 
-    return NextResponse.json({ ok: true, columnId: colMap.get(name) });
+    const newColId = colMap.get(name);
+    
+    // If a specific position is requested, shift other columns and update the new one
+    if (typeof position === "number" && newColId) {
+      // First, get the internal database ID of the column we just created/restored
+      const col = await db.datasetColumnDef.findFirst({
+        where: { datasetId: id, columnId: newColId }
+      });
+      
+      if (col) {
+        // Shift everything at or after the target position forward by 1
+        await db.datasetColumnDef.updateMany({
+          where: { 
+            datasetId: id, 
+            position: { gte: position },
+            id: { not: col.id } // exclude the one we're moving
+          },
+          data: { position: { increment: 1 } }
+        });
+        
+        // Update the new column to be exactly at the target position
+        await db.datasetColumnDef.update({
+          where: { id: col.id },
+          data: { position }
+        });
+      }
+    }
+
+    return NextResponse.json({ ok: true, columnId: newColId });
   } catch (err) {
     if (err instanceof AuthError) return authErrorResponse(err);
     return NextResponse.json({ error: "Failed to create column" }, { status: 500 });

@@ -136,7 +136,8 @@ export function OrgSheetsWizard({
   function toggleDataset(id: string) {
     setSelectedDatasets((prev) => {
       const next = new Set(prev);
-      next.has(id) ? next.delete(id) : next.add(id);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
       return next;
     });
   }
@@ -203,9 +204,10 @@ export function OrgSheetsWizard({
 
         <Separator />
 
-        {/* ── Step 0: Account ─────────────────────────────────────────── */}
-        {step === 0 && (
-          <div className="space-y-3 py-1">
+        <div className="flex-1 overflow-y-auto min-h-[260px] pr-2 -mr-2">
+          {/* ── Step 0: Account ─────────────────────────────────────────── */}
+          {step === 0 && (
+            <div className="space-y-3 py-1">
             <p className="text-sm text-muted-foreground">
               Select the Google account to use for the export. The spreadsheet
               will be created in that account's Google Drive.
@@ -435,6 +437,7 @@ export function OrgSheetsWizard({
             </Button>
           </div>
         )}
+        </div>
 
         <DialogFooter>
           {!resultUrl && (

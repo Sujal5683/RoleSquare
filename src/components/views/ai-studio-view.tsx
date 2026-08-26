@@ -153,13 +153,41 @@ export function AiStudioView() {
             <Workflow className="mr-1.5 h-3.5 w-3.5" />
             Extract Data
           </TabsTrigger>
-          <TabsTrigger value="runs">
-            <Activity className="mr-1.5 h-3.5 w-3.5" />
-            Extraction Runs
-          </TabsTrigger>
           <TabsTrigger value="sandbox">
             <Sparkles className="mr-1.5 h-3.5 w-3.5" />
             Test Sandbox
+          </TabsTrigger>
+          <TabsTrigger value="insights">
+            <Layers className="mr-1.5 h-3.5 w-3.5" />
+            Insights &amp; Logs
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="wizard" className="mt-4">
+          <ExtractionWizard />
+        </TabsContent>
+        <TabsContent value="sandbox" className="mt-4">
+          <TestSandboxTab />
+        </TabsContent>
+        <TabsContent value="insights" className="mt-4">
+          <InsightsTab />
+        </TabsContent>
+      </Tabs>
+    </div>
+  );
+}
+
+// ── Insights & Logs combined tab ─────────────────────────────────────────
+
+function InsightsTab() {
+  const [insightTab, setInsightTab] = useState("runs");
+  return (
+    <div className="space-y-4">
+      <Tabs value={insightTab} onValueChange={setInsightTab}>
+        <TabsList>
+          <TabsTrigger value="runs">
+            <Activity className="mr-1.5 h-3.5 w-3.5" />
+            Extraction Runs
           </TabsTrigger>
           <TabsTrigger value="logs">
             <Layers className="mr-1.5 h-3.5 w-3.5" />
@@ -170,15 +198,8 @@ export function AiStudioView() {
             Model &amp; Cost
           </TabsTrigger>
         </TabsList>
-
-        <TabsContent value="wizard" className="mt-4">
-          <ExtractionWizard />
-        </TabsContent>
         <TabsContent value="runs" className="mt-4">
           <ExtractionRunsTab />
-        </TabsContent>
-        <TabsContent value="sandbox" className="mt-4">
-          <TestSandboxTab />
         </TabsContent>
         <TabsContent value="logs" className="mt-4">
           <AgentLogsTab />

@@ -4,6 +4,9 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { PublicHeader } from "@/components/public/public-header";
+import { PublicFooter } from "@/components/public/public-footer";
 import {
   Zap,
   Mail,
@@ -33,36 +36,7 @@ export function LandingView() {
   return (
     <div className="flex min-h-screen flex-col bg-background text-foreground selection:bg-primary/10">
       {/* Header */}
-      <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="mx-auto flex h-14 max-w-7xl items-center justify-between px-4 md:px-6">
-          <div className="flex items-center gap-2">
-            <div className="flex h-7 w-7 items-center justify-center rounded-md bg-primary text-primary-foreground">
-              <Zap className="h-4 w-4" />
-            </div>
-            <div className="flex flex-col leading-none">
-              <span className="text-sm font-semibold">Workspace</span>
-              <span className="text-[10px] text-muted-foreground uppercase tracking-wider">Intelligence Platform</span>
-            </div>
-          </div>
-          <nav className="hidden md:flex items-center gap-6 text-sm font-medium">
-            <a href="#platform" className="text-muted-foreground hover:text-foreground transition-colors">Platform</a>
-            <a href="#solutions" className="text-muted-foreground hover:text-foreground transition-colors">Solutions</a>
-            <a href="#security" className="text-muted-foreground hover:text-foreground transition-colors">Security</a>
-            <a href="#pricing" className="text-muted-foreground hover:text-foreground transition-colors">Pricing</a>
-          </nav>
-          <div className="flex items-center gap-2">
-            <Button variant="ghost" size="sm" asChild className="hidden sm:inline-flex text-muted-foreground hover:text-foreground">
-              <Link href="/workspace">Sign in</Link>
-            </Button>
-            <Button size="sm" asChild>
-              <Link href="/workspace">
-                Get started
-                <ArrowRight className="ml-1.5 h-3.5 w-3.5" />
-              </Link>
-            </Button>
-          </div>
-        </div>
-      </header>
+      <PublicHeader />
 
       <main className="flex-1">
         {/* Hero */}
@@ -266,6 +240,26 @@ export function LandingView() {
           </div>
         </section>
 
+        {/* FAQ */}
+        <section id="faq" className="py-20 bg-muted/30 border-b">
+          <div className="mx-auto max-w-3xl px-4 md:px-6">
+            <div className="text-center mb-12">
+              <h2 className="text-3xl font-bold tracking-tight">Frequently Asked Questions</h2>
+              <p className="mt-4 text-muted-foreground">Everything you need to know about the product and billing.</p>
+            </div>
+            <Accordion type="single" collapsible className="w-full">
+              {FAQS.map((faq, i) => (
+                <AccordionItem key={i} value={`item-${i}`}>
+                  <AccordionTrigger className="text-left font-medium text-base">{faq.q}</AccordionTrigger>
+                  <AccordionContent className="text-muted-foreground leading-relaxed">
+                    {faq.a}
+                  </AccordionContent>
+                </AccordionItem>
+              ))}
+            </Accordion>
+          </div>
+        </section>
+
         {/* Final CTA */}
         <section className="py-24 bg-primary text-primary-foreground">
           <div className="mx-auto max-w-4xl px-4 md:px-6 text-center">
@@ -288,17 +282,7 @@ export function LandingView() {
       </main>
 
       {/* Footer */}
-      <footer className="border-t py-8 bg-background">
-        <div className="mx-auto max-w-7xl px-4 md:px-6 flex flex-col md:flex-row justify-between items-center gap-4">
-          <div className="flex items-center gap-2">
-            <Zap className="h-4 w-4 text-primary" />
-            <span className="text-sm font-semibold tracking-tight">Workspace Intelligence Platform</span>
-          </div>
-          <p className="text-xs text-muted-foreground">
-            &copy; {new Date().getFullYear()} Workspace Intelligence Platform. All rights reserved.
-          </p>
-        </div>
-      </footer>
+      <PublicFooter />
     </div>
   );
 }
@@ -363,4 +347,27 @@ const PRICING = [
       "Unlimited audit retention",
     ],
   },
+];
+
+const FAQS = [
+  {
+    q: "How secure is my data?",
+    a: "We employ enterprise-grade security. OAuth tokens are encrypted at rest with strict key rotation. Your data sits in isolated, row-level secured PostgreSQL tables. We do not use your data to train our own models, and we employ prompt-injection defense mechanisms."
+  },
+  {
+    q: "Do I need technical skills to use the platform?",
+    a: "No! The Workspace Intelligence Platform is designed with a visual rule builder that lets you easily define extraction schemas. If you can define the columns you want in a spreadsheet, our AI will figure out how to extract that data from your emails and documents."
+  },
+  {
+    q: "What data sources are currently supported?",
+    a: "We currently support deep integration with Google Workspace. You can extract data from Gmail (emails, threads, attachments) and Google Drive (Docs, Sheets, PDFs, standard documents). We are continuously adding more enterprise connectors."
+  },
+  {
+    q: "How does the AI handle large documents?",
+    a: "Our ingestion pipeline automatically chunks and parses large PDFs, HTML, and text documents while preserving structural context and page references. This allows the AI to accurately find and extract fields even from hundred-page reports without hitting context limits."
+  },
+  {
+    q: "Can I export the extracted datasets?",
+    a: "Absolutely. Any dataset you build can be easily exported as a standard CSV file, or synced directly into an external Google Sheet for downstream reporting and analytics."
+  }
 ];

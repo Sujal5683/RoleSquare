@@ -94,6 +94,7 @@ import {
   Upload,
   MoreHorizontal,
   Settings2,
+  Eye,
 } from "lucide-react";
 
 // ── Constants ────────────────────────────────────────────────────────────
@@ -388,6 +389,7 @@ export function SchemaBuilderView() {
   const [editOpen, setEditOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [templatesOpen, setTemplatesOpen] = useState(false);
+  const [viewTemplate, setViewTemplate] = useState<typeof PREBUILT_TEMPLATES[0] | null>(null);
   const [newName, setNewName] = useState("");
   const [newDescription, setNewDescription] = useState("");
   const [fieldDialog, setFieldDialog] = useState<{
@@ -1338,43 +1340,120 @@ export function SchemaBuilderView() {
         </AlertDialogContent>
       </AlertDialog>
       {/* Templates Dialog */}
-      <Dialog open={templatesOpen} onOpenChange={setTemplatesOpen}>
-        <DialogContent className="sm:max-w-xl">
-          <DialogHeader>
-            <DialogTitle>Pre-built Schema Templates</DialogTitle>
-            <DialogDescription>
-              Select a template to quickly create a schema with standard fields.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-4 py-4">
-            {PREBUILT_TEMPLATES.map((t, i) => (
-              <Card key={i} className="cursor-pointer hover:bg-muted/50 transition-colors" onClick={async () => {
-                setTemplatesOpen(false);
-                try {
-                  const created = await api.post<SchemaDTO>("/api/schemas", {
-                    name: t.name,
-                    description: t.description,
-                  });
-                  for (const field of t.fields) {
-                    await api.post(`/api/schemas/${created.id}/fields`, field);
+      <Dialog open={templatesOpen} onOpenChange={(open) => {
+        setTemplatesOpen(open);
+        if (!open) setViewTemplate(null);
+      }}>
+        <DialogContent className="sm:max-w-3xl">
+          {viewTemplate ? (
+            <>
+              <DialogHeader>
+                <div className="flex items-center gap-2">
+                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setViewTemplate(null)}>
+                    <ChevronLeft className="h-4 w-4" />
+                  </Button>
+                  <div>
+                    <DialogTitle>{viewTemplate.name}</DialogTitle>
+                    <DialogDescription>{viewTemplate.description}</DialogDescription>
+                  </div>
+                </div>
+              </DialogHeader>
+              <div className="py-4 space-y-4 max-h-[60vh] overflow-y-auto pr-2">
+                <div className="grid gap-2">
+                  {viewTemplate.fields.map((f, i) => (
+                    <div key={i} className="flex items-start gap-3 p-3 bg-muted/50 rounded-lg border">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-medium">{f.name}</span>
+                          <FieldTypeBadge type={f.type as any} />
+                          {f.required && (
+                            <span className="text-[10px] bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300 px-1.5 py-0.5 rounded">required</span>
+                          )}
+                        </div>
+                        {f.description && <p className="text-xs text-muted-foreground mt-1">{f.description}</p>}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setViewTemplate(null)}>Back</Button>
+                <Button onClick={async () => {
+                  setTemplatesOpen(false);
+                  try {
+                    const created = await api.post<SchemaDTO>("/api/schemas", {
+                      name: viewTemplate.name,
+                      description: viewTemplate.description,
+                    });
+                    for (const field of viewTemplate.fields) {
+                      await api.post(`/api/schemas/${created.id}/fields`, field);
+                    }
+                    toast.success("Template schema created!");
+                    queryClient.invalidateQueries({ queryKey: ["schemas"] });
+                    setActiveSchemaId(created.id);
+                  } catch (err: any) {
+                    toast.error("Failed to create from template", { description: err.message });
                   }
-                  toast.success("Template schema created!");
-                  queryClient.invalidateQueries({ queryKey: ["schemas"] });
-                  setActiveSchemaId(created.id);
-                } catch (err: any) {
-                  toast.error("Failed to create from template", { description: err.message });
-                }
-              }}>
-                <CardHeader className="p-4">
-                  <CardTitle className="text-sm">{t.name}</CardTitle>
-                  <DialogDescription className="text-xs">{t.description} ({t.fields.length} fields)</DialogDescription>
-                </CardHeader>
-              </Card>
-            ))}
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setTemplatesOpen(false)}>Close</Button>
-          </DialogFooter>
+                }}>
+                  <Download className="mr-2 h-4 w-4" />
+                  Import
+                </Button>
+              </DialogFooter>
+            </>
+          ) : (
+            <>
+              <DialogHeader>
+                <DialogTitle>Pre-built Schema Templates</DialogTitle>
+                <DialogDescription>
+                  Select a template to quickly create a schema with standard fields.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="grid gap-3 sm:grid-cols-2 py-4 max-h-[60vh] overflow-y-auto pr-2">
+                {PREBUILT_TEMPLATES.map((t, i) => (
+                  <Card key={i} className="flex flex-col">
+                    <CardHeader className="p-4 flex-1">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="space-y-1">
+                          <CardTitle className="text-sm">{t.name}</CardTitle>
+                          <DialogDescription className="text-xs line-clamp-2">{t.description}</DialogDescription>
+                        </div>
+                        <Badge variant="secondary" className="shrink-0 text-[10px] font-normal">{t.fields.length} fields</Badge>
+                      </div>
+                    </CardHeader>
+                    <div className="p-4 pt-3 mt-auto flex items-center justify-end gap-2 border-t">
+                      <Button variant="outline" size="sm" onClick={() => setViewTemplate(t)}>
+                        <Eye className="mr-1.5 h-3.5 w-3.5" />
+                        View
+                      </Button>
+                      <Button size="sm" onClick={async () => {
+                        setTemplatesOpen(false);
+                        try {
+                          const created = await api.post<SchemaDTO>("/api/schemas", {
+                            name: t.name,
+                            description: t.description,
+                          });
+                          for (const field of t.fields) {
+                            await api.post(`/api/schemas/${created.id}/fields`, field);
+                          }
+                          toast.success("Template schema created!");
+                          queryClient.invalidateQueries({ queryKey: ["schemas"] });
+                          setActiveSchemaId(created.id);
+                        } catch (err: any) {
+                          toast.error("Failed to create from template", { description: err.message });
+                        }
+                      }}>
+                        <Download className="mr-1.5 h-3.5 w-3.5" />
+                        Import
+                      </Button>
+                    </div>
+                  </Card>
+                ))}
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setTemplatesOpen(false)}>Close</Button>
+              </DialogFooter>
+            </>
+          )}
         </DialogContent>
       </Dialog>
     </div>
@@ -1521,43 +1600,88 @@ function FieldEditorDialog({
 
           <div className="rounded-lg border p-3 space-y-3">
             <div>
-              <Label className="text-sm font-medium">Validation rules</Label>
-              <p className="text-[10px] text-muted-foreground">Optional constraints enforced during extraction.</p>
+              <Label className="text-sm font-medium">Validation Rules</Label>
+              <p className="text-[10px] text-muted-foreground mt-0.5">
+                Optional constraints the AI must respect when extracting this field. Extracted values that don't pass these checks will be flagged for human review.
+              </p>
             </div>
             
             {(draft.type === "number" || draft.type === "date") && (
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1.5">
-                  <Label className="text-xs">Min</Label>
-                  <Input 
-                    type={draft.type === "number" ? "number" : "date"}
-                    className="h-8 text-xs" 
-                    value={draft.validation?.min?.toString() || ""}
-                    onChange={(e) => setDraft(d => ({ ...d, validation: { ...d.validation, min: e.target.value ? Number(e.target.value) : undefined } }))} 
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <Label className="text-xs">Max</Label>
-                  <Input 
-                    type={draft.type === "number" ? "number" : "date"}
-                    className="h-8 text-xs" 
-                    value={draft.validation?.max?.toString() || ""}
-                    onChange={(e) => setDraft(d => ({ ...d, validation: { ...d.validation, max: e.target.value ? Number(e.target.value) : undefined } }))} 
-                  />
+              <div className="space-y-3">
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">
+                      Min {draft.type === "number" ? "value" : "date"}
+                    </Label>
+                    <Input 
+                      type={draft.type === "number" ? "number" : "date"}
+                      className="h-8 text-xs" 
+                      value={draft.validation?.min?.toString() || ""}
+                      onChange={(e) => setDraft(d => ({ ...d, validation: { ...d.validation, min: e.target.value ? Number(e.target.value) : undefined } }))} 
+                    />
+                    <p className="text-[10px] text-muted-foreground">
+                      {draft.type === "number" ? "e.g. 0 — values below this are rejected" : "e.g. Jan 1 2020 — dates earlier than this are flagged"}
+                    </p>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">
+                      Max {draft.type === "number" ? "value" : "date"}
+                    </Label>
+                    <Input 
+                      type={draft.type === "number" ? "number" : "date"}
+                      className="h-8 text-xs" 
+                      value={draft.validation?.max?.toString() || ""}
+                      onChange={(e) => setDraft(d => ({ ...d, validation: { ...d.validation, max: e.target.value ? Number(e.target.value) : undefined } }))} 
+                    />
+                    <p className="text-[10px] text-muted-foreground">
+                      {draft.type === "number" ? "e.g. 1000000 — values above this are rejected" : "e.g. Today — dates in the future are flagged"}
+                    </p>
+                  </div>
                 </div>
               </div>
             )}
             
             {draft.type === "text" && (
-              <div className="space-y-1.5">
-                <Label className="text-xs">Regex Pattern</Label>
-                <Input 
-                  className="h-8 text-xs font-mono" 
-                  placeholder="^[A-Z]{3}-\d{4}$"
-                  value={draft.validation?.regex || ""}
-                  onChange={(e) => setDraft(d => ({ ...d, validation: { ...d.validation, regex: e.target.value || undefined } }))} 
-                />
+              <div className="space-y-2">
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-xs">Regex Pattern</Label>
+                    <select
+                      className="text-[10px] border rounded px-1 py-0.5 bg-background text-muted-foreground h-6"
+                      value=""
+                      onChange={(e) => {
+                        if (e.target.value) setDraft(d => ({ ...d, validation: { ...d.validation, regex: e.target.value || undefined } }));
+                      }}
+                    >
+                      <option value="">— Quick presets —</option>
+                      <option value="^\S+@\S+\.\S+$">Email address</option>
+                      <option value="^\+?[\d\s\-()]{7,15}$">Phone number</option>
+                      <option value="^\d{4}-\d{2}-\d{2}$">Date (YYYY-MM-DD)</option>
+                      <option value="^[A-Z]{2,3}-\d{4,6}$">ID code (e.g. INV-1042)</option>
+                      <option value="^\$?\d{1,3}(,\d{3})*(\.\d{2})?$">Currency (e.g. $1,234.56)</option>
+                      <option value="^https?://.+$">URL</option>
+                      <option value="^[A-Z][a-z]+ [A-Z][a-z]+$">Full name (Title Case)</option>
+                    </select>
+                  </div>
+                  <Input 
+                    className="h-8 text-xs font-mono" 
+                    placeholder="e.g.  ^[A-Z]{3}-\d{4}$  matches codes like ABC-1234"
+                    value={draft.validation?.regex || ""}
+                    onChange={(e) => setDraft(d => ({ ...d, validation: { ...d.validation, regex: e.target.value || undefined } }))} 
+                  />
+                  <p className="text-[10px] text-muted-foreground">
+                    A regular expression the extracted text must match. Leave blank for no format constraint. Use the presets above for common formats.
+                  </p>
+                  {draft.validation?.regex && (() => {
+                    try { new RegExp(draft.validation.regex); return <p className="text-[10px] text-emerald-600 dark:text-emerald-400">✓ Valid pattern</p>; }
+                    catch { return <p className="text-[10px] text-destructive">✗ Invalid regex — check your syntax</p>; }
+                  })()}
+                </div>
               </div>
+            )}
+
+            {draft.type !== "number" && draft.type !== "date" && draft.type !== "text" && (
+              <p className="text-xs text-muted-foreground italic">No validation rules available for this field type.</p>
             )}
           </div>
 

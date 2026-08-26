@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect, useCallback, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { formatDistanceToNow, format, parseISO } from "date-fns";
 import { toast } from "sonner";
@@ -19,6 +19,8 @@ import {
   LoadingState,
   ErrorState,
 } from "@/components/ui/page-elements";
+import { InlineEditCell } from "./dataset-inline-edit";
+import { GoogleSheetsPanel } from "@/components/google-sheets/google-sheets-panel";
 import {
   StatusBadge,
   ConfidenceBadge,
@@ -69,6 +71,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
@@ -107,10 +110,18 @@ import {
   Bookmark,
   Upload,
   Sparkles,
+  Plus,
   Zap,
   AlertTriangle,
+  FileSpreadsheet,
   MoreHorizontal,
   FileCode2,
+  LayoutGrid,
+  LayoutList,
+  Undo,
+  Redo,
+  ArrowLeftToLine,
+  ArrowRightToLine,
 } from "lucide-react";
 import { NewShareRequestDialog } from "@/components/sharing/new-share-request-dialog";
 import { AssignSchemaDialog } from "@/components/datasets/assign-schema-dialog";
@@ -228,7 +239,40 @@ export function DatasetDetailView() {
   const [selectedRecordId, setSelectedRecordId] = useState<string | null>(
     null
   );
+  const [viewMode, setViewMode] = useState<"list" | "card">("list");
+  const [inlineEditCell, setInlineEditCell] = useState<{ recordId: string; fieldId: string } | null>(null);
   const [selectedRecords, setSelectedRecords] = useState<Set<string>>(new Set());
+
+  const cannotEdit = dataset?.accessLevel === "read" || dataset?.accessLevel === "comment";
+
+  const clickTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const handleCellClick = (recordId: string, e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    if (clickTimeoutRef.current) {
+      clearTimeout(clickTimeoutRef.current);
+      clickTimeoutRef.current = null;
+    }
+    
+    clickTimeoutRef.current = setTimeout(() => {
+      setSelectedRecordId(recordId);
+      clickTimeoutRef.current = null;
+    }, 250);
+  };
+
+  const handleCellDoubleClick = (recordId: string, fieldId: string, e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    if (dataset?.accessLevel === "read" || dataset?.accessLevel === "comment") {
+      toast.error("You do not have permission to edit this dataset.");
+      return;
+    }
+    if (clickTimeoutRef.current) {
+      clearTimeout(clickTimeoutRef.current);
+      clickTimeoutRef.current = null;
+    }
+    setInlineEditCell({ recordId, fieldId });
+  };
+
   const [savedViews, setSavedViews] = useState<
     { id: string; name: string; statusFilter: string; search: string; hiddenFields: string[] }[]
   >(() => {
@@ -249,6 +293,7 @@ export function DatasetDetailView() {
   const [extractDialog, setExtractDialog] = useState(false);
   const [extractSchemaId, setExtractSchemaId] = useState("");
   const [extractDatasetName, setExtractDatasetName] = useState("");
+  const [sheetsPanelOpen, setSheetsPanelOpen] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
   const [assignSchemaOpen, setAssignSchemaOpen] = useState(false);
 
@@ -370,6 +415,17 @@ export function DatasetDetailView() {
     },
   });
 
+  const createRecordMutation = useMutation({
+    mutationFn: () => api.post<{id: string}>(`/api/datasets/${datasetId}/records`, {}),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["dataset-records", datasetId] });
+      toast.success("Row added successfully");
+    },
+    onError: (err: any) => {
+      toast.error(err.message || "Failed to add row");
+    }
+  });
+
   // ── Schemas for AI extraction dialog ─────────────────────────────────
   const { data: schemas } = useQuery({
     queryKey: ["schemas"],
@@ -475,25 +531,64 @@ export function DatasetDetailView() {
     },
   });
 
+  const createColumnMutation = useMutation({
+    mutationFn: (vars: { name: string; type: string; position?: number }) =>
+      api.post(`/api/datasets/${datasetId}/columns`, vars),
+    onSuccess: () => {
+      toast.success("Column created");
+      queryClient.invalidateQueries({ queryKey: ["dataset", datasetId] });
+    },
+    onError: (err: unknown) => {
+      const msg = err instanceof Error ? err.message : "Failed to create column";
+      toast.error("Create column failed", { description: msg });
+    },
+  });
+
+  const deleteColumnMutation = useMutation({
+    mutationFn: (columnId: string) =>
+      api.delete(`/api/datasets/${datasetId}/columns/${columnId}`),
+    onSuccess: () => {
+      toast.success("Column deleted");
+      queryClient.invalidateQueries({ queryKey: ["dataset", datasetId] });
+    },
+    onError: (err: unknown) => {
+      const msg = err instanceof Error ? err.message : "Failed to delete column";
+      toast.error("Delete column failed", { description: msg });
+    },
+  });
+
+
   // ── Derived: visible fields ───────────────────────────────────────────
   const allFields = useMemo(() => {
+    // DatasetColumnDef is the authoritative source once seeded.
+    if (dataset?.columnDefs && dataset.columnDefs.length > 0) {
+      const schemaFieldsMap = new Map(
+        dataset.schema?.fields?.map((f) => [f.id, f]) || []
+      );
+      return dataset.columnDefs
+        .filter((c: any) => !c.isDeleted)
+        .map((c) => {
+          const sf = schemaFieldsMap.get(c.columnId);
+          return {
+            id: c.columnId,
+            name: c.name,
+            type: c.dataType as any,
+            description: sf?.description ?? null,
+            instructions: sf?.instructions ?? null,
+            required: c.required,
+            options: sf?.options ?? null,
+            validation: sf?.validation ?? null,
+            position: c.position,
+            confidenceThreshold: sf?.confidenceThreshold ?? 0.7,
+          };
+        });
+    }
+
+    // Fallback if not seeded yet
     if (dataset?.schema?.fields && dataset.schema.fields.length > 0) {
       return dataset.schema.fields;
     }
-    if (dataset?.columnDefs && dataset.columnDefs.length > 0) {
-      return dataset.columnDefs.map((c) => ({
-        id: c.columnId,
-        name: c.name,
-        type: c.dataType as any,
-        description: null,
-        instructions: null,
-        required: c.required,
-        options: null,
-        validation: null,
-        position: c.position,
-        confidenceThreshold: 0.7,
-      }));
-    }
+    
     return [];
   }, [dataset]);
 
@@ -523,6 +618,55 @@ export function DatasetDetailView() {
       });
     });
   }, [records, search, minConfidence]);
+
+  // ── Clipboard Copy (Ctrl+C / Cmd+C) ──────────────────────────────────
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === "c") {
+        // Only if we have selections and focus is not inside an input
+        if (selectedRecords.size === 0) return;
+        if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+
+        e.preventDefault();
+
+        // Build TSV format (Tab Separated Values) for easy pasting into Excel/Sheets
+        const rows: string[] = [];
+
+        // Header row
+        if (visibleFields) {
+          rows.push(["Record ID", ...visibleFields.map(f => f.name)].join("\t"));
+        }
+
+        // Selected records data
+        if (filteredRecords && visibleFields) {
+          const selectedList = filteredRecords.filter(r => selectedRecords.has(r.id));
+          for (const r of selectedList) {
+            const rowData: string[] = [r.id];
+            for (const f of visibleFields) {
+              const val = valueByFieldId(r, f.id);
+              const text = val ? formatValueCompact(val.value, f.type).text || "" : "";
+              // Basic escaping for tabs and newlines within cells
+              const escaped = text.replace(/\t/g, " ").replace(/\n/g, " ");
+              rowData.push(escaped);
+            }
+            rows.push(rowData.join("\t"));
+          }
+        }
+
+        if (rows.length > 0) {
+          const text = rows.join("\n");
+          navigator.clipboard.writeText(text).then(() => {
+            toast.success(`Copied ${selectedRecords.size} record(s) to clipboard`);
+          }).catch(() => {
+            toast.error("Failed to copy to clipboard");
+          });
+        }
+      }
+    };
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [selectedRecords, filteredRecords, visibleFields]);
 
   // Selected record (latest from query data, so it updates after PATCH)
   const selectedRecord = useMemo(
@@ -702,53 +846,23 @@ export function DatasetDetailView() {
                   className="pl-9"
                 />
               </div>
-              {/* Confidence filter */}
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button variant="outline" className="shrink-0">
-                    <Zap className="mr-2 h-4 w-4 text-amber-500" />
-                    Min Confidence: {minConfidence[0]}%
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent align="start" className="w-80">
-                  <div className="space-y-4">
-                    <h4 className="font-medium leading-none">Confidence Filter</h4>
-                    <p className="text-sm text-muted-foreground">
-                      Only show records with an overall confidence score greater than {minConfidence[0]}%.
-                    </p>
-                    <Slider
-                      value={minConfidence}
-                      onValueChange={setMinConfidence}
-                      max={100}
-                      step={1}
-                    />
-                  </div>
-                </PopoverContent>
-              </Popover>
             </div>
+            {/* Confidence filter moved into three-dot menu */}
 
-            {/* Save view + Import + Column visibility */}
+            {/* Right-side toolbar: Connect Sheets | View Toggle | Column Toggle | Three-dot */}
             <div className="flex items-center gap-2 shrink-0">
+              {/* Connect Sheets */}
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => setSaveViewDialog(true)}
-                title="Save current filter/column configuration"
+                onClick={() => setSheetsPanelOpen(true)}
+                title="Connect to Google Sheets"
               >
-                <Bookmark className="mr-1.5 h-3.5 w-3.5" />
-                Save view
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setImportDialog(true)}
-                title="Bulk import records from CSV or JSON"
-              >
-                <Upload className="mr-1.5 h-3.5 w-3.5" />
-                Import
+                <FileSpreadsheet className="mr-1.5 h-3.5 w-3.5 text-emerald-500" />
+                Connect Sheets
               </Button>
 
-              {/* AI Extract button — only shown for Default Datasets with a linked source */}
+              {/* AI Extract — primary action when available */}
               {dataset?.isDefault && dataset.sourceId && (
                 <Button
                   size="sm"
@@ -761,6 +875,29 @@ export function DatasetDetailView() {
                 </Button>
               )}
 
+              {/* List / Card view toggle */}
+              <div className="flex items-center rounded-md border p-0.5 shrink-0 bg-muted/20">
+                <Button
+                  variant={viewMode === "list" ? "secondary" : "ghost"}
+                  size="icon"
+                  className="h-7 w-7"
+                  onClick={() => setViewMode("list")}
+                  title="List view (Spreadsheet)"
+                >
+                  <LayoutList className="h-3.5 w-3.5" />
+                </Button>
+                <Button
+                  variant={viewMode === "card" ? "secondary" : "ghost"}
+                  size="icon"
+                  className="h-7 w-7"
+                  onClick={() => setViewMode("card")}
+                  title="Card view"
+                >
+                  <LayoutGrid className="h-3.5 w-3.5" />
+                </Button>
+              </div>
+
+              {/* Column visibility */}
               <Popover>
               <PopoverTrigger asChild>
                 <Button variant="outline" size="sm" className="shrink-0 px-2" title="Show/Hide columns">
@@ -820,11 +957,113 @@ export function DatasetDetailView() {
                   </Button>
                 </div>
               </PopoverContent>
-            </Popover>
+              </Popover>
+
+              {/* Three-dot overflow menu — Min Confidence, Save view, Add row, Import */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="icon" className="h-8 w-8 shrink-0" title="More options">
+                    <MoreHorizontal className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56">
+                  <DropdownMenuLabel className="text-xs text-muted-foreground font-normal">Filter</DropdownMenuLabel>
+                  <DropdownMenuItem
+                    onClick={() => {
+                      const val = prompt(`Minimum confidence % (current: ${minConfidence[0]}%)`, String(minConfidence[0]));
+                      if (val !== null && !isNaN(Number(val))) setMinConfidence([Math.max(0, Math.min(100, Number(val)))]);
+                    }}
+                  >
+                    <Zap className="mr-2 h-4 w-4 text-amber-500" />
+                    Min Confidence: {minConfidence[0]}%
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuLabel className="text-xs text-muted-foreground font-normal">Actions</DropdownMenuLabel>
+                  <DropdownMenuItem onClick={() => setSaveViewDialog(true)}>
+                    <Bookmark className="mr-2 h-4 w-4" />
+                    Save view
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={() => createRecordMutation.mutate()}
+                    disabled={createRecordMutation.isPending || cannotEdit}
+                  >
+                    <Plus className="mr-2 h-4 w-4" />
+                    Add row
+                  </DropdownMenuItem>
+                  <DropdownMenuItem 
+                    onClick={() => setImportDialog(true)}
+                    disabled={cannotEdit}
+                  >
+                    <Upload className="mr-2 h-4 w-4" />
+                    Import (CSV / JSON)
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
           </div>
         </CardContent>
       </Card>
+
+      {/* Secondary Spreadsheet Toolbar */}
+      <div className="flex items-center gap-1 overflow-x-auto rounded-md border bg-card px-2 py-1.5 shadow-sm">
+        <Button variant="ghost" size="icon" className="h-7 w-7 rounded-sm text-muted-foreground" disabled title="Undo (Coming soon)">
+          <Undo className="h-3.5 w-3.5" />
+        </Button>
+        <Button variant="ghost" size="icon" className="h-7 w-7 rounded-sm text-muted-foreground" disabled title="Redo (Coming soon)">
+          <Redo className="h-3.5 w-3.5" />
+        </Button>
+        
+        <Separator orientation="vertical" className="mx-1 h-5" />
+        
+        <Button 
+          variant="ghost" 
+          size="sm" 
+          className="h-7 rounded-sm px-2 text-xs text-muted-foreground hover:text-foreground"
+          onClick={() => createRecordMutation.mutate()}
+          disabled={createRecordMutation.isPending || cannotEdit}
+        >
+          <Plus className="mr-1.5 h-3.5 w-3.5" />
+          Add Row
+        </Button>
+        
+        <Separator orientation="vertical" className="mx-1 h-5" />
+        
+        <Button 
+          variant="ghost" 
+          size="sm" 
+          className="h-7 rounded-sm px-2 text-xs text-muted-foreground hover:text-foreground"
+          onClick={() => {
+            const name = prompt("Enter new column name:");
+            if (!name) return;
+            const targetField = inlineEditCell ? visibleFields.find(f => f.id === inlineEditCell.fieldId) : null;
+            const position = targetField ? targetField.position : undefined;
+            createColumnMutation.mutate({ name, type: "text", position });
+          }}
+          disabled={cannotEdit}
+          title={inlineEditCell ? "Insert column to the left of the active cell" : "Insert column (select a cell first to insert left)"}
+        >
+          <ArrowLeftToLine className="mr-1.5 h-3.5 w-3.5" />
+          Insert Col Left
+        </Button>
+        
+        <Button 
+          variant="ghost" 
+          size="sm" 
+          className="h-7 rounded-sm px-2 text-xs text-muted-foreground hover:text-foreground"
+          onClick={() => {
+            const name = prompt("Enter new column name:");
+            if (!name) return;
+            const targetField = inlineEditCell ? visibleFields.find(f => f.id === inlineEditCell.fieldId) : null;
+            const position = targetField ? targetField.position + 1 : undefined;
+            createColumnMutation.mutate({ name, type: "text", position });
+          }}
+          disabled={cannotEdit}
+          title={inlineEditCell ? "Insert column to the right of the active cell" : "Insert column at the end"}
+        >
+          <ArrowRightToLine className="mr-1.5 h-3.5 w-3.5" />
+          Insert Col Right
+        </Button>
+      </div>
 
       {selectedRecords.size > 0 && (
         <div className="flex items-center gap-3 p-3 bg-primary/10 rounded-md border border-primary/20 text-sm">
@@ -836,7 +1075,7 @@ export function DatasetDetailView() {
             variant="outline" 
             size="sm" 
             className="h-8 bg-background"
-            disabled={statusMutation.isPending}
+            disabled={statusMutation.isPending || cannotEdit}
             onClick={() => {
               const promises = Array.from(selectedRecords).map(id => statusMutation.mutateAsync({ recordId: id, status: "approved" }).catch(() => {}));
               toast.promise(Promise.all(promises), {
@@ -856,7 +1095,7 @@ export function DatasetDetailView() {
             variant="outline" 
             size="sm" 
             className="h-8 bg-background"
-            disabled={statusMutation.isPending}
+            disabled={statusMutation.isPending || cannotEdit}
             onClick={() => {
               const promises = Array.from(selectedRecords).map(id => statusMutation.mutateAsync({ recordId: id, status: "rejected" }).catch(() => {}));
               toast.promise(Promise.all(promises), {
@@ -879,7 +1118,7 @@ export function DatasetDetailView() {
             variant="outline" 
             size="sm" 
             className="h-8 bg-destructive/10 text-destructive border-destructive/20 hover:bg-destructive/20 hover:text-destructive"
-            disabled={deleteMutation.isPending}
+            disabled={deleteMutation.isPending || cannotEdit}
             onClick={() => {
               if (confirm(`Are you sure you want to delete ${selectedRecords.size} records?`)) {
                 deleteMutation.mutate(Array.from(selectedRecords));
@@ -894,11 +1133,44 @@ export function DatasetDetailView() {
 
       {/* Airtable-style grid */}
       <Card className="overflow-hidden">
+      {viewMode === "list" ? (
         <div className="overflow-x-auto">
-          <Table className="w-full">
+          <Table 
+            className="w-full"
+            onCopy={(e) => {
+              const selection = window.getSelection();
+              if (!selection || selection.rangeCount === 0) return;
+              
+              const range = selection.getRangeAt(0);
+              const container = document.createElement("div");
+              container.appendChild(range.cloneContents());
+              
+              // Extract only valid table cells
+              const rows = Array.from(container.querySelectorAll("tr"));
+              if (rows.length === 0) return; // Not a table selection
+              
+              const tsv = rows.map(row => {
+                const cells = Array.from(row.querySelectorAll("td, th"));
+                return cells.map(cell => {
+                  // For the record status cell or checkbox cell, we might want to skip or just grab text
+                  // We'll just grab the innerText of the cell, which strips out HTML
+                  let text = (cell.textContent || "").trim();
+                  // Remove line breaks which would break TSV
+                  text = text.replace(/[\r\n]+/g, " ");
+                  return text;
+                }).join("\t");
+              }).join("\n");
+              
+              if (tsv) {
+                e.clipboardData.setData("text/plain", tsv);
+                e.preventDefault();
+                toast.success("Copied cells to clipboard");
+              }
+            }}
+          >
             <TableHeader>
               <TableRow className="bg-muted/60 hover:bg-muted/60 sticky top-0 z-10">
-                <TableHead className="w-10 border-r text-center">
+                <TableHead className="w-12 border-r text-center">
                   <Checkbox 
                     checked={selectedRecords.size > 0 && selectedRecords.size === filteredRecords.length}
                     onCheckedChange={(checked) => {
@@ -918,19 +1190,54 @@ export function DatasetDetailView() {
                 {visibleFields.map((f) => (
                   <TableHead
                     key={f.id}
-                    className="min-w-[180px] border-r last:border-r-0"
+                    className="min-w-[180px] border-r last:border-r-0 group/th px-1"
                   >
-                    <div className="flex items-center gap-1.5">
-                      <FieldTypeBadge type={f.type} />
-                      <span className="truncate text-sm font-medium">
-                        {f.name}
-                      </span>
-                      {f.required && (
-                        <span className="text-destructive" title="Required">
-                          *
-                        </span>
-                      )}
-                    </div>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <div className="flex h-9 w-full items-center gap-1.5 cursor-pointer hover:bg-muted/60 px-2 rounded-md">
+                          <FieldTypeBadge type={f.type} />
+                          <span className="truncate text-sm font-medium flex-1 text-left">
+                            {f.name}
+                          </span>
+                          {f.required && (
+                            <span className="text-destructive shrink-0" title="Required">
+                              *
+                            </span>
+                          )}
+                          <ChevronDown className="h-3.5 w-3.5 text-muted-foreground opacity-0 group-hover/th:opacity-100 transition-opacity shrink-0" />
+                        </div>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="start" className="w-48">
+                        <DropdownMenuItem 
+                          disabled={cannotEdit}
+                          onClick={() => {
+                          const name = prompt("Enter new column name:");
+                          if (name) createColumnMutation.mutate({ name, type: "text", position: f.position });
+                        }}>
+                          <Plus className="mr-2 h-4 w-4" /> Insert Left
+                        </DropdownMenuItem>
+                        <DropdownMenuItem 
+                          disabled={cannotEdit}
+                          onClick={() => {
+                          const name = prompt("Enter new column name:");
+                          if (name) createColumnMutation.mutate({ name, type: "text", position: f.position + 1 });
+                        }}>
+                          <Plus className="mr-2 h-4 w-4" /> Insert Right
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem 
+                          className="text-destructive focus:text-destructive" 
+                          disabled={cannotEdit}
+                          onClick={() => {
+                            if (confirm(`Delete column "${f.name}"? This cannot be undone.`)) {
+                              deleteColumnMutation.mutate(f.id);
+                            }
+                          }}
+                        >
+                          <Trash2 className="mr-2 h-4 w-4" /> Delete Column
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </TableHead>
                 ))}
               </TableRow>
@@ -940,21 +1247,18 @@ export function DatasetDetailView() {
                 <TableRow>
                   <TableCell
                     colSpan={visibleFields.length + 2}
-                    className="py-4"
+                    className="h-24 text-center"
                   >
-                    <LoadingState rows={3} />
+                    <LoadingState />
                   </TableCell>
                 </TableRow>
               ) : recordsError ? (
                 <TableRow>
                   <TableCell
                     colSpan={visibleFields.length + 2}
-                    className="py-4"
+                    className="py-6 text-center text-sm text-destructive"
                   >
-                    <ErrorState
-                      message="Failed to load records"
-                      onRetry={() => refetchRecords()}
-                    />
+                    Failed to load records.
                   </TableCell>
                 </TableRow>
               ) : filteredRecords.length === 0 ? (
@@ -983,9 +1287,9 @@ export function DatasetDetailView() {
                   <TableRow
                     key={r.id}
                     className={`h-12 cursor-pointer hover:bg-muted/40 ${idx % 2 === 1 ? "bg-muted/20" : ""} ${selectedRecordId === r.id ? "ring-1 ring-inset ring-primary" : ""}`}
-                    onClick={() => setSelectedRecordId(r.id)}
+                    onClick={(e) => handleCellClick(r.id, e)}
                   >
-                    <TableCell className="border-r w-10 text-center" onClick={(e) => e.stopPropagation()}>
+                    <TableCell className="border-r w-12 text-center" onClick={(e) => e.stopPropagation()}>
                       <Checkbox 
                         checked={selectedRecords.has(r.id)}
                         onCheckedChange={(checked) => {
@@ -1012,45 +1316,48 @@ export function DatasetDetailView() {
                       const fmt = v
                         ? formatValueCompact(v.value, f.type)
                         : { text: "" };
-                      return (
-                        <TableCell
-                          key={f.id}
-                          className="border-r last:border-r-0 align-middle group/cell max-w-[250px]"
-                        >
-                          <div 
-                            className="flex w-full items-center gap-2 cursor-pointer"
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                setSelectedRecordId(r.id);
-                            }}
-                            onDoubleClick={(e) => {
-                                e.stopPropagation();
-                                if (v) handleEditClick({ ...v, recordId: r.id });
-                            }}
+                        const isEditing = inlineEditCell?.recordId === r.id && inlineEditCell?.fieldId === f.id;
+                        return (
+                          <TableCell
+                            key={f.id}
+                            className="border-r last:border-r-0 align-middle group/cell min-w-[150px] max-w-[300px] p-0"
+                            onClick={(e) => handleCellClick(r.id, e)}
+                            onDoubleClick={(e) => handleCellDoubleClick(r.id, f.id, e)}
                           >
-                            <span
-                              className={`min-w-0 flex-1 truncate text-sm hover:underline-offset-2 ${
-                                f.type === "number"
-                                  ? "tabular-nums"
-                                  : ""
-                              }`}
-                              title={fmt.text}
-                            >
-                              {fmt.node ?? (
-                                <span className={fmt.text ? "text-foreground" : "text-muted-foreground"}>
-                                  {fmt.text || "—"}
-                                </span>
-                              )}
-                            </span>
-                            {v && (
-                              <span
-                                className={`inline-block h-1.5 w-1.5 shrink-0 rounded-full ${confidenceColor(v.confidence)}`}
-                                title={`Confidence ${Math.round(v.confidence * 100)}%`}
+                            {isEditing ? (
+                              <InlineEditCell
+                                datasetId={datasetId}
+                                recordId={r.id}
+                                fieldId={f.id}
+                                valueId={v?.id}
+                                initialValue={fmt.text}
+                                fieldType={f.type}
+                                onClose={() => setInlineEditCell(null)}
                               />
+                            ) : (
+                              <div className="flex w-full h-12 items-center gap-2 cursor-pointer px-4">
+                                <span
+                                  className={`min-w-0 flex-1 truncate text-sm hover:underline-offset-2 ${
+                                    f.type === "number" ? "tabular-nums" : ""
+                                  }`}
+                                  title={fmt.text}
+                                >
+                                  {fmt.node ?? (
+                                    <span className={fmt.text ? "text-foreground" : "text-muted-foreground"}>
+                                      {fmt.text || "—"}
+                                    </span>
+                                  )}
+                                </span>
+                                {v && (
+                                  <span
+                                    className={`inline-block h-1.5 w-1.5 shrink-0 rounded-full ${confidenceColor(v.confidence)}`}
+                                    title={`Confidence ${Math.round(v.confidence * 100)}%`}
+                                  />
+                                )}
+                              </div>
                             )}
-                          </div>
-                        </TableCell>
-                      );
+                          </TableCell>
+                        );
                     })}
                   </TableRow>
                 ))
@@ -1058,6 +1365,75 @@ export function DatasetDetailView() {
             </TableBody>
           </Table>
         </div>
+      ) : (
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 p-4 bg-muted/10">
+          {filteredRecords.length === 0 ? (
+            <div className="col-span-full">
+              <EmptyState
+                icon={<Database className="h-5 w-5" />}
+                title={records.length === 0 ? "No records yet" : "No records match your filters"}
+                description={records.length === 0 ? "Records will appear here once extracted." : "Try adjusting filters."}
+              />
+            </div>
+          ) : (
+            filteredRecords.map((r, idx) => (
+              <Card
+                key={r.id}
+                className={`flex flex-col gap-3 p-4 transition-all hover:shadow-md cursor-pointer ${
+                  selectedRecordId === r.id ? "border-primary ring-1 ring-primary shadow-sm" : ""
+                }`}
+                onClick={(e) => handleCellClick(r.id, e)}
+              >
+                <div className="flex items-center justify-between border-b pb-2">
+                  <div className="flex items-center gap-2">
+                    <Checkbox
+                      checked={selectedRecords.has(r.id)}
+                      onClick={(e) => e.stopPropagation()}
+                      onCheckedChange={(checked) => {
+                        const next = new Set(selectedRecords);
+                        if (checked) next.add(r.id);
+                        else next.delete(r.id);
+                        setSelectedRecords(next);
+                      }}
+                    />
+                    <span className="text-xs font-mono text-muted-foreground">
+                      #{(page - 1) * PAGE_SIZE + idx + 1}
+                    </span>
+                  </div>
+                  <StatusBadge status={r.status} />
+                </div>
+                <div className="flex-1 space-y-2">
+                  {visibleFields.slice(0, 6).map((f) => {
+                    const v = valueByFieldId(r, f.id);
+                    const fmt = v ? formatValueCompact(v.value, f.type) : { text: "" };
+                    return (
+                      <div key={f.id} className="grid grid-cols-[100px_1fr] items-start gap-2 text-sm">
+                        <span className="text-muted-foreground truncate" title={f.name}>{f.name}</span>
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          <span className="truncate font-medium flex-1">
+                            {fmt.text || "—"}
+                          </span>
+                          {v && (
+                            <span
+                              className={`inline-block h-1.5 w-1.5 shrink-0 rounded-full ${confidenceColor(v.confidence)}`}
+                              title={`Confidence ${Math.round(v.confidence * 100)}%`}
+                            />
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                  {visibleFields.length > 6 && (
+                    <div className="text-xs text-muted-foreground italic">
+                      + {visibleFields.length - 6} more fields
+                    </div>
+                  )}
+                </div>
+              </Card>
+            ))
+          )}
+        </div>
+      )}
       </Card>
 
       {/* Pagination */}
@@ -1273,6 +1649,29 @@ export function DatasetDetailView() {
         recordId={editValue?.recordId ?? null}
         onClose={() => setEditValue(null)}
       />
+
+      {/* Google Sheets Panel */}
+      {dataset && (
+        <GoogleSheetsPanel
+          open={sheetsPanelOpen}
+          onOpenChange={(open) => { if (!open) setSheetsPanelOpen(false); }}
+          dataset={{
+            id: dataset.id,
+            name: dataset.name,
+            recordCount: dataset.recordCount,
+            sheetMappingId: (dataset as any).sheetMappingId ?? null,
+            syncStatus: (dataset as any).syncStatus ?? null,
+          }}
+          appColumns={allFields.map((f) => ({
+              columnId: f.id,
+              name: f.name,
+              dataType: f.type,
+              required: f.required,
+            }))
+          }
+          allDatasets={[{ id: dataset.id, name: dataset.name }]}
+        />
+      )}
     </div>
   );
 }
@@ -1454,8 +1853,7 @@ function EvidenceDrawer({
                 </div>
               </SheetHeader>
 
-              {/* Field values list */}
-              <div className="flex-1 space-y-4 overflow-y-auto p-4">
+              <SheetBody className="space-y-4">
                 <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                   {record.values.length} extracted field
                   {record.values.length === 1 ? "" : "s"}
@@ -1475,10 +1873,10 @@ function EvidenceDrawer({
                     />
                   ))
                 )}
-              </div>
+              </SheetBody>
 
               {/* Action footer */}
-              <div className="border-t bg-muted/30 p-4">
+              <SheetFooter className="flex-col items-start bg-muted/30">
                 <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
                   Record actions
                 </p>
@@ -1510,7 +1908,7 @@ function EvidenceDrawer({
                     Mark for review
                   </Button>
                 </div>
-              </div>
+              </SheetFooter>
             </>
           )}
         </SheetContent>

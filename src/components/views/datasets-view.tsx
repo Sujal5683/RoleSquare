@@ -412,174 +412,209 @@ export function DatasetsView() {
           {filtered.map((d) => (
             <Card
               key={d.id}
-              className={`flex gap-3 p-4 transition-shadow hover:shadow-md ${viewMode === "list" ? "flex-row items-center" : "flex-col"}`}
+              className={`flex p-4 transition-shadow hover:shadow-md ${viewMode === "list" ? "flex-row gap-4" : "flex-col gap-3"}`}
             >
-              {/* Header */}
-              <div className={`flex items-start gap-3 ${viewMode === "list" ? "flex-1 min-w-0" : "justify-between"}`}>
-                <div className="flex min-w-0 items-start gap-3 flex-1">
-                  <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                    <Database className="h-4 w-4" />
-                  </div>
-                  <div className="min-w-0 flex-1 space-y-1">
-                    <button
-                      onClick={() => openDataset(d.id, d.name)}
-                      className="block w-full text-left text-base font-semibold leading-tight truncate hover:underline max-w-full"
-                      title={d.name}
-                    >
-                      {d.name}
-                    </button>
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                      {d.isShared && (
-                        <Badge className="bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400 font-normal text-xs shrink-0">
-                          Shared
-                        </Badge>
-                      )}
-                      {d.syncStatus && (
-                        <SyncStatusBadge status={d.syncStatus as any} className="shrink-0" />
-                      )}
-                      {d.schema ? (
-                        <Badge variant="secondary" className="font-normal truncate max-w-[140px]" title={d.schema.name}>
-                          {d.schema.name}
-                          {d.schema.fields?.length
-                            ? ` · ${d.schema.fields.length} fields`
-                            : ""}
-                        </Badge>
-                      ) : (
-                        <Badge variant="outline" className="font-normal text-muted-foreground shrink-0">
-                          No schema
-                        </Badge>
-                      )}
+              <div className="flex flex-1 min-w-0 gap-3">
+                <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                  <Database className="h-4 w-4" />
+                </div>
+                <div className="flex-1 min-w-0 space-y-2">
+                  <div className="flex items-start justify-between">
+                    <div className="min-w-0 w-full">
+                      <button
+                        onClick={() => openDataset(d.id, d.name)}
+                        className="block w-full text-left text-base font-semibold leading-tight truncate hover:underline"
+                        title={d.name}
+                      >
+                        {d.name}
+                      </button>
+                      <div className="flex items-center gap-1.5 flex-wrap mt-1">
+                        {d.schema ? (
+                          <Badge variant="secondary" className="font-normal truncate max-w-full block text-left" title={d.schema.name}>
+                            {d.schema.name}
+                            {d.schema.fields?.length
+                              ? ` · ${d.schema.fields.length} fields`
+                              : ""}
+                          </Badge>
+                        ) : (
+                          <Badge variant="outline" className="font-normal text-muted-foreground shrink-0 block text-left">
+                            No schema
+                          </Badge>
+                        )}
+                        {d.isShared && d.ownerOrgName && (
+                          <div className="text-xs text-muted-foreground flex items-center gap-1 truncate w-full mt-1">
+                            <ChevronRight className="h-3 w-3 shrink-0" />
+                            <span className="truncate">From: {d.ownerOrgName}</span>
+                          </div>
+                        )}
+                      </div>
                     </div>
-                    {d.isShared && d.ownerOrgName && (
-                      <div className="text-xs text-muted-foreground flex items-center gap-1 truncate">
-                        <ChevronRight className="h-3 w-3 shrink-0" />
-                        <span className="truncate">From: {d.ownerOrgName}</span>
+                    {/* In non-list modes, render actions on the right in the header */}
+                    {viewMode !== "list" && (
+                      <div className="flex items-center gap-1 shrink-0 ml-2">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8"
+                          aria-label="Share dataset"
+                          onClick={() => handleShare(d)}
+                        >
+                          <Share2 className="h-4 w-4" />
+                        </Button>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-8 w-8" aria-label="Dataset actions">
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="w-48">
+                            <DropdownMenuItem onClick={() => setAssignSchemaTarget(d)}>
+                              <FileCode2 className="mr-2 h-4 w-4" />
+                              {d.schema ? "Change Schema" : "Assign Schema"}
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => setSheetsPanelDataset(d)}>
+                              <FileSpreadsheet className="mr-2 h-4 w-4 text-emerald-500" />
+                              Google Sheets
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem onClick={() => exportMutation.mutate({ id: d.id, format: "csv" })} disabled={exportMutation.isPending}>
+                              <FileDown className="mr-2 h-4 w-4" />
+                              Export CSV
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => exportMutation.mutate({ id: d.id, format: "json" })} disabled={exportMutation.isPending}>
+                              <FileJson className="mr-2 h-4 w-4" />
+                              Export JSON
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem onClick={() => handleShare(d)}>
+                              <Share2 className="mr-2 h-4 w-4" />
+                              Share
+                            </DropdownMenuItem>
+                            <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => setDeleteTarget(d)}>
+                              <Trash2 className="mr-2 h-4 w-4" />
+                              Delete
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </div>
                     )}
                   </div>
-                </div>
-                <div className="flex items-center gap-1">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8 shrink-0"
-                    aria-label="Share dataset"
-                    onClick={() => handleShare(d)}
-                  >
-                    <Share2 className="h-4 w-4" />
-                  </Button>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 shrink-0"
-                        aria-label="Dataset actions"
-                      >
-                        <MoreHorizontal className="h-4 w-4" />
+
+                  {/* Description */}
+                  <p className={`text-sm text-muted-foreground ${viewMode === "list" ? "line-clamp-1" : "line-clamp-2 min-h-[2.5rem]"}`}>
+                    {d.description || "No description provided."}
+                  </p>
+
+                  {/* Meta row */}
+                  <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                    <span className="inline-flex items-center gap-1">
+                      <Hash className="h-3 w-3" />
+                      <span className="tabular-nums font-medium text-foreground">
+                        {d.recordCount}
+                      </span>{" "}
+                      records
+                    </span>
+                    <span
+                      className="inline-flex items-center gap-1"
+                      title={formatDate(d.createdAt)}
+                    >
+                      <Calendar className="h-3 w-3" />
+                      {relativeTime(d.createdAt)}
+                    </span>
+                  </div>
+
+                  {/* Footer content embedded inline for list view, separate row for grid */}
+                  <div className={`flex items-center justify-between ${viewMode === "list" ? "pt-1" : "border-t pt-3 mt-auto"}`}>
+                    <div className="flex items-center gap-2">
+                      {d.isShared && (
+                        <Badge className="bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400 font-normal text-[10px] shrink-0 h-5 px-1.5 py-0">
+                          Shared
+                        </Badge>
+                      )}
+                      {(d as any).syncStatus && (d as any).syncStatus !== "unlinked" && (
+                        <button
+                          onClick={() => setSheetsPanelDataset(d)}
+                          className="flex items-center hover:opacity-80 transition-opacity"
+                          id={`sheets-badge-footer-${d.id}`}
+                        >
+                          <SyncStatusBadge
+                            status={(d as any).syncStatus as any}
+                            lastSyncAt={(d as any).lastSyncAt}
+                            conflictCount={(d as any).pendingConflicts}
+                          />
+                        </button>
+                      )}
+                      {!d.isShared && !(d as any).syncStatus && (
+                        <span className="text-xs text-muted-foreground">
+                          {d.schema ? "Active" : "Needs schema"}
+                        </span>
+                      )}
+                    </div>
+                    {viewMode !== "list" && (
+                      <Button variant="outline" size="sm" onClick={() => openDataset(d.id, d.name)}>
+                        Open
+                        <ChevronRight className="ml-1.5 h-3.5 w-3.5" />
                       </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="w-48">
-                      <DropdownMenuItem
-                        onClick={() => setAssignSchemaTarget(d)}
-                      >
-                        <FileCode2 className="mr-2 h-4 w-4" />
-                        {d.schema ? "Change Schema" : "Assign Schema"}
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        onClick={() => setSheetsPanelDataset(d)}
-                      >
-                        <FileSpreadsheet className="mr-2 h-4 w-4 text-emerald-500" />
-                        Google Sheets
-                      </DropdownMenuItem>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem
-                        onClick={() =>
-                          exportMutation.mutate({ id: d.id, format: "csv" })
-                        }
-                        disabled={exportMutation.isPending}
-                      >
-                        <FileDown className="mr-2 h-4 w-4" />
-                        Export CSV
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        onClick={() =>
-                          exportMutation.mutate({ id: d.id, format: "json" })
-                        }
-                        disabled={exportMutation.isPending}
-                      >
-                        <FileJson className="mr-2 h-4 w-4" />
-                        Export JSON
-                      </DropdownMenuItem>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem onClick={() => handleShare(d)}>
-                        <Share2 className="mr-2 h-4 w-4" />
-                        Share
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        className="text-destructive focus:text-destructive"
-                        onClick={() => setDeleteTarget(d)}
-                      >
-                        <Trash2 className="mr-2 h-4 w-4" />
-                        Delete
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
+                    )}
+                  </div>
                 </div>
               </div>
 
-              {/* Description */}
-              <p className="text-sm text-muted-foreground line-clamp-2 min-h-[2.5rem]">
-                {d.description || "No description provided."}
-              </p>
-
-              {/* Google Sheets sync badge */}
-              {(d as any).syncStatus && (d as any).syncStatus !== "unlinked" && (
-                <button
-                  onClick={() => setSheetsPanelDataset(d)}
-                  className="flex items-center gap-1.5 hover:opacity-80 transition-opacity"
-                  id={`sheets-badge-${d.id}`}
-                >
-                  <SyncStatusBadge
-                    status={(d as any).syncStatus as any}
-                    lastSyncAt={(d as any).lastSyncAt}
-                    conflictCount={(d as any).pendingConflicts}
-                  />
-                </button>
+              {/* Sidebar actions specifically for list view */}
+              {viewMode === "list" && (
+                <div className="flex flex-col items-end justify-between shrink-0 pl-4 border-l">
+                  <div className="flex items-center gap-1">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8"
+                      aria-label="Share dataset"
+                      onClick={() => handleShare(d)}
+                    >
+                      <Share2 className="h-4 w-4" />
+                    </Button>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-8 w-8" aria-label="Dataset actions">
+                          <MoreHorizontal className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="w-48">
+                        <DropdownMenuItem onClick={() => setAssignSchemaTarget(d)}>
+                          <FileCode2 className="mr-2 h-4 w-4" />
+                          {d.schema ? "Change Schema" : "Assign Schema"}
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => setSheetsPanelDataset(d)}>
+                          <FileSpreadsheet className="mr-2 h-4 w-4 text-emerald-500" />
+                          Google Sheets
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem onClick={() => exportMutation.mutate({ id: d.id, format: "csv" })} disabled={exportMutation.isPending}>
+                          <FileDown className="mr-2 h-4 w-4" />
+                          Export CSV
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => exportMutation.mutate({ id: d.id, format: "json" })} disabled={exportMutation.isPending}>
+                          <FileJson className="mr-2 h-4 w-4" />
+                          Export JSON
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem onClick={() => handleShare(d)}>
+                          <Share2 className="mr-2 h-4 w-4" />
+                          Share
+                        </DropdownMenuItem>
+                        <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => setDeleteTarget(d)}>
+                          <Trash2 className="mr-2 h-4 w-4" />
+                          Delete
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+                  <Button variant="outline" size="sm" onClick={() => openDataset(d.id, d.name)} className="mt-4">
+                    Open
+                    <ChevronRight className="ml-1.5 h-3.5 w-3.5" />
+                  </Button>
+                </div>
               )}
-
-              {/* Meta row */}
-              <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
-                <span className="inline-flex items-center gap-1">
-                  <Hash className="h-3 w-3" />
-                  <span className="tabular-nums font-medium text-foreground">
-                    {d.recordCount}
-                  </span>{" "}
-                  records
-                </span>
-                <span
-                  className="inline-flex items-center gap-1"
-                  title={formatDate(d.createdAt)}
-                >
-                  <Calendar className="h-3 w-3" />
-                  {relativeTime(d.createdAt)}
-                </span>
-              </div>
-
-              {/* Footer */}
-              <div className="mt-auto flex items-center justify-between border-t pt-3">
-                <span className="text-xs text-muted-foreground">
-                  {d.schema ? "Ready to explore" : "Needs a schema"}
-                </span>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => openDataset(d.id, d.name)}
-                >
-                  Open
-                  <ChevronRight className="ml-1.5 h-3.5 w-3.5" />
-                </Button>
-              </div>
             </Card>
           ))}
         </div>
