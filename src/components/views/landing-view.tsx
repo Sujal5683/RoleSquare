@@ -94,7 +94,7 @@ export function LandingView() {
                 { icon: Database, title: "Dataset", desc: "Structured output", color: "text-rose-500" },
               ].map((step, i) => (
                 <Card key={i} className="relative border-border/50 bg-background shadow-sm hover:shadow-md transition-shadow">
-                  <CardHeader className="pb-3 text-center">
+                  <CardHeader className="text-center">
                     <div className="mx-auto mb-2 flex h-10 w-10 items-center justify-center rounded-lg bg-muted">
                       <step.icon className={`h-5 w-5 ${step.color}`} />
                     </div>

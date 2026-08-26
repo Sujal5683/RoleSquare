@@ -171,7 +171,7 @@ export function UsageView() {
 
       {/* Quotas progress bars */}
       <Card>
-        <CardHeader className="pb-3">
+        <CardHeader >
           <CardTitle className="text-base flex items-center gap-2">
             <Activity className="h-4 w-4" />
             Quota utilization
@@ -225,7 +225,7 @@ export function UsageView() {
 
       {/* Daily token consumption chart */}
       <Card>
-        <CardHeader className="pb-3">
+        <CardHeader >
           <CardTitle className="text-base flex items-center gap-2">
             <Zap className="h-4 w-4" />
             Daily token consumption
@@ -293,7 +293,7 @@ export function UsageView() {
       {/* Job type distribution + Job status distribution */}
       <div className="grid gap-4 lg:grid-cols-2">
         <Card>
-          <CardHeader className="pb-3">
+          <CardHeader >
             <CardTitle className="text-base flex items-center gap-2">
               <Cpu className="h-4 w-4" />
               Job type distribution
@@ -339,7 +339,7 @@ export function UsageView() {
         </Card>
 
         <Card>
-          <CardHeader className="pb-3">
+          <CardHeader >
             <CardTitle className="text-base flex items-center gap-2">
               <Activity className="h-4 w-4" />
               Job status distribution
@@ -398,7 +398,7 @@ export function UsageView() {
       <div className="grid gap-4 lg:grid-cols-2">
         {/* Model usage */}
         <Card>
-          <CardHeader className="pb-3">
+          <CardHeader >
             <CardTitle className="text-base flex items-center gap-2">
               <Brain className="h-4 w-4" />
               Model usage breakdown
@@ -445,7 +445,7 @@ export function UsageView() {
 
         {/* Cost breakdown */}
         <Card>
-          <CardHeader className="pb-3">
+          <CardHeader >
             <CardTitle className="text-base flex items-center gap-2">
               <DollarSign className="h-4 w-4" />
               Cost breakdown
@@ -488,7 +488,7 @@ export function UsageView() {
 
       {/* Summary counts */}
       <Card>
-        <CardHeader className="pb-3">
+        <CardHeader >
           <CardTitle className="text-base flex items-center gap-2">
             <FileText className="h-4 w-4" />
             Platform summary

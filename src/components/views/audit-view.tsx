@@ -292,7 +292,7 @@ export function AuditView() {
 
       {/* Filter bar */}
       <Card>
-        <CardHeader className="pb-3">
+        <CardHeader >
           <CardTitle className="flex items-center gap-2 text-base">
             <Filter className="h-4 w-4 text-primary" />
             Filters
@@ -377,7 +377,7 @@ export function AuditView() {
 
       {/* Timeline */}
       <Card>
-        <CardHeader className="pb-3">
+        <CardHeader >
           <CardTitle className="flex items-center justify-between text-base">
             <span>Timeline</span>
             <span className="text-xs font-normal text-muted-foreground">

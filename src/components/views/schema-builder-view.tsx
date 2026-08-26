@@ -761,7 +761,7 @@ export function SchemaBuilderView() {
           <div className="lg:col-span-2 space-y-4">
             {/* Metadata */}
             <Card>
-              <CardHeader className="flex flex-row items-center justify-between pb-3">
+              <CardHeader className="flex flex-row items-center justify-between">
                 <CardTitle className="text-base flex items-center gap-2">
                   <FileText className="h-4 w-4" />
                   Schema metadata
@@ -967,7 +967,7 @@ export function SchemaBuilderView() {
 
             {/* Fields list */}
             <Card>
-              <CardHeader className="flex flex-row items-center justify-between pb-3">
+              <CardHeader className="flex flex-row items-center justify-between">
                 <CardTitle className="text-base flex items-center gap-2">
                   <Sparkles className="h-4 w-4" />
                   Fields
@@ -1032,7 +1032,7 @@ export function SchemaBuilderView() {
           {/* Right: prompt preview + test extraction */}
           <div className="lg:col-span-1 space-y-4">
             <Card>
-              <CardHeader className="pb-3">
+              <CardHeader >
                 <CardTitle className="text-base flex items-center gap-2">
                   <Wand2 className="h-4 w-4" />
                   Prompt preview
@@ -1046,7 +1046,7 @@ export function SchemaBuilderView() {
             </Card>
 
             <Card>
-              <CardHeader className="pb-3">
+              <CardHeader >
                 <CardTitle className="text-base flex items-center gap-2">
                   <Play className="h-4 w-4" />
                   Test extraction

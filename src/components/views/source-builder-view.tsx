@@ -537,7 +537,7 @@ export function SourceBuilderView() {
         {/* Main step content */}
         <div className="lg:col-span-2">
           <Card>
-            <CardHeader className="pb-3">
+            <CardHeader >
               <CardTitle className="text-base flex items-center gap-2">
                 {STEPS[step].icon}
                 Step {step + 1}: {STEPS[step].label}
@@ -1217,7 +1217,7 @@ export function SourceBuilderView() {
         <div className="lg:col-span-1">
           <div className="lg:sticky lg:top-20 space-y-4">
             <Card>
-              <CardHeader className="pb-3">
+              <CardHeader >
                 <CardTitle className="text-base flex items-center gap-2">
                   <Link2 className="h-4 w-4" />
                   Summary
@@ -1257,7 +1257,7 @@ export function SourceBuilderView() {
 
             {form.rules.length > 0 && (
               <Card>
-                <CardHeader className="pb-3">
+                <CardHeader >
                   <CardTitle className="text-sm">Rule preview</CardTitle>
                 </CardHeader>
                 <CardContent>

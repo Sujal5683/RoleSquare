@@ -54,13 +54,25 @@ function SheetContent({
   side?: "top" | "right" | "bottom" | "left"
   hideClose?: boolean
 }) {
+  const childrenArray = React.Children.toArray(children)
+  const header = childrenArray.find(
+    (child) => React.isValidElement(child) && child.type === SheetHeader
+  )
+  const footer = childrenArray.find(
+    (child) => React.isValidElement(child) && child.type === SheetFooter
+  )
+  const content = childrenArray.filter(
+    (child) => child !== header && child !== footer
+  )
+  const isP0 = className?.includes("p-0")
+
   return (
     <SheetPortal>
       <SheetOverlay />
       <SheetPrimitive.Content
         data-slot="sheet-content"
         className={cn(
-          "bg-background data-[state=open]:animate-in data-[state=closed]:animate-out fixed z-50 flex flex-col shadow-lg transition ease-in-out data-[state=closed]:duration-300 data-[state=open]:duration-500",
+          "bg-background data-[state=open]:animate-in data-[state=closed]:animate-out fixed z-50 flex flex-col shadow-lg transition ease-in-out data-[state=closed]:duration-300 data-[state=open]:duration-500 overflow-hidden p-0",
           side === "right" &&
             "data-[state=closed]:slide-out-to-right data-[state=open]:slide-in-from-right inset-y-0 right-0 h-full w-[400px] border-l sm:w-[540px] sm:max-w-none",
           side === "left" &&
@@ -73,7 +85,11 @@ function SheetContent({
         )}
         {...props}
       >
-        {children}
+        {header}
+        <div className={cn("flex-1 overflow-y-auto", !isP0 && "p-6", !isP0 && header && "pt-4", !isP0 && footer && "pb-4")}>
+          {content}
+        </div>
+        {footer}
         {!hideClose && (
           <SheetPrimitive.Close className="ring-offset-background focus:ring-ring data-[state=open]:bg-secondary absolute top-4 right-4 rounded-xs opacity-70 transition-opacity hover:opacity-100 focus:ring-2 focus:ring-offset-2 focus:outline-hidden disabled:pointer-events-none">
             <XIcon className="size-4" />
@@ -89,7 +105,7 @@ function SheetHeader({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
       data-slot="sheet-header"
-      className={cn("flex flex-col gap-1.5 p-6 border-b bg-muted/10 shrink-0", className)}
+      className={cn("flex flex-col gap-2 text-center sm:text-left shrink-0 p-6 pb-4 border-b", className)}
       {...props}
     />
   )
@@ -99,7 +115,7 @@ function SheetBody({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
       data-slot="sheet-body"
-      className={cn("flex-1 overflow-y-auto p-6", className)}
+      className={cn("flex-1 overflow-y-auto", className)}
       {...props}
     />
   )
@@ -109,7 +125,7 @@ function SheetFooter({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
       data-slot="sheet-footer"
-      className={cn("mt-auto flex items-center justify-end gap-2 p-4 border-t bg-muted/10 shrink-0", className)}
+      className={cn("flex flex-col-reverse sm:flex-row sm:justify-end sm:space-x-2 shrink-0 p-6 pt-4 border-t mt-auto", className)}
       {...props}
     />
   )

@@ -264,7 +264,7 @@ function TestSandboxTab() {
     <div className="grid gap-4 lg:grid-cols-2">
       {/* Left: input */}
       <Card>
-        <CardHeader className="pb-3">
+        <CardHeader >
           <CardTitle className="flex items-center gap-2 text-base">
             <Sparkles className="h-4 w-4" />
             Input
@@ -347,7 +347,7 @@ function TestSandboxTab() {
 
       {/* Right: results */}
       <Card>
-        <CardHeader className="pb-3">
+        <CardHeader >
           <CardTitle className="flex items-center gap-2 text-base">
             <Gauge className="h-4 w-4" />
             Results

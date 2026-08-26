@@ -54,18 +54,34 @@ function DialogContent({
 }: React.ComponentProps<typeof DialogPrimitive.Content> & {
   showCloseButton?: boolean
 }) {
+  const childrenArray = React.Children.toArray(children)
+  const header = childrenArray.find(
+    (child) => React.isValidElement(child) && child.type === DialogHeader
+  )
+  const footer = childrenArray.find(
+    (child) => React.isValidElement(child) && child.type === DialogFooter
+  )
+  const content = childrenArray.filter(
+    (child) => child !== header && child !== footer
+  )
+  const isP0 = className?.includes("p-0")
+
   return (
     <DialogPortal data-slot="dialog-portal">
       <DialogOverlay />
       <DialogPrimitive.Content
         data-slot="dialog-content"
         className={cn(
-          "bg-background data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 fixed top-[50%] left-[50%] z-50 flex flex-col w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] rounded-lg border shadow-lg duration-200 sm:max-w-lg max-h-[calc(100vh-2rem)] sm:max-h-[90vh]",
+          "bg-background data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 fixed top-[50%] left-[50%] z-50 flex flex-col w-full max-w-lg translate-x-[-50%] translate-y-[-50%] border shadow-lg duration-200 sm:rounded-lg max-h-[calc(100vh-2rem)] sm:max-h-[90vh] overflow-hidden p-0",
           className
         )}
         {...props}
       >
-        {children}
+        {header}
+        <div className={cn("flex-1 overflow-y-auto", !isP0 && "p-6", !isP0 && header && "pt-4", !isP0 && footer && "pb-4")}>
+          {content}
+        </div>
+        {footer}
         {showCloseButton && (
           <DialogPrimitive.Close
             data-slot="dialog-close"
@@ -84,17 +100,7 @@ function DialogHeader({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
       data-slot="dialog-header"
-      className={cn("flex flex-col gap-2 p-6 border-b shrink-0 text-center sm:text-left", className)}
-      {...props}
-    />
-  )
-}
-
-function DialogBody({ className, ...props }: React.ComponentProps<"div">) {
-  return (
-    <div
-      data-slot="dialog-body"
-      className={cn("flex-1 overflow-y-auto p-6", className)}
+      className={cn("flex flex-col gap-1.5 text-center sm:text-left shrink-0 p-6 pb-4 border-b", className)}
       {...props}
     />
   )
@@ -105,7 +111,7 @@ function DialogFooter({ className, ...props }: React.ComponentProps<"div">) {
     <div
       data-slot="dialog-footer"
       className={cn(
-        "flex flex-col-reverse gap-2 sm:flex-row sm:justify-end p-6 border-t shrink-0 bg-muted/10 rounded-b-lg",
+        "flex flex-col-reverse sm:flex-row sm:justify-end sm:space-x-2 shrink-0 p-6 pt-4 border-t mt-auto",
         className
       )}
       {...props}
@@ -150,7 +156,6 @@ export {
   DialogClose,
   DialogContent,
   DialogHeader,
-  DialogBody,
   DialogFooter,
   DialogTitle,
   DialogDescription,

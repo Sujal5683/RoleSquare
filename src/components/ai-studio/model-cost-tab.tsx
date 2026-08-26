@@ -121,7 +121,7 @@ export function ModelCostTab() {
       {/* Daily cost chart (CSS sparkline) */}
       {aiCost.dailyCost.length > 0 && (
         <Card>
-          <CardHeader className="pb-2">
+          <CardHeader >
             <CardTitle className="text-sm">Daily Cost</CardTitle>
           </CardHeader>
           <CardContent>
@@ -152,7 +152,7 @@ export function ModelCostTab() {
 
       {/* Per-model table */}
       <Card>
-        <CardHeader className="pb-2">
+        <CardHeader >
           <CardTitle className="text-sm">Per-Model Breakdown</CardTitle>
         </CardHeader>
         <CardContent>

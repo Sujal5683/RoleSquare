@@ -68,7 +68,7 @@ export function SharingDetailsSheet({ open, onOpenChange, data, type }: SharingD
 
         <SheetBody className="flex flex-col gap-6">
           <Card>
-            <CardHeader className="pb-3">
+            <CardHeader >
               <CardTitle className="text-sm font-semibold flex items-center gap-2">
                 <Shield className="h-4 w-4" /> Status & Timeline
               </CardTitle>
@@ -96,7 +96,7 @@ export function SharingDetailsSheet({ open, onOpenChange, data, type }: SharingD
           </Card>
 
           <Card>
-            <CardHeader className="pb-3">
+            <CardHeader >
               <CardTitle className="text-sm font-semibold flex items-center gap-2">
                 <Info className="h-4 w-4" /> Participants
               </CardTitle>
@@ -138,7 +138,7 @@ export function SharingDetailsSheet({ open, onOpenChange, data, type }: SharingD
 
           {reason && (
             <Card>
-              <CardHeader className="pb-3">
+              <CardHeader >
                 <CardTitle className="text-sm font-semibold flex items-center gap-2">
                   <MessageSquare className="h-4 w-4" /> Request Notes
                 </CardTitle>

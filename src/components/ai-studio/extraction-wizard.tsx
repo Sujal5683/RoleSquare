@@ -8,7 +8,7 @@ import { api } from "@/lib/api-client";
 import type { DatasetDTO, SchemaDTO, AiJobDTO, AgentLogDTO } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -160,12 +160,12 @@ export function ExtractionWizard() {
                 </div>
               ))}
             </div>
-            <div className="mt-6 flex justify-end">
-              <Button onClick={() => setStep(2)} disabled={!sourceDatasetId}>
-                Next <ArrowRight className="ml-2 h-4 w-4" />
-              </Button>
-            </div>
           </CardContent>
+          <CardFooter className="flex justify-end border-t pt-4">
+            <Button onClick={() => setStep(2)} disabled={!sourceDatasetId}>
+              Next <ArrowRight className="ml-2 h-4 w-4" />
+            </Button>
+          </CardFooter>
         </Card>
       )}
 
@@ -196,13 +196,13 @@ export function ExtractionWizard() {
                 </div>
               ))}
             </div>
-            <div className="flex justify-between">
-              <Button variant="ghost" onClick={() => setStep(1)}>Back</Button>
-              <Button onClick={() => setStep(3)} disabled={!schemaId}>
-                Next <ArrowRight className="ml-2 h-4 w-4" />
-              </Button>
-            </div>
           </CardContent>
+          <CardFooter className="flex justify-between border-t pt-4">
+            <Button variant="ghost" onClick={() => setStep(1)}>Back</Button>
+            <Button onClick={() => setStep(3)} disabled={!schemaId}>
+              Next <ArrowRight className="ml-2 h-4 w-4" />
+            </Button>
+          </CardFooter>
         </Card>
       )}
 
@@ -271,13 +271,13 @@ export function ExtractionWizard() {
               />
             </div>
 
-            <div className="flex justify-between pt-4">
-              <Button variant="ghost" onClick={() => setStep(2)}>Back</Button>
-              <Button onClick={() => setStep(4)}>
-                Review <ArrowRight className="ml-2 h-4 w-4" />
-              </Button>
-            </div>
           </CardContent>
+          <CardFooter className="flex justify-between border-t pt-4">
+            <Button variant="ghost" onClick={() => setStep(2)}>Back</Button>
+            <Button onClick={() => setStep(4)}>
+              Review <ArrowRight className="ml-2 h-4 w-4" />
+            </Button>
+          </CardFooter>
         </Card>
       )}
 
@@ -313,19 +313,18 @@ export function ExtractionWizard() {
                 </div>
               </div>
             </div>
-
-            <div className="flex justify-between">
-              <Button variant="ghost" onClick={() => setStep(3)}>Back</Button>
-              <Button 
-                onClick={handleStart} 
-                disabled={startMutation.isPending}
-                className="bg-indigo-600 hover:bg-indigo-700 text-white"
-              >
-                {startMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Play className="mr-2 h-4 w-4" />}
-                {startMutation.isPending ? "Starting..." : "Start Extraction"}
-              </Button>
-            </div>
           </CardContent>
+          <CardFooter className="flex justify-between border-t pt-4">
+            <Button variant="ghost" onClick={() => setStep(3)}>Back</Button>
+            <Button 
+              onClick={handleStart} 
+              disabled={startMutation.isPending}
+              className="bg-indigo-600 hover:bg-indigo-700 text-white"
+            >
+              {startMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Play className="mr-2 h-4 w-4" />}
+              {startMutation.isPending ? "Starting..." : "Start Extraction"}
+            </Button>
+          </CardFooter>
         </Card>
       )}
 

@@ -93,7 +93,7 @@ export function CrossOrgPanel() {
 
   return (
     <Card>
-      <CardHeader className="pb-3">
+      <CardHeader >
         <CardTitle className="text-sm flex items-center gap-2">
           <Shield className="h-4 w-4 text-primary" />
           Cross-Organization Sharing

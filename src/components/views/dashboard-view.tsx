@@ -166,13 +166,13 @@ export function DashboardView() {
 
           {/* Time-series Chart */}
           <Card>
-            <CardHeader className="pb-3 flex flex-row items-center justify-between">
+            <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle className="text-base flex items-center gap-2">
                 <Activity className="h-4 w-4" /> Activity (Last {dateRange.replace('d', '')} Days)
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="h-[250px] w-full mt-4">
+              <div className="h-[250px] w-full mt-0">
                 <ResponsiveContainer width="100%" height="100%">
                   <AreaChart data={data.chartData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
                     <defs>
@@ -219,7 +219,7 @@ export function DashboardView() {
           <div className="grid gap-4 lg:grid-cols-3">
             {/* Recent runs */}
             <Card className="lg:col-span-2">
-              <CardHeader className="flex flex-row items-center justify-between pb-3">
+              <CardHeader className="flex flex-row items-center justify-between">
                 <CardTitle className="text-base">Recent source runs</CardTitle>
                 <Button variant="ghost" size="sm" onClick={() => setView("sources")}>
                   View all <ArrowRight className="ml-1 h-3 w-3" />
@@ -266,7 +266,7 @@ export function DashboardView() {
 
             {/* Review queue */}
             <Card>
-              <CardHeader className="flex flex-row items-center justify-between pb-3">
+              <CardHeader className="flex flex-row items-center justify-between">
                 <CardTitle className="text-base">Review queue</CardTitle>
                 <Button variant="ghost" size="sm" onClick={() => setView("datasets")}>
                   Open <ArrowRight className="ml-1 h-3 w-3" />
@@ -313,7 +313,7 @@ export function DashboardView() {
           <div className="grid gap-4 lg:grid-cols-3">
             {/* Queue health */}
             <Card className="lg:col-span-2">
-              <CardHeader className="pb-3">
+              <CardHeader >
                 <CardTitle className="text-base flex items-center gap-2">
                   <Activity className="h-4 w-4" /> Queue Health
                 </CardTitle>
@@ -392,7 +392,7 @@ export function DashboardView() {
 
             {/* Connection alerts */}
             <Card>
-              <CardHeader className="pb-3">
+              <CardHeader >
                 <CardTitle className="text-base flex items-center gap-2">
                   <AlertTriangle className="h-4 w-4" /> Sync alerts
                 </CardTitle>
@@ -442,7 +442,7 @@ export function DashboardView() {
           <div className="grid gap-4 lg:grid-cols-3">
             {/* Recently viewed (from local store) */}
             <Card>
-              <CardHeader className="flex flex-row items-center justify-between pb-3">
+              <CardHeader className="flex flex-row items-center justify-between">
                 <CardTitle className="text-base flex items-center gap-2">
                   <Clock className="h-4 w-4" /> Recently viewed
                 </CardTitle>
@@ -499,7 +499,7 @@ export function DashboardView() {
 
             {/* Usage */}
             <Card className="lg:col-span-1">
-              <CardHeader className="pb-3">
+              <CardHeader >
                 <CardTitle className="text-base flex items-center gap-2">
                   <TrendingUp className="h-4 w-4" /> Usage this month
                 </CardTitle>
@@ -522,7 +522,7 @@ export function DashboardView() {
 
             {/* Recent datasets */}
             <Card className="lg:col-span-1">
-              <CardHeader className="flex flex-row items-center justify-between pb-3">
+              <CardHeader className="flex flex-row items-center justify-between">
                 <CardTitle className="text-base flex items-center gap-2">
                   <Database className="h-4 w-4" /> Recent datasets
                 </CardTitle>
@@ -557,7 +557,7 @@ export function DashboardView() {
 
           {/* Activity feed */}
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-3">
+            <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle className="text-base flex items-center gap-2">
                 <Activity className="h-4 w-4" /> Activity feed
               </CardTitle>

@@ -1566,7 +1566,7 @@ function WebhooksSection() {
 
   return (
     <Card>
-      <CardHeader className="flex flex-row items-center justify-between pb-3">
+      <CardHeader className="flex flex-row items-center justify-between">
         <div>
           <CardTitle className="text-base flex items-center gap-2">
             <Webhook className="h-4 w-4" /> Webhooks

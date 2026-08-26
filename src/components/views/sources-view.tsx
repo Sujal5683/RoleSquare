@@ -46,7 +46,6 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
-  DialogBody,
 } from "@/components/ui/dialog";
 import {
   AlertDialog,
@@ -498,7 +497,7 @@ export function SourcesView() {
 
       {/* Sources table */}
       <Card>
-        <CardHeader className="pb-3">
+        <CardHeader >
           <CardTitle className="text-base flex items-center gap-2">
             <Activity className="h-4 w-4" />
             Sources
@@ -935,7 +934,7 @@ export function SourcesView() {
               in the AI pipeline.
             </DialogDescription>
           </DialogHeader>
-          <DialogBody className="p-0">
+          <div className="p-0 flex-1 overflow-y-auto">
             {runsLoading ? (
               <LoadingState rows={3} />
             ) : !runs || runs.length === 0 ? (
@@ -995,7 +994,7 @@ export function SourcesView() {
                 ))}
               </div>
             )}
-          </DialogBody>
+          </div>
         </DialogContent>
       </Dialog>
 

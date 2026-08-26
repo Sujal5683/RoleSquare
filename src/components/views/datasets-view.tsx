@@ -414,92 +414,96 @@ export function DatasetsView() {
               key={d.id}
               className={`flex p-4 transition-shadow hover:shadow-md ${viewMode === "list" ? "flex-row gap-4" : "flex-col gap-3"}`}
             >
-              <div className="flex flex-1 min-w-0 gap-3">
-                <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                  <Database className="h-4 w-4" />
-                </div>
-                <div className="flex-1 min-w-0 space-y-2">
-                  <div className="flex items-start justify-between">
-                    <div className="min-w-0 w-full">
-                      <button
-                        onClick={() => openDataset(d.id, d.name)}
-                        className="block w-full text-left text-base font-semibold leading-tight truncate hover:underline"
-                        title={d.name}
-                      >
-                        {d.name}
-                      </button>
-                      <div className="flex items-center gap-1.5 flex-wrap mt-1">
-                        {d.schema ? (
-                          <Badge variant="secondary" className="font-normal truncate max-w-full block text-left" title={d.schema.name}>
-                            {d.schema.name}
-                            {d.schema.fields?.length
-                              ? ` · ${d.schema.fields.length} fields`
-                              : ""}
-                          </Badge>
-                        ) : (
-                          <Badge variant="outline" className="font-normal text-muted-foreground shrink-0 block text-left">
-                            No schema
-                          </Badge>
-                        )}
-                        {d.isShared && d.ownerOrgName && (
-                          <div className="text-xs text-muted-foreground flex items-center gap-1 truncate w-full mt-1">
-                            <ChevronRight className="h-3 w-3 shrink-0" />
-                            <span className="truncate">From: {d.ownerOrgName}</span>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                    {/* In non-list modes, render actions on the right in the header */}
-                    {viewMode !== "list" && (
-                      <div className="flex items-center gap-1 shrink-0 ml-2">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8"
-                          aria-label="Share dataset"
-                          onClick={() => handleShare(d)}
-                        >
-                          <Share2 className="h-4 w-4" />
-                        </Button>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon" className="h-8 w-8" aria-label="Dataset actions">
-                              <MoreHorizontal className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end" className="w-48">
-                            <DropdownMenuItem onClick={() => setAssignSchemaTarget(d)}>
-                              <FileCode2 className="mr-2 h-4 w-4" />
-                              {d.schema ? "Change Schema" : "Assign Schema"}
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => setSheetsPanelDataset(d)}>
-                              <FileSpreadsheet className="mr-2 h-4 w-4 text-emerald-500" />
-                              Google Sheets
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem onClick={() => exportMutation.mutate({ id: d.id, format: "csv" })} disabled={exportMutation.isPending}>
-                              <FileDown className="mr-2 h-4 w-4" />
-                              Export CSV
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => exportMutation.mutate({ id: d.id, format: "json" })} disabled={exportMutation.isPending}>
-                              <FileJson className="mr-2 h-4 w-4" />
-                              Export JSON
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem onClick={() => handleShare(d)}>
-                              <Share2 className="mr-2 h-4 w-4" />
-                              Share
-                            </DropdownMenuItem>
-                            <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => setDeleteTarget(d)}>
-                              <Trash2 className="mr-2 h-4 w-4" />
-                              Delete
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </div>
-                    )}
+              <div className="flex flex-col flex-1 min-w-0 gap-3">
+                <div className="flex min-w-0 gap-3">
+                  <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                    <Database className="h-4 w-4" />
                   </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-start justify-between">
+                      <div className="min-w-0 w-full">
+                        <button
+                          onClick={() => openDataset(d.id, d.name)}
+                          className="block w-full text-left text-base font-semibold leading-tight truncate hover:underline"
+                          title={d.name}
+                        >
+                          {d.name}
+                        </button>
+                        <div className="flex items-center gap-1.5 flex-wrap mt-1">
+                          {d.schema ? (
+                            <Badge variant="secondary" className="font-normal truncate max-w-full block text-left" title={d.schema.name}>
+                              {d.schema.name}
+                              {d.schema.fields?.length
+                                ? ` · ${d.schema.fields.length} fields`
+                                : ""}
+                            </Badge>
+                          ) : (
+                            <Badge variant="outline" className="font-normal text-muted-foreground shrink-0 block text-left">
+                              No schema
+                            </Badge>
+                          )}
+                          {d.isShared && d.ownerOrgName && (
+                            <div className="text-xs text-muted-foreground flex items-center gap-1 truncate w-full mt-1">
+                              <ChevronRight className="h-3 w-3 shrink-0" />
+                              <span className="truncate">From: {d.ownerOrgName}</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                      {/* In non-list modes, render actions on the right in the header */}
+                      {viewMode !== "list" && (
+                        <div className="flex items-center gap-1 shrink-0 ml-2">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8"
+                            aria-label="Share dataset"
+                            onClick={() => handleShare(d)}
+                          >
+                            <Share2 className="h-4 w-4" />
+                          </Button>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon" className="h-8 w-8" aria-label="Dataset actions">
+                                <MoreHorizontal className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="w-48">
+                              <DropdownMenuItem onClick={() => setAssignSchemaTarget(d)}>
+                                <FileCode2 className="mr-2 h-4 w-4" />
+                                {d.schema ? "Change Schema" : "Assign Schema"}
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => setSheetsPanelDataset(d)}>
+                                <FileSpreadsheet className="mr-2 h-4 w-4 text-emerald-500" />
+                                Google Sheets
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem onClick={() => exportMutation.mutate({ id: d.id, format: "csv" })} disabled={exportMutation.isPending}>
+                                <FileDown className="mr-2 h-4 w-4" />
+                                Export CSV
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => exportMutation.mutate({ id: d.id, format: "json" })} disabled={exportMutation.isPending}>
+                                <FileJson className="mr-2 h-4 w-4" />
+                                Export JSON
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem onClick={() => handleShare(d)}>
+                                <Share2 className="mr-2 h-4 w-4" />
+                                Share
+                              </DropdownMenuItem>
+                              <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => setDeleteTarget(d)}>
+                                <Trash2 className="mr-2 h-4 w-4" />
+                                Delete
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
 
+                <div className="flex flex-col flex-1 min-w-0 space-y-2">
                   {/* Description */}
                   <p className={`text-sm text-muted-foreground ${viewMode === "list" ? "line-clamp-1" : "line-clamp-2 min-h-[2.5rem]"}`}>
                     {d.description || "No description provided."}

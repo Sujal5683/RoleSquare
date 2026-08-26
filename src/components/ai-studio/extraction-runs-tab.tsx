@@ -109,8 +109,8 @@ export function ExtractionRunsTab() {
   return (
     <div className="flex gap-4 overflow-hidden h-[calc(100vh-280px)] min-h-[500px]">
       {/* Left — job list */}
-      <div className="w-72 flex-shrink-0 flex flex-col gap-2 overflow-y-auto">
-        <div className="flex items-center justify-between sticky top-0 bg-background pb-2 pt-1">
+      <div className="w-72 flex-shrink-0 flex flex-col h-full">
+        <div className="flex items-center justify-between pb-2 pt-1 border-b mb-2 shrink-0">
           <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
             Extraction Jobs
           </p>
@@ -119,15 +119,16 @@ export function ExtractionRunsTab() {
           </Button>
         </div>
 
-        {jobsLoading ? (
-          <LoadingState rows={4} />
-        ) : !jobsResp?.data?.length ? (
-          <EmptyState
-            icon={<Zap className="h-4 w-4" />}
-            title="No extraction jobs yet"
-            description="Run an extraction from AI Studio to see results here."
-          />
-        ) : (
+        <div className="flex-1 overflow-y-auto flex flex-col gap-2 pr-2 -mr-2 pb-2">
+          {jobsLoading ? (
+            <LoadingState rows={4} />
+          ) : !jobsResp?.data?.length ? (
+            <EmptyState
+              icon={<Zap className="h-4 w-4" />}
+              title="No extraction jobs yet"
+              description="Run an extraction from AI Studio to see results here."
+            />
+          ) : (
           jobsResp.data.map((job) => {
             const payload = job.payload as Record<string, unknown>;
             const isSelected = job.id === selectedJobId;
@@ -173,6 +174,7 @@ export function ExtractionRunsTab() {
             );
           })
         )}
+        </div>
       </div>
 
       <Separator orientation="vertical" className="h-auto" />
@@ -191,7 +193,7 @@ export function ExtractionRunsTab() {
           <>
             {/* Job summary */}
             <Card>
-              <CardHeader className="pb-2">
+              <CardHeader >
                 <CardTitle className="text-sm flex items-center justify-between">
                   <span className="font-mono text-xs text-muted-foreground">
                     Job: {selectedJob.id}
@@ -323,7 +325,7 @@ export function ExtractionRunsTab() {
 
             {/* AI Outputs */}
             <Card>
-              <CardHeader className="pb-2">
+              <CardHeader >
                 <CardTitle className="text-sm flex items-center gap-2">
                   <Cpu className="h-4 w-4 text-primary" />
                   AI Outputs
