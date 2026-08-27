@@ -180,10 +180,32 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   // Show a minimal loading skeleton while session is being fetched
   if (sessionLoading) {
     return (
-      <div className="flex min-h-screen items-center justify-center">
-        <div className="flex flex-col items-center gap-3">
-          <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-          <p className="text-sm text-muted-foreground">Loading workspace…</p>
+      <div className="relative flex min-h-screen items-center justify-center bg-background overflow-hidden">
+        {/* Subtle grid background */}
+        <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:24px_24px]"></div>
+        
+        <div className="relative z-10 flex flex-col items-center gap-8">
+          {/* Logo */}
+          <div className="flex h-24 w-24 items-center justify-center">
+            <img src="/Logo.svg" alt="RoleSquare Logo" className="h-full w-full object-contain drop-shadow-md" />
+          </div>
+          
+          {/* 3 shimmering dots */}
+          <div className="flex gap-2.5">
+            <div className="h-3 w-3 rounded-full bg-primary/60 animate-pulse" style={{ animationDelay: "0ms", animationDuration: "1s" }} />
+            <div className="h-3 w-3 rounded-full bg-primary/80 animate-pulse" style={{ animationDelay: "200ms", animationDuration: "1s" }} />
+            <div className="h-3 w-3 rounded-full bg-primary animate-pulse" style={{ animationDelay: "400ms", animationDuration: "1s" }} />
+          </div>
+          
+          {/* Loading text with animated dots */}
+          <div className="text-sm font-semibold text-muted-foreground uppercase tracking-widest flex items-center">
+            Loading Workspace
+            <span className="flex w-6 justify-start ml-1">
+              <span className="animate-pulse text-lg leading-none" style={{ animationDelay: "0ms", animationDuration: "1s" }}>.</span>
+              <span className="animate-pulse text-lg leading-none" style={{ animationDelay: "200ms", animationDuration: "1s" }}>.</span>
+              <span className="animate-pulse text-lg leading-none" style={{ animationDelay: "400ms", animationDuration: "1s" }}>.</span>
+            </span>
+          </div>
         </div>
       </div>
     );
@@ -197,12 +219,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       {/* Logo */}
       <div className="flex h-14 items-center justify-between border-b px-4">
         <div className="flex items-center gap-2 overflow-hidden">
-          <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-primary text-primary-foreground">
-            <Zap className="h-4 w-4" />
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md">
+            <img src="/Logo.svg" alt="RoleSquare Logo" className="h-full w-full object-contain" />
           </div>
           <div className="flex flex-col leading-none truncate">
-            <span className="text-sm font-semibold truncate">Workspace</span>
-            <span className="text-[10px] text-muted-foreground truncate">Intelligence Platform</span>
+            <span className="text-lg font-black tracking-tight truncate">RoleSquare</span>
+            <span className="text-[10px] font-medium text-muted-foreground truncate uppercase tracking-widest mt-0.5">Intelligent Workspace</span>
           </div>
         </div>
         <Button 

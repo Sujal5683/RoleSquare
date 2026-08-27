@@ -2,7 +2,7 @@ import { PublicHeader } from "@/components/public/public-header";
 import { PublicFooter } from "@/components/public/public-footer";
 
 export const metadata = {
-  title: "Privacy Policy | Workspace Intelligence Platform",
+  title: "Privacy Policy | RoleSquare",
 };
 
 export default function PrivacyPage() {
@@ -19,7 +19,7 @@ export default function PrivacyPage() {
             <section>
               <h2 className="text-2xl font-semibold text-foreground mb-4">1. Introduction</h2>
               <p>
-                Workspace Intelligence Platform ("we," "our," or "us") is committed to protecting your privacy. This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you use our SaaS application to extract and manage data from your Google Workspace environment.
+                RoleSquare ("we," "our," or "us") is committed to protecting your privacy. This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you use our SaaS application to extract and manage data from your Google Workspace environment.
               </p>
             </section>
 
@@ -35,7 +35,7 @@ export default function PrivacyPage() {
             <section>
               <h2 className="text-2xl font-semibold text-foreground mb-4">3. How We Use Your Data</h2>
               <p>
-                Your data is strictly used to provide the Workspace Intelligence Platform service. Specifically:
+                Your data is strictly used to provide the RoleSquare service. Specifically:
               </p>
               <ul className="list-disc pl-6 space-y-2 mt-4">
                 <li>To ingest and parse your selected emails and documents.</li>

@@ -1,4 +1,4 @@
-// Workspace Intelligence Platform — shared LLM extraction helper.
+// RoleSquare — shared LLM extraction helper.
 //
 // Used by `/api/extraction` and `/api/schemas/[id]/test-extraction`.
 // Calls the Gemini API via the fallback chain in `gemini.ts`. On success,

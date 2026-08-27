@@ -1,4 +1,4 @@
-// Workspace Intelligence Platform — Agent Logger
+// RoleSquare — Agent Logger
 //
 // Writes structured AgentLog rows to the database.
 // Each log entry is tagged with an agentKey so users can filter logs

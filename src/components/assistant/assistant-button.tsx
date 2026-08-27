@@ -22,7 +22,7 @@ export function AssistantButton() {
             onClick={handleClick}
             aria-label="Toggle AI Assistant"
             className={cn(
-              "fixed bottom-6 right-6 z-50 flex h-14 w-14 items-center justify-center rounded-full shadow-lg transition-all duration-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+              "fixed bottom-6 right-6 z-50 flex h-14 w-14 items-center justify-center rounded-lg shadow-lg transition-all duration-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
               "bg-primary text-primary-foreground hover:bg-primary/90 hover:shadow-xl",
               assistantOpen
                 ? "scale-95 opacity-90 ring-2 ring-primary ring-offset-2"
@@ -31,12 +31,14 @@ export function AssistantButton() {
           >
             {/* Pulse ring when closed */}
             {!assistantOpen && (
-              <span className="absolute inset-0 rounded-full animate-ping bg-primary/20 pointer-events-none" />
+              <span className="absolute inset-0 rounded-lg animate-ping bg-primary/20 pointer-events-none" />
             )}
 
-            <Sparkles
+            <img
+              src="/RoleSquare_Ai.svg"
+              alt="RoleSquare AI"
               className={cn(
-                "h-6 w-6 text-primary-foreground transition-transform duration-200",
+                "h-8 w-8 transition-transform duration-200 invert dark:invert-0",
                 assistantOpen && "rotate-12"
               )}
             />

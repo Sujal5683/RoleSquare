@@ -1,4 +1,4 @@
-// Workspace Intelligence Platform — Gemini Fallback Client
+// RoleSquare — Gemini Fallback Client
 //
 // Provides callGeminiWithFallback() — a drop-in replacement for the
 // z-ai-web-dev-sdk wrapper. Calls the Google Generative AI API directly,

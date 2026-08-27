@@ -1,4 +1,4 @@
-// Workspace Intelligence Platform — Google OAuth & Token Utilities
+// RoleSquare — Google OAuth & Token Utilities
 //
 // Provides:
 //   buildGoogleOAuthUrl(state)        → consent URL string

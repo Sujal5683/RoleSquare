@@ -1,4 +1,4 @@
-// Workspace Intelligence Platform — Dataset Provisioner
+// RoleSquare — Dataset Provisioner
 //
 // Ensures a Source always has a "Default Dataset" linked.
 // The Default Dataset uses the Default Email Schema and is populated

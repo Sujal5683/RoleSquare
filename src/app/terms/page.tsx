@@ -2,7 +2,7 @@ import { PublicHeader } from "@/components/public/public-header";
 import { PublicFooter } from "@/components/public/public-footer";
 
 export const metadata = {
-  title: "Terms & Conditions | Workspace Intelligence Platform",
+  title: "Terms & Conditions | RoleSquare",
 };
 
 export default function TermsPage() {
@@ -19,7 +19,7 @@ export default function TermsPage() {
             <section>
               <h2 className="text-2xl font-semibold text-foreground mb-4">1. Acceptance of Terms</h2>
               <p>
-                By accessing or using the Workspace Intelligence Platform ("Service"), you agree to be bound by these Terms and Conditions ("Terms"). If you disagree with any part of the terms, you may not access the Service.
+                By accessing or using the RoleSquare ("Service"), you agree to be bound by these Terms and Conditions ("Terms"). If you disagree with any part of the terms, you may not access the Service.
               </p>
             </section>
 
@@ -60,7 +60,7 @@ export default function TermsPage() {
             <section>
               <h2 className="text-2xl font-semibold text-foreground mb-4">6. Limitation of Liability</h2>
               <p>
-                In no event shall the Workspace Intelligence Platform, nor its directors, employees, partners, agents, suppliers, or affiliates, be liable for any indirect, incidental, special, consequential or punitive damages, including without limitation, loss of profits, data, use, goodwill, or other intangible losses, resulting from your access to or use of or inability to access or use the Service.
+                In no event shall the RoleSquare, nor its directors, employees, partners, agents, suppliers, or affiliates, be liable for any indirect, incidental, special, consequential or punitive damages, including without limitation, loss of profits, data, use, goodwill, or other intangible losses, resulting from your access to or use of or inability to access or use the Service.
               </p>
             </section>
 

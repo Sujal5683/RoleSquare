@@ -3,7 +3,7 @@ import { processDriveScan } from "@/lib/pipelines/drive";
 import { processDocsScan } from "@/lib/pipelines/docs";
 import { processSheetsScan } from "@/lib/pipelines/sheets";
 import { processFormsScan } from "@/lib/pipelines/forms";
-// Workspace Intelligence Platform — in-process job runner.
+// RoleSquare — in-process job runner.
 //
 // This module provides a lightweight, in-process job processor that
 // handles GMAIL_SCAN, EXPORT, and AI_EXTRACTION jobs. It is NOT a

@@ -356,7 +356,7 @@ const FAQS = [
   },
   {
     q: "Do I need technical skills to use the platform?",
-    a: "No! The Workspace Intelligence Platform is designed with a visual rule builder that lets you easily define extraction schemas. If you can define the columns you want in a spreadsheet, our AI will figure out how to extract that data from your emails and documents."
+    a: "No! The RoleSquare is designed with a visual rule builder that lets you easily define extraction schemas. If you can define the columns you want in a spreadsheet, our AI will figure out how to extract that data from your emails and documents."
   },
   {
     q: "What data sources are currently supported?",

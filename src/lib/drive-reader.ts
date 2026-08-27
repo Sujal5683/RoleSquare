@@ -1,4 +1,4 @@
-// Workspace Intelligence Platform — Google Drive Content Reader
+// RoleSquare — Google Drive Content Reader
 //
 // Provides utilities to explore Google Drive links found in dataset records:
 //   - List all files in a Drive folder (recursively)

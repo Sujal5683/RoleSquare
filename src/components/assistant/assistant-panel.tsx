@@ -148,7 +148,7 @@ export function AssistantPanel() {
           {isLoading && messages[messages.length - 1]?.content === "" && (
             <div className="flex gap-2.5">
               <div className="mt-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary">
-                <Bot className="h-3.5 w-3.5 text-primary-foreground" />
+                <img src="/RoleSquare_Ai.svg" alt="AI" className="h-4 w-4 object-contain invert dark:invert-0" />
               </div>
               <div className="rounded-2xl rounded-tl-sm bg-muted/60 px-4 py-3 border border-border">
                 <div className="flex items-center gap-1.5">

@@ -16,11 +16,11 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Workspace Intelligence Platform — AI-Native Google Workspace SaaS",
+  title: "RoleSquare — AI-Native Google Workspace SaaS",
   description:
     "Turn Gmail, Drive, Docs, Sheets & Forms content into structured, governed, evidence-backed datasets through an asynchronous AI extraction pipeline.",
   keywords: [
-    "Workspace Intelligence",
+    "RoleSquare",
     "AI extraction",
     "Gmail automation",
     "Drive ingestion",
@@ -28,15 +28,15 @@ export const metadata: Metadata = {
     "evidence-backed AI",
     "multi-tenant SaaS",
   ],
-  authors: [{ name: "Workspace Intelligence Platform" }],
+  authors: [{ name: "RoleSquare" }],
   icons: {
-    icon: "https://z-cdn.chatglm.cn/z-ai/static/logo.svg",
+    icon: "/Logo.svg",
   },
   openGraph: {
-    title: "Workspace Intelligence Platform",
+    title: "RoleSquare",
     description:
       "Convert Google Workspace content into structured, queryable, evidence-backed datasets.",
-    siteName: "Workspace Intelligence Platform",
+    siteName: "RoleSquare",
     type: "website",
   },
 };

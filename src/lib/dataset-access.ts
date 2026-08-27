@@ -1,4 +1,4 @@
-// Workspace Intelligence Platform — Dataset Access Resolution
+// RoleSquare — Dataset Access Resolution
 //
 // Single source of truth for answering "can this user/org see this dataset?".
 // Used by all dataset-reading API routes to enforce access control.

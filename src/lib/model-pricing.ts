@@ -1,4 +1,4 @@
-// Workspace Intelligence Platform — Model Pricing
+// RoleSquare — Model Pricing
 //
 // Static pricing table for all supported Gemini model families.
 // Used by job-runner.ts (at AiOutput write time) and by the AI Studio cost tab.

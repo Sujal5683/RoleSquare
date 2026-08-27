@@ -82,7 +82,7 @@ export function MessageBubble({
             : "bg-primary text-primary-foreground"
         )}
       >
-        {isUser ? <User className="h-3.5 w-3.5" /> : <Bot className="h-3.5 w-3.5" />}
+        {isUser ? <User className="h-3.5 w-3.5" /> : <img src="/RoleSquare_Ai.svg" alt="AI" className="h-3.5 w-3.5 object-contain invert dark:invert-0" />}
       </div>
 
       {/* Bubble */}

@@ -14,7 +14,7 @@ export async function POST() {
     // Create an otpauth:// URI
     const otpauth = generateURI({
       label: user.email,
-      issuer: "Workspace Intelligence Platform",
+      issuer: "RoleSquare",
       secret,
     });
     

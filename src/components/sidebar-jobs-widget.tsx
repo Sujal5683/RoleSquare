@@ -66,7 +66,7 @@ export function SidebarJobsWidget() {
   const getJobName = (job: AiJobDTO) => {
     try {
       const payload = job.payload as any;
-      if (job.type === "GMAIL_SCAN" || job.type === "NOTION_SCAN" || job.type === "GDRIVE_SCAN") {
+      if (job.type === "GMAIL_SCAN" || job.type === "DRIVE_SCAN" || job.type === "SHEETS_SCAN" || job.type === "DOCS_SCAN" || job.type === "FORMS_SCAN") {
         const source = sources?.find((s) => s.id === payload?.sourceId);
         return source?.name || "Source Scan";
       }

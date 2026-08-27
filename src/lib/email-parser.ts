@@ -1,4 +1,4 @@
-// Workspace Intelligence Platform — Deterministic Email Parser
+// RoleSquare — Deterministic Email Parser
 //
 // Extracts structured fields from a Gmail message object with zero AI tokens.
 // Returns a flat map of field name → value matching the Default Email Schema.

@@ -2,7 +2,7 @@ import { PublicHeader } from "@/components/public/public-header";
 import { PublicFooter } from "@/components/public/public-footer";
 
 export const metadata = {
-  title: "Contact Us | Workspace Intelligence Platform",
+  title: "Contact Us | RoleSquare",
 };
 
 export default function ContactPage() {

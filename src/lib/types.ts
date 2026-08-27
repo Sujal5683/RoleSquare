@@ -1,4 +1,4 @@
-// Workspace Intelligence Platform — shared domain types
+// RoleSquare — shared domain types
 // Mirrors the plan's REST contract but adapted to a single-page App Router app.
 
 export type ViewId =

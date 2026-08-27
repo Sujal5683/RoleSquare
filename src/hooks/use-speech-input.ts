@@ -1,4 +1,4 @@
-// Workspace Intelligence Platform — Web Speech API hook
+// RoleSquare — Web Speech API hook
 //
 // Wraps the browser's SpeechRecognition API with a clean React interface.
 // Returns interim transcripts for real-time display and fires a callback

@@ -1,4 +1,4 @@
-// Workspace Intelligence Platform — serialization helpers.
+// RoleSquare — serialization helpers.
 //
 // Converts Prisma records into DTOs that match the shared types in
 // `src/lib/types.ts`. Responsibilities:

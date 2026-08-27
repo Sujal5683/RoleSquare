@@ -1,4 +1,4 @@
-// Workspace Intelligence Platform — webhook event dispatcher.
+// RoleSquare — webhook event dispatcher.
 //
 // Sends HTTP POST notifications to all webhooks in the org that are
 // subscribed to the given event. Failures are recorded on the webhook

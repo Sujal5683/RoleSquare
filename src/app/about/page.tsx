@@ -2,7 +2,7 @@ import { PublicHeader } from "@/components/public/public-header";
 import { PublicFooter } from "@/components/public/public-footer";
 
 export const metadata = {
-  title: "About Us | Workspace Intelligence Platform",
+  title: "About Us | RoleSquare",
 };
 
 export default function AboutPage() {
@@ -11,11 +11,11 @@ export default function AboutPage() {
       <PublicHeader />
       <main className="flex-1 py-16 md:py-24">
         <div className="mx-auto max-w-3xl px-4 md:px-6">
-          <h1 className="text-4xl font-bold tracking-tight mb-8">About Workspace Intelligence Platform</h1>
+          <h1 className="text-4xl font-bold tracking-tight mb-8">About RoleSquare</h1>
           
           <div className="space-y-6 text-lg text-muted-foreground leading-relaxed">
             <p>
-              We founded the Workspace Intelligence Platform to solve a problem that plagues almost every modern business: the massive accumulation of unstructured data hidden inside emails, PDFs, and internal documents.
+              We founded the RoleSquare to solve a problem that plagues almost every modern business: the massive accumulation of unstructured data hidden inside emails, PDFs, and internal documents.
             </p>
             
             <p>

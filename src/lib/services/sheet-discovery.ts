@@ -342,7 +342,7 @@ export async function protectHeaderRow(
                     startRowIndex: 0,
                     endRowIndex: 1,
                   },
-                  description: "Header row — managed by Workspace Intelligence Platform",
+                  description: "Header row — managed by RoleSquare",
                   warningOnly: true, // show warning but don't block
                 },
               },

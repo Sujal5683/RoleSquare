@@ -2216,7 +2216,7 @@ function ApiKeysSection() {
           API Keys
         </CardTitle>
         <CardDescription>
-          Manage API keys used to programmatically interact with Workspace Intelligence Platform.
+          Manage API keys used to programmatically interact with RoleSquare.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">

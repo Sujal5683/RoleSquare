@@ -1,4 +1,4 @@
-// Workspace Intelligence Platform — audit log helper.
+// RoleSquare — audit log helper.
 //
 // Inserts a row into the AuditLog table, capturing before/after state as
 // JSON strings. Safe to call inside a Prisma `$transaction` callback.

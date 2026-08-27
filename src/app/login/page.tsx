@@ -205,8 +205,8 @@ function LoginPageContent() {
         {/* Logo */}
         <div className="text-center">
           <Link href="/" className="inline-block">
-            <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-lg hover:scale-105 transition-transform">
-              <Zap className="h-6 w-6" />
+            <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-transparent shadow-lg hover:scale-105 transition-transform">
+              <img src="/Logo.svg" alt="RoleSquare Logo" className="h-full w-full object-contain" />
             </div>
           </Link>
           <h1 className="text-2xl font-bold tracking-tight text-foreground">
@@ -437,7 +437,7 @@ function LoginPageContent() {
         </div>
 
         <p className="text-center text-xs text-muted-foreground">
-          Workspace Intelligence Platform · Secured by Supabase Auth
+          RoleSquare · Secured by Supabase Auth
         </p>
       </div>
     </div>

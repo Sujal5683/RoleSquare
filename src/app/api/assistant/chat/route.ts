@@ -42,7 +42,7 @@ interface AppContext {
 // ── System prompt ────────────────────────────────────────────────────────────
 
 function buildSystemPrompt(ctx: AppContext, orgId: string): string {
-  return `You are the Workspace Intelligence Platform AI Assistant — a powerful, context-aware agent embedded in the app. You can answer questions, navigate the UI, and execute actions on behalf of the user.
+  return `You are the RoleSquare AI Assistant — a powerful, context-aware agent embedded in the app. You can answer questions, navigate the UI, and execute actions on behalf of the user.
 
 ## Current App Context
 - Active view: ${ctx.view ?? "unknown"}

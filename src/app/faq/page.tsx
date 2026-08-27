@@ -3,7 +3,7 @@ import { PublicFooter } from "@/components/public/public-footer";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 
 export const metadata = {
-  title: "FAQ | Workspace Intelligence Platform",
+  title: "FAQ | RoleSquare",
 };
 
 export default function FAQPage() {
@@ -47,7 +47,7 @@ const FAQ_CATEGORIES = [
     title: "General & Product",
     items: [
       {
-        q: "What is the Workspace Intelligence Platform?",
+        q: "What is the RoleSquare?",
         a: "It is a SaaS tool that connects directly to your Google Workspace (Gmail, Drive) and uses schema-driven AI to extract unstructured data (like invoices, contracts, or support tickets) into structured, queryable datasets."
       },
       {

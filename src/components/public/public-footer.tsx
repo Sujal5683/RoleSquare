@@ -8,12 +8,12 @@ export function PublicFooter() {
         <div className="grid gap-10 md:grid-cols-4 lg:grid-cols-5">
           <div className="lg:col-span-2">
             <Link href="/" className="flex items-center gap-2 mb-4">
-              <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary text-primary-foreground shadow-sm">
-                <Zap className="h-5 w-5" />
+              <div className="flex h-10 w-10 items-center justify-center rounded-md bg-transparent shadow-sm">
+                <img src="/Logo.svg" alt="RoleSquare Logo" className="h-full w-full object-contain" />
               </div>
               <div className="flex flex-col leading-none">
-                <span className="text-base font-semibold">Workspace</span>
-                <span className="text-[10px] text-muted-foreground uppercase tracking-wider">Intelligence Platform</span>
+                <span className="text-xl font-black tracking-tight">RoleSquare</span>
+                <span className="text-xs font-medium text-muted-foreground uppercase tracking-widest mt-0.5">Intelligent Workspace</span>
               </div>
             </Link>
             <p className="text-sm text-muted-foreground max-w-xs leading-relaxed">
@@ -48,7 +48,7 @@ export function PublicFooter() {
         </div>
         <div className="mt-16 pt-8 border-t flex flex-col md:flex-row justify-between items-center gap-4">
           <p className="text-xs text-muted-foreground">
-            &copy; {new Date().getFullYear()} Workspace Intelligence Platform. All rights reserved.
+            &copy; {new Date().getFullYear()} RoleSquare. All rights reserved.
           </p>
           <div className="flex gap-4 text-xs text-muted-foreground">
             <span>Powered by Gemini</span>

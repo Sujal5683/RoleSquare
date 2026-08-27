@@ -1,4 +1,4 @@
-// Workspace Intelligence Platform — server-side authorization helpers.
+// RoleSquare — server-side authorization helpers.
 //
 // This module provides the ONLY entry point for resolving the current
 // session user and their active organization context. All API routes

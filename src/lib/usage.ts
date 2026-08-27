@@ -1,4 +1,4 @@
-// Workspace Intelligence Platform — usage metric helpers.
+// RoleSquare — usage metric helpers.
 //
 // Tracks monthly usage per organization. The current month's window is
 // computed on demand so callers don't need to pass dates.

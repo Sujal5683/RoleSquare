@@ -1,4 +1,4 @@
-// Workspace Intelligence Platform — Google API Client Factory
+// RoleSquare — Google API Client Factory
 //
 // Provides authenticated Gmail and Drive client instances, auto-refreshing
 // expired access tokens using the stored encrypted refresh token.

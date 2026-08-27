@@ -1,4 +1,4 @@
-// Workspace Intelligence Platform — Dataset Column Management
+// RoleSquare — Dataset Column Management
 //
 // The DatasetColumnDef table is the AUTHORITATIVE source of column definitions
 // for a dataset. It is initialized from the schema's fields when a schema is
