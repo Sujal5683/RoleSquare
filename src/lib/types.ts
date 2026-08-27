@@ -113,6 +113,7 @@ export interface GoogleConnectionDTO {
   scopes: string[];
   status: ConnectionStatus;
   watchExpiresAt: string | null;
+  watchExpirePref: "never" | "weekly" | "monthly" | "yearly";
   lastSyncAt: string | null;
   organizationId: string | null;
 }

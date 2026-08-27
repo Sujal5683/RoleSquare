@@ -65,6 +65,7 @@ import { UsageView } from "./views/usage-view";
 import { OrganizationsView } from "./views/organizations-view";
 import { AssistantButton } from "./assistant/assistant-button";
 import { AssistantPanel } from "./assistant/assistant-panel";
+import { SidebarJobsWidget } from "./sidebar-jobs-widget";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 
 interface NavItem {
@@ -80,12 +81,12 @@ const NAV_ITEMS: NavItem[] = [
   { id: "datasets", label: "Datasets", icon: Database, group: "Workspace" },
   { id: "schema-builder", label: "Schema Builder", icon: FileJson, group: "Workspace" },
   { id: "ai-studio", label: "AI Studio", icon: Sparkles, group: "Workspace" },
-  { id: "usage", label: "Usage & Billing", icon: TrendingUp, group: "Workspace" },
   { id: "sharing", label: "Sharing Center", icon: Share2, group: "Governance" },
   { id: "organizations", label: "Organizations", icon: Building2, group: "Governance" },
   { id: "members", label: "Members", icon: Users, group: "Governance" },
   { id: "invitations", label: "Invitations", icon: MailOpen, group: "Governance" },
-  { id: "audit", label: "Audit Logs", icon: ShieldCheck, group: "Governance" },
+  { id: "usage", label: "Usage & Billing", icon: TrendingUp, group: "Account" },
+  { id: "audit", label: "Audit Logs", icon: ShieldCheck, group: "Account" },
   { id: "settings", label: "Settings", icon: Settings, group: "Account" },
 ];
 
@@ -139,7 +140,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           avatarUrl: data.user.avatarUrl,
         });
         setOrgs(data.organizations);
-        if (!activeOrgId && data.organizations.length > 0) {
+        const currentActiveOrgId = useAppStore.getState().selectedOrganizationId;
+        const isValid = data.organizations.some(o => o.id === currentActiveOrgId);
+        
+        if (!isValid && data.organizations.length > 0) {
           setActiveOrgId(data.organizations[0].id);
         }
       })
@@ -147,7 +151,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         // api-client will handle 401→/login redirect automatically
       })
       .finally(() => setSessionLoading(false));
-  }, [activeOrgId, setActiveOrgId]);
+  }, [setActiveOrgId]);
 
   async function handleSignOut() {
     await fetch("/api/auth/logout", { method: "POST" });
@@ -259,36 +263,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </div>
         ))}
 
-        {/* Quick Actions */}
-        <div>
-          <p className="px-3 pb-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-            Quick Actions
-          </p>
-          <div className="space-y-0.5">
-            <button
-              onClick={() => {
-                openSource(null);
-                setSidebarOpen(false);
-              }}
-              className="flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-sm font-medium text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors"
-            >
-              <Plus className="h-4 w-4 shrink-0" />
-              <span className="truncate">New Source</span>
-            </button>
-            <button
-              onClick={() => {
-                setView("ai-studio");
-                setSidebarOpen(false);
-              }}
-              className="flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-sm font-medium text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors"
-            >
-              <Sparkles className="h-4 w-4 shrink-0" />
-              <span className="truncate">Test Extraction</span>
-            </button>
-          </div>
-        </div>
+
       </nav>
 
+      <SidebarJobsWidget />
     </div>
   );
 

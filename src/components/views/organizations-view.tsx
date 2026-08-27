@@ -18,7 +18,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   Select,
   SelectContent,
@@ -407,8 +407,20 @@ export function OrganizationsView() {
         <div className={viewMode === "list" ? "flex flex-col gap-3" : "grid gap-4 sm:grid-cols-2 lg:grid-cols-3"}>
           {filtered.map((org) => {
             const members = membersByOrg?.[org.id] ?? [];
-            const firstThree = members.slice(0, 3);
-            const extra = Math.max(0, members.length - 3);
+            const rolePriority: Record<string, number> = {
+              owner: 1,
+              admin: 2,
+              manager: 3,
+              member: 4,
+              viewer: 5,
+            };
+            const sortedMembers = [...members].sort((a, b) => {
+              const pA = rolePriority[a.role] || 99;
+              const pB = rolePriority[b.role] || 99;
+              return pA - pB;
+            });
+            const firstFive = sortedMembers.slice(0, 5);
+            const extra = Math.max(0, sortedMembers.length - 5);
             return (
               <Card
                 key={org.id}
@@ -502,23 +514,32 @@ export function OrganizationsView() {
 
                     {/* Member avatars */}
                     <div className="flex items-center gap-2">
-                      {firstThree.length === 0 ? (
+                      {firstFive.length === 0 ? (
                         <span className="text-xs text-muted-foreground">
                           No members yet
                         </span>
                       ) : (
                         <>
                           <div className="flex -space-x-2">
-                            {firstThree.map((m) => (
-                              <Avatar
-                                key={m.id}
-                                className="relative h-7 w-7 border-2 border-background ring-1 ring-border/50 transition-transform hover:z-10 hover:scale-110"
-                                title={m.user.name ?? m.user.email}
-                              >
-                                <AvatarFallback className={`text-[10px] font-medium ${getAvatarColor(m.user.name ?? m.user.email)}`}>
-                                  {initials(m.user.name ?? m.user.email)}
-                                </AvatarFallback>
-                              </Avatar>
+                            {firstFive.map((m) => (
+                              <Tooltip key={m.id}>
+                                <TooltipTrigger asChild>
+                                  <Avatar
+                                    className="relative h-7 w-7 border-2 border-background ring-1 ring-border/50 transition-transform hover:z-10 hover:scale-110 cursor-pointer"
+                                  >
+                                    {m.user.avatarUrl && (
+                                      <AvatarImage src={m.user.avatarUrl} alt={m.user.name ?? m.user.email} />
+                                    )}
+                                    <AvatarFallback className={`text-[10px] font-medium ${getAvatarColor(m.user.name ?? m.user.email)}`}>
+                                      {initials(m.user.name ?? m.user.email)}
+                                    </AvatarFallback>
+                                  </Avatar>
+                                </TooltipTrigger>
+                                <TooltipContent side="top" className="flex flex-col py-1.5 px-2.5">
+                                  <span className="font-medium">{m.user.name ?? m.user.email}</span>
+                                  <span className="text-xs opacity-70 capitalize">{m.role}</span>
+                                </TooltipContent>
+                              </Tooltip>
                             ))}
                           </div>
                           {extra > 0 && (

@@ -150,7 +150,7 @@ export function UsageView() {
             value: `${Math.abs(ms.costTrend).toFixed(1)}%`,
             positive: ms.costTrend <= 0,
           }}
-          hint="at $0.001 / 1K tokens"
+          hint="at $1.00 / 1M tokens"
         />
         <StatCard
           label="Emails scanned"

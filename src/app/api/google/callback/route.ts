@@ -68,9 +68,17 @@ export async function GET(req: NextRequest) {
     });
 
     const now = new Date();
+    let watchExpiresAt: Date | null = offsetDate(365, now);
 
     let connection;
     if (existingConn) {
+      const pref = (existingConn as any).watchExpirePref;
+      let days = 365;
+      if (pref === "monthly") days = 30;
+      else if (pref === "weekly") days = 7;
+      else if (pref === "never") days = 3650;
+      watchExpiresAt = pref === "never" ? null : offsetDate(days, now);
+
       connection = await db.googleConnection.update({
         where: { id: existingConn.id },
         data: {
@@ -79,7 +87,7 @@ export async function GET(req: NextRequest) {
           tokenExpiresAt: expiresAt,
           status: "active",
           scopes: "gmail.readonly,drive.metadata.readonly,drive.readonly",
-          watchExpiresAt: offsetDate(7, now),
+          watchExpiresAt,
           lastSyncAt: now,
         },
       });
@@ -94,7 +102,8 @@ export async function GET(req: NextRequest) {
           tokenExpiresAt: expiresAt,
           status: "active",
           scopes: "gmail.readonly,drive.metadata.readonly,drive.readonly",
-          watchExpiresAt: offsetDate(7, now),
+          watchExpiresAt,
+          watchExpirePref: "yearly",
           lastSyncAt: now,
         },
       });

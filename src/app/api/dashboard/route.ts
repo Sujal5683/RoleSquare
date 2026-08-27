@@ -217,7 +217,7 @@ export async function GET(req: NextRequest) {
           } catch (e) {}
           return null;
         })
-        .filter(Boolean),
+        .filter(Boolean) as any,
       chartData,
     };
 

@@ -34,7 +34,7 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   Select,
   SelectContent,
@@ -328,7 +328,7 @@ export function MembersView() {
         queryKey: ["organizations", activeOrgId, "members"],
       });
       if (variables.role === "owner") {
-         useAppStore.getState().fetchSession();
+         queryClient.invalidateQueries({ queryKey: ["session"] });
       }
     },
     onError: (err: unknown) => {
@@ -604,6 +604,9 @@ export function MembersView() {
                       <TableCell>
                         <div className="flex items-center gap-3">
                           <Avatar className="h-9 w-9">
+                            {m.user.avatarUrl && (
+                              <AvatarImage src={m.user.avatarUrl} alt={m.user.name ?? m.user.email} />
+                            )}
                             <AvatarFallback className={`text-xs font-medium ${getAvatarColor(m.user.name ?? m.user.email)}`}>
                               {initials(m.user.name ?? m.user.email)}
                             </AvatarFallback>
@@ -748,6 +751,9 @@ export function MembersView() {
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex items-center gap-3 min-w-0">
                       <Avatar className="h-10 w-10 shrink-0">
+                        {m.user.avatarUrl && (
+                          <AvatarImage src={m.user.avatarUrl} alt={m.user.name ?? m.user.email} />
+                        )}
                         <AvatarFallback className={`text-sm font-medium ${getAvatarColor(m.user.name ?? m.user.email)}`}>
                           {initials(m.user.name ?? m.user.email)}
                         </AvatarFallback>
@@ -900,11 +906,11 @@ export function MembersView() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Transfer Ownership?</AlertDialogTitle>
-            <AlertDialogDescription>
-              <div className="space-y-4">
+            <AlertDialogDescription asChild>
+              <div className="space-y-4 text-foreground text-base">
                 <p>
                   You are about to transfer ownership of this organization to{" "}
-                  <span className="font-medium text-foreground">
+                  <span className="font-semibold text-foreground">
                     {transferTarget?.user.name ?? transferTarget?.user.email}
                   </span>
                   .
@@ -913,14 +919,13 @@ export function MembersView() {
                   Warning: You will be demoted to an Admin and lose owner privileges. This action cannot be reversed unless the new owner transfers it back to you.
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="transfer-confirm">
-                    Type <strong>transfer</strong> to confirm
+                  <Label htmlFor="transfer-confirm" className="text-base font-medium">
+                    Type <strong className="font-bold">TRANSFER</strong> to confirm
                   </Label>
                   <Input
                     id="transfer-confirm"
                     value={transferInput}
                     onChange={(e) => setTransferInput(e.target.value)}
-                    placeholder="transfer"
                     autoComplete="off"
                   />
                 </div>
@@ -933,10 +938,10 @@ export function MembersView() {
             </AlertDialogCancel>
             <AlertDialogAction
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              disabled={changeRoleMutation.isPending || transferInput.trim().toLowerCase() !== "transfer"}
+              disabled={changeRoleMutation.isPending || transferInput.trim() !== "TRANSFER"}
               onClick={(e) => {
                 e.preventDefault();
-                if (transferTarget && transferInput.trim().toLowerCase() === "transfer") {
+                if (transferTarget && transferInput.trim() === "TRANSFER") {
                   changeRoleMutation.mutate({ memberId: transferTarget.id, role: "owner" });
                   setTransferTarget(null);
                 }

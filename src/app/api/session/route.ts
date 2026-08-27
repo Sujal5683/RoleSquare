@@ -35,6 +35,9 @@ export async function PATCH(req: Request) {
     if (typeof body.name === "string") {
       dataToUpdate.name = body.name.trim();
     }
+    if (typeof body.avatarUrl === "string") {
+      dataToUpdate.avatarUrl = body.avatarUrl;
+    }
     if (body.notificationPrefs && typeof body.notificationPrefs === "object") {
       dataToUpdate.notificationPrefs = JSON.stringify(body.notificationPrefs);
     }

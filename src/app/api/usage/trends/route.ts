@@ -9,6 +9,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { requireOrgContext, AuthError, authErrorResponse } from "@/lib/auth";
+import { PLANS } from "@/lib/plans";
 
 export async function GET(req: NextRequest) {
   try {
@@ -166,50 +167,61 @@ export async function GET(req: NextRequest) {
     }));
 
     // ── Quota calculation ───────────────────────────────────────────────
-    // Assume team plan = 100,000 tokens/month, free = 1,000, enterprise = 1,000,000
-    const planLimits: Record<string, { tokens: number, jobs: number, records: number }> = {
-      free: { tokens: 10_000, jobs: 100, records: 50 },
-      team: { tokens: 1_000_000, jobs: 1_000, records: 500 },
-      enterprise: { tokens: 10_000_000, jobs: 10_000, records: 5_000 },
-    };
-    const org = await db.organization.findUnique({
-      where: { id: organizationId },
+    // Fetch the user's individual plan
+    const dbUser = await db.user.findUnique({
+      where: { id: user.id },
       select: { plan: true },
     });
     
-    const limits = planLimits[org?.plan || "free"] || planLimits.free;
+    const userPlan = dbUser?.plan || "free";
+    const limits = (PLANS[userPlan] || PLANS.free).limits;
 
-    // We can count total records extracted this month
+    // We can count total records extracted this month for the user
+    // Wait, datasets might be tied to organization, but let's count user's jobs or usage if possible.
+    // The user said "keep these as users individual plans/limits". We can count usage by the user.
+    // For now, if we count by org, we still apply user plan limits. Let's count records created by this user.
     const currentMonthRecords = await db.datasetRecord.count({
-      where: { dataset: { organizationId }, createdAt: { gte: startOfMonth } }
+      where: { dataset: { createdBy: user.id }, createdAt: { gte: startOfMonth } }
     });
     
-    const currentMonthJobs = aiJobs.filter(j => j.createdAt >= startOfMonth).length;
+    // Count jobs created by this user
+    const userJobs = await db.aiJob.findMany({
+        where: { userId: user.id, createdAt: { gte: startOfMonth } },
+        select: { id: true }
+    });
+    const currentMonthJobs = userJobs.length;
+
+    // Count tokens used by this user's jobs
+    const userOutputs = await db.aiOutput.findMany({
+        where: { job: { userId: user.id }, createdAt: { gte: startOfMonth } },
+        select: { tokensUsed: true }
+    });
+    const currentMonthUserTokens = userOutputs.reduce((sum, o) => sum + o.tokensUsed, 0);
 
     const quotas = [
       {
         id: "tokens",
         name: "AI Tokens",
-        limit: limits.tokens,
-        used: currentMonthTokens,
-        remaining: Math.max(0, limits.tokens - currentMonthTokens),
-        percent: limits.tokens > 0 ? Math.min(100, (currentMonthTokens / limits.tokens) * 100) : 0,
+        limit: limits.maxAiTokensPerMonth,
+        used: currentMonthUserTokens,
+        remaining: limits.maxAiTokensPerMonth === -1 ? -1 : Math.max(0, limits.maxAiTokensPerMonth - currentMonthUserTokens),
+        percent: limits.maxAiTokensPerMonth === -1 ? 0 : (limits.maxAiTokensPerMonth > 0 ? Math.min(100, (currentMonthUserTokens / limits.maxAiTokensPerMonth) * 100) : 0),
       },
       {
         id: "jobs",
         name: "AI Jobs",
-        limit: limits.jobs,
+        limit: limits.maxAiJobsPerMonth,
         used: currentMonthJobs,
-        remaining: Math.max(0, limits.jobs - currentMonthJobs),
-        percent: limits.jobs > 0 ? Math.min(100, (currentMonthJobs / limits.jobs) * 100) : 0,
+        remaining: limits.maxAiJobsPerMonth === -1 ? -1 : Math.max(0, limits.maxAiJobsPerMonth - currentMonthJobs),
+        percent: limits.maxAiJobsPerMonth === -1 ? 0 : (limits.maxAiJobsPerMonth > 0 ? Math.min(100, (currentMonthJobs / limits.maxAiJobsPerMonth) * 100) : 0),
       },
       {
         id: "records",
         name: "Records Extracted",
-        limit: limits.records,
+        limit: limits.maxRecordsPerMonth,
         used: currentMonthRecords,
-        remaining: Math.max(0, limits.records - currentMonthRecords),
-        percent: limits.records > 0 ? Math.min(100, (currentMonthRecords / limits.records) * 100) : 0,
+        remaining: limits.maxRecordsPerMonth === -1 ? -1 : Math.max(0, limits.maxRecordsPerMonth - currentMonthRecords),
+        percent: limits.maxRecordsPerMonth === -1 ? 0 : (limits.maxRecordsPerMonth > 0 ? Math.min(100, (currentMonthRecords / limits.maxRecordsPerMonth) * 100) : 0),
       }
     ];
 
@@ -234,11 +246,11 @@ export async function GET(req: NextRequest) {
             : 0,
       },
       quota: { // legacy support for older components
-        plan: org?.plan || "free",
-        limit: limits.tokens,
-        used: Math.min(currentMonthTokens, limits.tokens),
-        remaining: Math.max(0, limits.tokens - currentMonthTokens),
-        percent: limits.tokens > 0 ? (currentMonthTokens / limits.tokens) * 100 : 0,
+        plan: userPlan,
+        limit: limits.maxAiTokensPerMonth,
+        used: Math.min(currentMonthUserTokens, limits.maxAiTokensPerMonth === -1 ? currentMonthUserTokens : limits.maxAiTokensPerMonth),
+        remaining: limits.maxAiTokensPerMonth === -1 ? -1 : Math.max(0, limits.maxAiTokensPerMonth - currentMonthUserTokens),
+        percent: limits.maxAiTokensPerMonth === -1 ? 0 : (limits.maxAiTokensPerMonth > 0 ? (currentMonthUserTokens / limits.maxAiTokensPerMonth) * 100 : 0),
       },
       quotas,
       counts: {

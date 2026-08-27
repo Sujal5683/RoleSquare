@@ -213,10 +213,12 @@ export function ExtractionRunsTab() {
                         className="h-6 text-[10px] px-2"
                         onClick={async () => {
                           try {
-                            // Fire-and-forget UI cancel (optimistic, exact route might not exist but simulates the feature)
+                            await api.post(`/api/ai-jobs/${selectedJob.id}/cancel`);
                             toast.success("Job cancellation requested");
                             refetchJobs();
-                          } catch {}
+                          } catch (err: any) {
+                            toast.error("Failed to cancel job", { description: err.message });
+                          }
                         }}
                       >
                         Cancel Job

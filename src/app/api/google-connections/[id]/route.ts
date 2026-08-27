@@ -28,12 +28,28 @@ export async function PATCH(
         { status: 404 }
       );
     }
+    let watchExpirePref = before.watchExpirePref;
+    try {
+      const body = await req.json();
+      if (body && body.watchExpirePref) {
+        watchExpirePref = body.watchExpirePref;
+      }
+    } catch {
+      // no body, ignore
+    }
+
+    let days = 7;
+    if (watchExpirePref === "monthly") days = 30;
+    else if (watchExpirePref === "yearly") days = 365;
+    else if (watchExpirePref === "never") days = 3650; // 10 years
+
     const now = new Date();
     const connection = await db.googleConnection.update({
       where: { id },
       data: {
         status: "active",
-        watchExpiresAt: offsetDate(7, now),
+        watchExpiresAt: watchExpirePref === "never" ? null : offsetDate(days, now),
+        watchExpirePref,
         lastSyncAt: now,
       },
     });
@@ -44,8 +60,8 @@ export async function PATCH(
       action: "update",
       entity: "connection",
       entityId: id,
-      before: { status: before.status },
-      after: { status: "active", watchExpiresAt: connection.watchExpiresAt },
+      before: { status: before.status, watchExpirePref: before.watchExpirePref },
+      after: { status: "active", watchExpiresAt: connection.watchExpiresAt, watchExpirePref },
       reason: "refresh",
     });
 

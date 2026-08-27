@@ -21,8 +21,9 @@ model User {
   email       String   @unique
   name        String?
   avatarUrl   String?
-  role        String   @default("user") // global role: user | admin
-  notificationPrefs String @default("{}") // JSON
+  role              String   @default("user") // global role: user | admin
+  plan              String   @default("free") // user's billing plan
+  notificationPrefs String   @default("{}") // JSON
   twoFactorSecret String?
   twoFactorEnabled Boolean @default(false)
   createdAt   DateTime @default(now())
@@ -125,6 +126,7 @@ model GoogleConnection {
   refreshToken   String?  // AES-256-GCM encrypted long-lived refresh token
   tokenExpiresAt DateTime? // when the access token expires
   watchExpiresAt DateTime?
+  watchExpirePref String @default("yearly") // never | weekly | monthly | yearly
   lastSyncAt     DateTime?
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
@@ -536,6 +538,7 @@ model AuditLog {
 model UsageMetric {
   id             String   @id @default(cuid())
   organizationId String
+  userId         String?
   metricType     String   // ai_tokens | emails_scanned | documents_parsed | exports | storage
   value          Int      @default(0)
   periodStart    DateTime

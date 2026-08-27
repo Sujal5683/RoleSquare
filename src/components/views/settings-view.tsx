@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState, useEffect, useRef } from "react";
 import { useActiveOrg } from "@/hooks/use-active-org";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { formatDistanceToNow } from "date-fns";
@@ -36,7 +36,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 import {
@@ -98,7 +98,23 @@ import {
   FileDown,
   HardDriveDownload,
   AlertTriangle,
+  Pencil,
+  MoreHorizontal,
+  Clock
 } from "lucide-react";
+import { ProfileAvatar } from "@/components/settings/profile-avatar";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuSub,
+  DropdownMenuSubTrigger,
+  DropdownMenuSubContent,
+  DropdownMenuSeparator,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+} from "@/components/ui/dropdown-menu";
 
 // ── Helpers ──────────────────────────────────────────────────────────────
 
@@ -111,15 +127,6 @@ function relativeTime(iso: string | null | undefined): string {
   }
 }
 
-function initials(name: string | null | undefined): string {
-  if (!name) return "?";
-  return name
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((w) => w[0]?.toUpperCase() ?? "")
-    .join("");
-}
 
 // ── Main component ───────────────────────────────────────────────────────
 
@@ -237,7 +244,6 @@ function ProfileSection() {
   const { data: session, isLoading } = useSession();
   const [name, setName] = useState("");
   const [savedName, setSavedName] = useState("");
-
   // Render-time sync — only update local state when session first loads or
   // the user's name on the server changes.
   const serverName = session?.user.name ?? "";
@@ -258,6 +264,7 @@ function ProfileSection() {
     },
     onError: () => toast.error("Failed to save profile"),
   });
+
 
   const handleSave = () => {
     const trimmed = name.trim();
@@ -288,11 +295,7 @@ function ProfileSection() {
       <CardContent className="space-y-4">
         {/* Avatar + identity */}
         <div className="flex flex-col sm:flex-row sm:items-center gap-4">
-          <Avatar className="h-16 w-16">
-            <AvatarFallback className="text-lg font-medium">
-              {initials(session.user.name ?? session.user.email)}
-            </AvatarFallback>
-          </Avatar>
+          <ProfileAvatar user={session.user} />
           <div className="space-y-1">
             <p className="font-medium text-base">
               {session.user.name ?? session.user.email}
@@ -345,6 +348,8 @@ function ProfileSection() {
           </Button>
         </div>
       </CardContent>
+
+
     </Card>
   );
 }
@@ -373,8 +378,8 @@ function ConnectedAccountsSection() {
   });
 
   const refreshMutation = useMutation({
-    mutationFn: (id: string) =>
-      api.patch<GoogleConnectionDTO>(`/api/google-connections/${id}`),
+    mutationFn: ({ id, watchExpirePref }: { id: string; watchExpirePref?: string }) =>
+      api.patch<GoogleConnectionDTO>(`/api/google-connections/${id}`, watchExpirePref ? { watchExpirePref } : {}),
     onSuccess: (c) => {
       toast.success("Connection refreshed", {
         description: `${c.googleEmail} is now active until ${relativeTime(c.watchExpiresAt)}.`,
@@ -483,7 +488,7 @@ function ConnectedAccountsSection() {
                     <div className="flex flex-wrap items-center gap-2">
                       <StatusBadge status={c.status} />
                       <span className="text-xs text-muted-foreground">
-                        Watch expires {relativeTime(c.watchExpiresAt)}
+                        Connection expires {c.watchExpirePref === 'never' ? 'never' : relativeTime(c.watchExpiresAt)}
                       </span>
                       <span className="text-xs text-muted-foreground">
                         · Last sync {relativeTime(c.lastSyncAt)}
@@ -506,7 +511,7 @@ function ConnectedAccountsSection() {
                   <Button
                     size="sm"
                     variant="outline"
-                    onClick={() => refreshMutation.mutate(c.id)}
+                    onClick={() => refreshMutation.mutate({ id: c.id })}
                     disabled={refreshMutation.isPending}
                   >
                     <RefreshCw
@@ -514,24 +519,50 @@ function ConnectedAccountsSection() {
                     />
                     Refresh
                   </Button>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => refreshMutation.mutate(c.id)}
-                    disabled={refreshMutation.isPending}
-                  >
-                    Reconnect
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="text-destructive hover:text-destructive"
-                    onClick={() => setDisconnectTarget(c)}
-                    disabled={disconnectMutation.isPending}
-                  >
-                    <X className="mr-1.5 h-3.5 w-3.5" />
-                    Disconnect
-                  </Button>
+                  
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                        <MoreHorizontal className="h-4 w-4" />
+                        <span className="sr-only">More options</span>
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuSub>
+                        <DropdownMenuSubTrigger>
+                          <Clock className="mr-2 h-4 w-4" />
+                          <span>Connection Expiry</span>
+                        </DropdownMenuSubTrigger>
+                        <DropdownMenuSubContent>
+                          <DropdownMenuRadioGroup
+                            value={c.watchExpirePref}
+                            onValueChange={(val) => refreshMutation.mutate({ id: c.id, watchExpirePref: val })}
+                          >
+                            <DropdownMenuRadioItem value="never">Never</DropdownMenuRadioItem>
+                            <DropdownMenuRadioItem value="weekly">Weekly</DropdownMenuRadioItem>
+                            <DropdownMenuRadioItem value="monthly">Monthly</DropdownMenuRadioItem>
+                            <DropdownMenuRadioItem value="yearly">Yearly</DropdownMenuRadioItem>
+                          </DropdownMenuRadioGroup>
+                        </DropdownMenuSubContent>
+                      </DropdownMenuSub>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem
+                        onClick={() => refreshMutation.mutate({ id: c.id })}
+                        disabled={refreshMutation.isPending}
+                      >
+                        <RefreshCw className="mr-2 h-4 w-4" />
+                        Reconnect
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        className="text-destructive focus:text-destructive focus:bg-destructive/10"
+                        onClick={() => setDisconnectTarget(c)}
+                        disabled={disconnectMutation.isPending}
+                      >
+                        <X className="mr-2 h-4 w-4" />
+                        Disconnect
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </div>
               </div>
             ))}

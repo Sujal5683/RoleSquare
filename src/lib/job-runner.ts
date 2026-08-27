@@ -161,6 +161,7 @@ async function pickNextJob() {
 async function processJob(job: {
   id: string;
   organizationId: string;
+  userId: string | null;
   type: string;
   payload: string;
   attempts: number;
@@ -168,6 +169,13 @@ async function processJob(job: {
   console.log(`[job-runner] processing job ${job.id} (${job.type}, attempt ${job.attempts})`);
 
   try {
+    if (job.userId) {
+      const { checkUserLimits } = await import("@/lib/usage");
+      await checkUserLimits(job.userId, "jobs");
+      await checkUserLimits(job.userId, "tokens");
+      await checkUserLimits(job.userId, "records");
+    }
+
     const payload = JSON.parse(job.payload || "{}");
     let result: Record<string, unknown> = {};
 

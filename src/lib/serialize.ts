@@ -115,6 +115,7 @@ export function serializeGoogleConnection(c: any): GoogleConnectionDTO {
       c.watchExpiresAt instanceof Date
         ? c.watchExpiresAt.toISOString()
         : (c.watchExpiresAt ?? null),
+    watchExpirePref: (c.watchExpirePref as GoogleConnectionDTO["watchExpirePref"]) || "yearly",
     lastSyncAt:
       c.lastSyncAt instanceof Date
         ? c.lastSyncAt.toISOString()

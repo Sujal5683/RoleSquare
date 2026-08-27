@@ -381,7 +381,7 @@ function IncomingInvites({ onSelect, viewMode = "card" }: { onSelect: (inv: Invi
             )}
             <div className="mt-2 flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
               <Button
-                className="w-full"
+                className="flex-1"
                 size="sm"
                 variant="default"
                 disabled={expired || acceptMutation.isPending || declineMutation.isPending}
@@ -390,7 +390,7 @@ function IncomingInvites({ onSelect, viewMode = "card" }: { onSelect: (inv: Invi
                 Accept
               </Button>
               <Button
-                className="w-full"
+                className="flex-1"
                 size="sm"
                 variant="outline"
                 disabled={acceptMutation.isPending || declineMutation.isPending}
@@ -510,7 +510,7 @@ function OutgoingInvites({ onSelect, viewMode = "list" }: { onSelect: (inv: Invi
               </div>
               <div className="mt-2 flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
                 <Button
-                  className="w-full"
+                  className="flex-1"
                   size="sm"
                   variant="default"
                   disabled={resendMutation.isPending}
@@ -525,7 +525,7 @@ function OutgoingInvites({ onSelect, viewMode = "list" }: { onSelect: (inv: Invi
                   Resend
                 </Button>
                 <Button
-                  className="w-full"
+                  className="flex-1"
                   size="sm"
                   variant="outline"
                   disabled={cancelMutation.isPending}

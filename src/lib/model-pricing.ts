@@ -130,17 +130,15 @@ export const DEFAULT_PRICING: ModelPricing = {
 
 /**
  * Computes the USD cost for a given model and token counts.
- * Falls back to DEFAULT_PRICING if the model is unknown.
+ * Uses standard pricing: $1 per 1,000,000 tokens for all models.
  */
 export function computeCost(
   model: string,
   promptTokens: number,
   completionTokens: number
 ): number {
-  const pricing = MODEL_PRICING[model] ?? DEFAULT_PRICING;
-  const promptCost = (promptTokens / 1000) * pricing.promptCostPer1k;
-  const completionCost = (completionTokens / 1000) * pricing.completionCostPer1k;
-  return promptCost + completionCost;
+  const totalTokens = promptTokens + completionTokens;
+  return (totalTokens / 1_000_000) * 1.0;
 }
 
 /**
