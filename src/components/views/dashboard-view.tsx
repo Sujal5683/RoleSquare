@@ -6,7 +6,7 @@ import { api } from "@/lib/api-client";
 import { useAppStore } from "@/lib/store";
 import type { DashboardData, AuditLogDTO } from "@/lib/types";
 import { PageHeader, StatCard, LoadingState, EmptyState } from "@/components/ui/page-elements";
-import { StatusBadge, ConfidenceBadge, JobTypeBadge } from "@/components/ui/status-badge";
+import { StatusBadge, ConfidenceBadge } from "@/components/ui/status-badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
@@ -49,14 +49,35 @@ import {
   Download,
   Calendar,
 } from "lucide-react";
-import { Area as RechartsArea, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip as RechartsTooltipRaw, XAxis as RechartsXAxis, YAxis as RechartsYAxis } from "recharts";
+import { Area as RechartsArea, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip as RechartsTooltipRaw, XAxis as RechartsXAxis, YAxis as RechartsYAxis, BarChart as RechartsBarChart, Bar as RechartsBar, Legend as RechartsLegend } from "recharts";
 
 // Workaround for Recharts + React 19 type definitions
 const Area = RechartsArea as any;
 const XAxis = RechartsXAxis as any;
 const YAxis = RechartsYAxis as any;
 const RechartsTooltip = RechartsTooltipRaw as any;
+const BarChart = RechartsBarChart as any;
+const Bar = RechartsBar as any;
+const Legend = RechartsLegend as any;
 
+
+import {
+  ACTOR_TYPE_STYLE,
+  ACTION_STYLE,
+  initials,
+  relativeTime,
+  formatDateTime,
+  renderObjectDiff
+} from "./audit-view";
+import { ChevronRight } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 type ExtendedDashboardData = DashboardData & {
   chartData: Array<{ date: string; records: number; jobs: number }>;
@@ -70,7 +91,8 @@ export function DashboardView() {
   const openSchema = useAppStore((s) => s.openSchema);
   const recentItems = useAppStore((s) => s.recentItems);
   
-  const [dateRange, setDateRange] = useState("30d");
+  const [dateRange, setDateRange] = useState("7d");
+  const [diffDialog, setDiffDialog] = useState<AuditLogDTO | null>(null);
 
   const { data: session } = useQuery({
     queryKey: ["session"],
@@ -330,70 +352,43 @@ export function DashboardView() {
                 {data.queueHealth.length === 0 ? (
                   <EmptyState title="No jobs" description="No AI jobs have run yet." />
                 ) : (() => {
-                  // Aggregate counts by status
-                  const byStatus: Record<string, { count: number; types: string[] }> = {};
+                  const chartDataObj: Record<string, { name: string; success: number; running: number; failed: number; pending: number }> = {};
                   for (const q of data.queueHealth) {
-                    if (!byStatus[q.status]) byStatus[q.status] = { count: 0, types: [] };
-                    byStatus[q.status].count += q.count;
-                    if (!byStatus[q.status].types.includes(q.type)) byStatus[q.status].types.push(q.type);
+                    if (!chartDataObj[q.type]) {
+                      chartDataObj[q.type] = { name: q.type, success: 0, running: 0, failed: 0, pending: 0 };
+                    }
+                    chartDataObj[q.type][q.status as "success" | "running" | "failed" | "pending"] = q.count;
                   }
-                  const total = Object.values(byStatus).reduce((s, v) => s + v.count, 0);
-                  const statusConfig: Record<string, { label: string; color: string; bg: string; ring: string; bar: string }> = {
-                    success:  { label: "Completed",   color: "text-emerald-700 dark:text-emerald-400", bg: "bg-emerald-50 dark:bg-emerald-950/40",  ring: "ring-emerald-200 dark:ring-emerald-800",  bar: "bg-emerald-500" },
-                    running:  { label: "In Progress",  color: "text-amber-700 dark:text-amber-400",    bg: "bg-amber-50 dark:bg-amber-950/40",         ring: "ring-amber-200 dark:ring-amber-800",      bar: "bg-amber-500" },
-                    failed:   { label: "Failed",       color: "text-red-700 dark:text-red-400",         bg: "bg-red-50 dark:bg-red-950/40",             ring: "ring-red-200 dark:ring-red-800",          bar: "bg-red-500" },
-                    pending:  { label: "Queued",       color: "text-slate-600 dark:text-slate-400",     bg: "bg-slate-50 dark:bg-slate-900/40",         ring: "ring-slate-200 dark:ring-slate-700",      bar: "bg-slate-400" },
-                  };
+                  const chartData = Object.values(chartDataObj);
+                  
                   return (
-                    <div className="space-y-4">
-                      {/* Status summary cards */}
-                      <div className="flex flex-wrap gap-3">
-                        {(["success", "running", "failed", "pending"] as const).map((s) => {
-                          const cfg = statusConfig[s];
-                          const entry = byStatus[s];
-                          const count = entry?.count ?? 0;
-                          return (
-                            <div key={s} className={`rounded-xl px-3 py-2 ring-1 ${cfg.bg} ${cfg.ring} flex flex-col gap-1.5 min-w-[130px] flex-1 sm:flex-none`}>
-                              <div className="flex items-baseline gap-2">
-                                <span className={`text-xl font-bold tabular-nums ${cfg.color}`}>{count}</span>
-                                <span className={`text-xs font-medium ${cfg.color}`}>{cfg.label}</span>
-                              </div>
-                              {count > 0 && (
-                                <div className="h-1 rounded-full bg-black/10 dark:bg-white/10 overflow-hidden">
-                                  <div className={`h-full ${cfg.bar} rounded-full`} style={{ width: `${Math.min(100, (count / Math.max(total, 1)) * 100)}%` }} />
-                                </div>
-                              )}
-                            </div>
-                          );
-                        })}
-                      </div>
-
-                      {/* Per-job-type breakdown */}
-                      <div className="space-y-2">
-                        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">By Job Type</p>
-                        <div className="space-y-2">
-                          {data.queueHealth.map((q, i) => {
-                            const cfg = statusConfig[q.status] ?? statusConfig.pending;
-                            const pct = total > 0 ? Math.round((q.count / total) * 100) : 0;
-                            return (
-                              <div key={`${q.type}-${q.status}-${i}`} className="flex items-center gap-3">
-                                <div className="w-36 shrink-0">
-                                  <JobTypeBadge type={q.type as any} />
-                                </div>
-                                <div className="flex-1">
-                                  <div className="h-1.5 rounded-full bg-muted overflow-hidden">
-                                    <div className={`h-full rounded-full transition-all ${cfg.bar}`} style={{ width: `${Math.min(100, Math.max(4, pct))}%` }} />
-                                  </div>
-                                </div>
-                                <div className="flex items-center gap-2 shrink-0 w-24 justify-end">
-                                  <span className={`text-[10px] font-medium ${cfg.color}`}>{cfg.label}</span>
-                                  <span className="text-xs font-semibold tabular-nums">{q.count}</span>
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
+                    <div className="h-[300px] w-full mt-2">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart
+                          data={chartData}
+                          layout="vertical"
+                          margin={{ top: 5, right: 20, left: 20, bottom: 5 }}
+                        >
+                          <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={true} className="stroke-muted" />
+                          <XAxis type="number" className="text-xs text-muted-foreground" />
+                          <YAxis 
+                            dataKey="name" 
+                            type="category" 
+                            width={120} 
+                            tick={{ fontSize: 10, fill: "currentColor" }} 
+                            className="text-muted-foreground font-mono"
+                          />
+                          <RechartsTooltip 
+                            cursor={{ fill: 'rgba(0,0,0,0.05)' }}
+                            contentStyle={{ borderRadius: '8px', border: '1px solid var(--border)', backgroundColor: 'var(--background)' }}
+                          />
+                          <Legend wrapperStyle={{ fontSize: '12px', paddingTop: '10px' }} />
+                          <Bar dataKey="success" name="Completed" stackId="a" fill="#10b981" radius={[0, 0, 0, 0]} />
+                          <Bar dataKey="running" name="In Progress" stackId="a" fill="#f59e0b" radius={[0, 0, 0, 0]} />
+                          <Bar dataKey="failed" name="Failed" stackId="a" fill="#ef4444" radius={[0, 0, 0, 0]} />
+                          <Bar dataKey="pending" name="Queued" stackId="a" fill="#94a3b8" radius={[0, 4, 4, 0]} />
+                        </BarChart>
+                      </ResponsiveContainer>
                     </div>
                   );
                 })()}
@@ -591,76 +586,104 @@ export function DashboardView() {
               </Button>
             </CardHeader>
             <CardContent className="p-0">
-              <div className="max-h-[400px] overflow-y-auto">
                 {activityData?.data && activityData.data.length > 0 ? (
-                  <div className="relative px-4 py-3">
-                    {/* Timeline line */}
-                    <div className="absolute left-7 top-3 bottom-3 w-px bg-border" />
-                    {activityData.data.map((log) => {
-                      const icon = getActivityIcon(log.action);
-                      const color = getActivityColor(log.action, log.actorType);
-                      return (
-                        <div key={log.id} className="relative flex gap-3 pb-4 last:pb-0">
-                          <div
-                            className={`relative z-10 flex h-6 w-6 shrink-0 items-center justify-center rounded-full ring-2 ring-background ${color}`}
-                          >
-                            {icon}
-                          </div>
-                          <div className="flex-1 min-w-0 pt-0.5">
-                            <p className="text-xs">
-                              <span className="font-medium">{log.actorName || log.actorType}</span>
-                              {" "}
-                              <span className="text-muted-foreground">{log.action}</span>
-                              {" "}
-                              <span className="font-mono text-[10px] text-muted-foreground">{log.entity}</span>
-                              {log.reason && (
-                                <>
-                                  {" — "}
-                                  <span className="text-muted-foreground italic">{log.reason}</span>
-                                </>
-                              )}
-                            </p>
-                            <p className="text-[10px] text-muted-foreground mt-0.5">
-                              {new Date(log.createdAt).toLocaleString()}
-                            </p>
-                            {((log.before && Object.keys(log.before).length > 0) || (log.after && Object.keys(log.after).length > 0)) && (
-                              <Accordion type="single" collapsible className="w-full mt-2">
-                                <AccordionItem value="payload" className="border-b-0">
-                                  <AccordionTrigger className="py-1 px-2 text-[10px] bg-muted/50 rounded-md hover:no-underline">
-                                    View Payload
-                                  </AccordionTrigger>
-                                  <AccordionContent className="pt-2 space-y-2">
-                                    {[ { label: "Before", data: log.before }, { label: "After", data: log.after }].map(({ label, data }) => {
-                                      if (!data || typeof data !== 'object' || Object.keys(data).length === 0) return null;
-                                      
-                                      const entries = Object.entries(data).filter(([key, val]) => {
-                                        const k = key.toLowerCase();
-                                        return k !== 'id' && !k.endsWith('id') && val !== null && val !== undefined && typeof val !== 'object';
-                                      });
+                  <div className="relative max-h-[40rem] overflow-y-auto pr-2">
+                    {/* Vertical line */}
+                    <div className="absolute left-[19px] top-2 bottom-2 w-px bg-border" />
+                    <ol className="space-y-4 pt-2 pb-4">
+                      {activityData.data.map((log) => {
+                        const actorStyle =
+                          ACTOR_TYPE_STYLE[log.actorType] ?? ACTOR_TYPE_STYLE.system;
+                        const actionStyle =
+                          ACTION_STYLE[log.action] ??
+                          "bg-muted text-muted-foreground";
+                        return (
+                          <li key={log.id} className="relative pl-12">
+                            {/* Dot */}
+                            <div
+                              className={`absolute left-[12px] top-1 flex h-4 w-4 items-center justify-center rounded-full ring-4 ring-background ${actionStyle}`}
+                            >
+                              <span className="block h-1.5 w-1.5 rounded-full bg-current" />
+                            </div>
+                            <div className="rounded-lg border p-2.5 transition-colors hover:bg-muted/30">
+                              <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
+                                {/* Actor and Action */}
+                                <div className="flex items-center gap-2 sm:w-[220px] md:w-[260px] shrink-0">
+                                  <Avatar className="h-7 w-7">
+                                    <AvatarFallback className="text-[10px] font-medium">
+                                      {initials(log.actorName)}
+                                    </AvatarFallback>
+                                  </Avatar>
+                                  <div className="min-w-0">
+                                    <div className="flex items-center gap-1.5 flex-wrap">
+                                      <span className="text-xs font-medium truncate max-w-[100px]" title={log.actorName ?? "Unknown actor"}>
+                                        {log.actorName ?? "Unknown actor"}
+                                      </span>
+                                      <span
+                                        className={`inline-flex items-center gap-1 rounded px-1 py-0 text-[9px] font-medium uppercase tracking-wide shrink-0 ${actorStyle.className}`}
+                                      >
+                                        {actorStyle.icon}
+                                        {actorStyle.label}
+                                      </span>
+                                      <span
+                                        className={`inline-flex items-center rounded px-1 py-0 text-[9px] font-medium uppercase tracking-wide shrink-0 ${actionStyle}`}
+                                      >
+                                        {log.action}
+                                      </span>
+                                    </div>
+                                    <p className="text-[10px] text-muted-foreground mt-0.5 truncate" title={formatDateTime(log.createdAt)}>
+                                      {relativeTime(log.createdAt)} · {formatDateTime(log.createdAt)}
+                                    </p>
+                                  </div>
+                                </div>
 
-                                      if (entries.length === 0) return null;
+                                {/* Entity and Reason */}
+                                <div className="flex-1 flex flex-col justify-center min-w-0 border-l-0 sm:border-l pl-0 sm:pl-4 border-border">
+                                  <div className="flex items-center gap-2">
+                                    <Badge
+                                      variant="outline"
+                                      className="font-normal capitalize shrink-0 text-[10px] px-1 py-0 h-4"
+                                    >
+                                      {log.entity}
+                                    </Badge>
+                                    {log.entityName ? (
+                                      <span className="text-xs font-medium truncate" title={log.entityName}>
+                                        {log.entityName}
+                                      </span>
+                                    ) : (
+                                      <span className="text-xs font-medium text-muted-foreground italic">
+                                        Unnamed
+                                      </span>
+                                    )}
+                                  </div>
+                                  {log.reason && (
+                                    <p className="mt-1 text-[11px] text-muted-foreground truncate" title={log.reason}>
+                                      <span className="font-medium text-foreground">
+                                        Reason:
+                                      </span>{" "}
+                                      {log.reason}
+                                    </p>
+                                  )}
+                                </div>
 
-                                      return (
-                                        <div key={label} className="bg-muted/50 p-2 rounded-md">
-                                          <div className="text-[10px] font-semibold mb-1 uppercase tracking-wider text-muted-foreground">{label}</div>
-                                          <ul className="text-[11px] text-foreground space-y-0.5">
-                                            {entries.map(([key, val]) => (
-                                              <li key={key}>
-                                                <span className="font-medium opacity-70">{key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())}:</span> {String(val)}
-                                              </li>
-                                            ))}
-                                          </ul>
-                                        </div>
-                                      );
-                                    })}
-                                  </AccordionContent>
-                                </AccordionItem>
-                              </Accordion>
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })}
+                                {/* Action Button */}
+                                {(log.before || log.after) && (
+                                  <div className="shrink-0 mt-1 sm:mt-0">
+                                    <button
+                                      onClick={() => setDiffDialog(log)}
+                                      className="inline-flex items-center gap-1 rounded bg-muted px-2 py-1 text-[10px] font-medium text-muted-foreground hover:bg-muted/70 transition-colors"
+                                    >
+                                      <ChevronRight className="h-3 w-3" />
+                                      View diff
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </li>
+                        );
+                      })}
+                    </ol>
                   </div>
                 ) : (
                   <div className="p-4">
@@ -676,55 +699,49 @@ export function DashboardView() {
           </Card>
         </>
       )}
+
+      {/* Diff dialog */}
+      <Dialog
+        open={!!diffDialog}
+        onOpenChange={(open) => {
+          if (!open) setDiffDialog(null);
+        }}
+      >
+        <DialogContent className="sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-base">
+              <AlertCircle className="h-4 w-4 text-primary" />
+              Change details
+            </DialogTitle>
+            <DialogDescription>
+              {diffDialog?.actorName ?? "Unknown actor"} ·{" "}
+              <span className="capitalize">{diffDialog?.action}</span> on{" "}
+              <span className="capitalize">{diffDialog?.entity}</span> ·{" "}
+              {diffDialog ? formatDateTime(diffDialog.createdAt) : ""}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 sm:grid-cols-2 max-h-96 overflow-y-auto">
+            <div>
+              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                Before
+              </p>
+              <div className="rounded-md bg-destructive/5 border border-destructive/20 p-3">
+                {renderObjectDiff(diffDialog?.before)}
+              </div>
+            </div>
+            <div>
+              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                After
+              </p>
+              <div className="rounded-md bg-emerald-500/5 border border-emerald-500/20 p-3">
+                {renderObjectDiff(diffDialog?.after)}
+              </div>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
-}
-
-function getActivityIcon(action: string): React.ReactNode {
-  const iconClass = "h-3 w-3 text-white";
-  switch (action) {
-    case "create":
-      return <Plus className={iconClass} />;
-    case "update":
-      return <Pencil className={iconClass} />;
-    case "delete":
-      return <Trash2 className={iconClass} />;
-    case "scan":
-    case "extract":
-      return <Sparkles className={iconClass} />;
-    case "approve":
-      return <CheckCircle2 className={iconClass} />;
-    case "share":
-      return <Share2 className={iconClass} />;
-    case "export":
-      return <Download className={iconClass} />;
-    default:
-      return <Activity className={iconClass} />;
-  }
-}
-
-function getActivityColor(action: string, actorType: string): string {
-  if (actorType === "ai") return "bg-violet-500";
-  if (actorType === "system") return "bg-slate-500";
-  switch (action) {
-    case "create":
-      return "bg-emerald-500";
-    case "update":
-      return "bg-sky-500";
-    case "delete":
-      return "bg-destructive";
-    case "scan":
-    case "extract":
-      return "bg-violet-500";
-    case "approve":
-      return "bg-emerald-500";
-    case "share":
-      return "bg-amber-500";
-    case "export":
-      return "bg-rose-500";
-    default:
-      return "bg-slate-500";
-  }
 }
 
 function timeAgoShort(ts: number): string {

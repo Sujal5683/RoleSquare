@@ -55,7 +55,7 @@ Copy, } from "lucide-react";
 
 // ── Helpers ──────────────────────────────────────────────────────────────
 
-function relativeTime(iso: string | null | undefined): string {
+export function relativeTime(iso: string | null | undefined): string {
   if (!iso) return "—";
   try {
     return formatDistanceToNow(new Date(iso), { addSuffix: true });
@@ -64,7 +64,7 @@ function relativeTime(iso: string | null | undefined): string {
   }
 }
 
-function formatDateTime(iso: string | null | undefined): string {
+export function formatDateTime(iso: string | null | undefined): string {
   if (!iso) return "—";
   try {
     return format(new Date(iso), "MMM d, yyyy HH:mm:ss");
@@ -73,7 +73,7 @@ function formatDateTime(iso: string | null | undefined): string {
   }
 }
 
-function initials(name: string | null | undefined): string {
+export function initials(name: string | null | undefined): string {
   if (!name) return "?";
   return name
     .split(/\s+/)
@@ -83,7 +83,7 @@ function initials(name: string | null | undefined): string {
     .join("");
 }
 
-function truncateId(id: string | null | undefined, max = 8): string {
+export function truncateId(id: string | null | undefined, max = 8): string {
   if (!id) return "—";
   return id.length <= max ? id : `${id.slice(0, max)}…`;
 }
@@ -115,7 +115,7 @@ const ACTION_OPTIONS = [
 ];
 
 // Color maps for actor types
-const ACTOR_TYPE_STYLE: Record<
+export const ACTOR_TYPE_STYLE: Record<
   string,
   { label: string; className: string; icon: React.ReactNode }
 > = {
@@ -140,7 +140,7 @@ const ACTOR_TYPE_STYLE: Record<
 };
 
 // Color maps for actions
-const ACTION_STYLE: Record<string, string> = {
+export const ACTION_STYLE: Record<string, string> = {
   create: "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300",
   update: "bg-sky-100 text-sky-800 dark:bg-sky-950 dark:text-sky-300",
   delete: "bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-300",
@@ -156,7 +156,7 @@ import { useActiveOrg } from "@/hooks/use-active-org";
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
-function renderObjectDiff(data: any): React.ReactNode {
+export function renderObjectDiff(data: any): React.ReactNode {
   if (data === null || data === undefined || data === "") return <span className="text-xs text-muted-foreground">—</span>;
   if (typeof data !== "object") {
     return <span className="text-xs text-muted-foreground">Updated</span>;
@@ -464,81 +464,80 @@ export function AuditView() {
                       >
                         <span className="block h-1.5 w-1.5 rounded-full bg-current" />
                       </div>
-                      <div className="rounded-lg border p-2 transition-colors hover:bg-muted/30">
-                        {/* Top row */}
-                        <div className="flex flex-wrap items-start justify-between gap-2">
-                          <div className="flex items-center gap-2">
-                            <Avatar className="h-6 w-6">
-                              <AvatarFallback className="text-[9px] font-medium">
+                      <div className="rounded-lg border p-2.5 transition-colors hover:bg-muted/30">
+                        <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
+                          {/* Actor and Action */}
+                          <div className="flex items-center gap-2 sm:w-[220px] md:w-[260px] shrink-0">
+                            <Avatar className="h-7 w-7">
+                              <AvatarFallback className="text-[10px] font-medium">
                                 {initials(log.actorName)}
                               </AvatarFallback>
                             </Avatar>
-                            <div>
-                              <div className="flex items-center gap-2 flex-wrap">
-                                <span className="text-xs font-medium">
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <span className="text-xs font-medium truncate max-w-[100px]" title={log.actorName ?? "Unknown actor"}>
                                   {log.actorName ?? "Unknown actor"}
                                 </span>
                                 <span
-                                  className={`inline-flex items-center gap-1 rounded px-1 py-0 text-[9px] font-medium uppercase tracking-wide ${actorStyle.className}`}
+                                  className={`inline-flex items-center gap-1 rounded px-1 py-0 text-[9px] font-medium uppercase tracking-wide shrink-0 ${actorStyle.className}`}
                                 >
                                   {actorStyle.icon}
                                   {actorStyle.label}
                                 </span>
                                 <span
-                                  className={`inline-flex items-center rounded px-1 py-0 text-[9px] font-medium uppercase tracking-wide ${actionStyle}`}
+                                  className={`inline-flex items-center rounded px-1 py-0 text-[9px] font-medium uppercase tracking-wide shrink-0 ${actionStyle}`}
                                 >
                                   {log.action}
                                 </span>
                               </div>
-                              <p className="text-[10px] text-muted-foreground mt-0.5">
-                                {relativeTime(log.createdAt)} ·{" "}
-                                <span title={formatDateTime(log.createdAt)}>
-                                  {formatDateTime(log.createdAt)}
-                                </span>
+                              <p className="text-[10px] text-muted-foreground mt-0.5 truncate" title={formatDateTime(log.createdAt)}>
+                                {relativeTime(log.createdAt)} · {formatDateTime(log.createdAt)}
                               </p>
                             </div>
                           </div>
-                          <div className="flex items-center gap-2 max-w-full">
-                            <Badge
-                              variant="outline"
-                              className="font-normal capitalize shrink-0 text-[10px] px-1 py-0 h-4"
-                            >
-                              {log.entity}
-                            </Badge>
-                            {log.entityName ? (
-                              <span className="text-xs font-medium truncate" title={log.entityName}>
-                                {log.entityName}
-                              </span>
-                            ) : (
-                              <span className="text-xs font-medium text-muted-foreground italic">
-                                Unnamed
-                              </span>
+
+                          {/* Entity and Reason */}
+                          <div className="flex-1 flex flex-col justify-center min-w-0 border-l-0 sm:border-l pl-0 sm:pl-4 border-border">
+                            <div className="flex items-center gap-2">
+                              <Badge
+                                variant="outline"
+                                className="font-normal capitalize shrink-0 text-[10px] px-1 py-0 h-4"
+                              >
+                                {log.entity}
+                              </Badge>
+                              {log.entityName ? (
+                                <span className="text-xs font-medium truncate" title={log.entityName}>
+                                  {log.entityName}
+                                </span>
+                              ) : (
+                                <span className="text-xs font-medium text-muted-foreground italic">
+                                  Unnamed
+                                </span>
+                              )}
+                            </div>
+                            {log.reason && (
+                              <p className="mt-1 text-[11px] text-muted-foreground truncate" title={log.reason}>
+                                <span className="font-medium text-foreground">
+                                  Reason:
+                                </span>{" "}
+                                {log.reason}
+                              </p>
                             )}
                           </div>
+
+                          {/* Action Button */}
+                          {(log.before || log.after) && (
+                            <div className="shrink-0 mt-1 sm:mt-0">
+                              <button
+                                onClick={() => setDiffDialog(log)}
+                                className="inline-flex items-center gap-1 rounded bg-muted px-2 py-1 text-[10px] font-medium text-muted-foreground hover:bg-muted/70 transition-colors"
+                              >
+                                <ChevronRight className="h-3 w-3" />
+                                View diff
+                              </button>
+                            </div>
+                          )}
                         </div>
-
-                        {/* Reason */}
-                        {log.reason && (
-                          <p className="mt-2 text-sm text-muted-foreground">
-                            <span className="font-medium text-foreground">
-                              Reason:
-                            </span>{" "}
-                            {log.reason}
-                          </p>
-                        )}
-
-                        {/* Before/After diff */}
-                        {(log.before || log.after) && (
-                          <div className="mt-2">
-                            <button
-                              onClick={() => setDiffDialog(log)}
-                              className="inline-flex items-center gap-1 rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground hover:bg-muted/70 transition-colors"
-                            >
-                              <ChevronRight className="h-3 w-3" />
-                              View change diff
-                            </button>
-                          </div>
-                        )}
                       </div>
                     </li>
                   );
