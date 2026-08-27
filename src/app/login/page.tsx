@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/client";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Zap, Mail, Lock, Eye, EyeOff, ArrowRight, Loader2, AlertCircle, ArrowLeft } from "lucide-react";
 import Link from "next/link";
+import { InputOTP, InputOTPGroup, InputOTPSlot, InputOTPSeparator } from "@/components/ui/input-otp";
 
 type Mode = "login" | "signup" | "forgot" | "2fa";
 
@@ -240,18 +241,24 @@ function LoginPageContent() {
                 <label htmlFor="token2fa" className="text-sm font-medium text-foreground">
                   Authentication Code
                 </label>
-                <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                  <input
-                    id="token2fa"
-                    type="text"
-                    required
-                    autoComplete="one-time-code"
+                <div className="flex justify-center py-2">
+                  <InputOTP
+                    maxLength={6}
                     value={token2fa}
-                    onChange={(e) => setToken2fa(e.target.value)}
-                    placeholder="6-digit code"
-                    className="w-full rounded-lg border bg-background py-2.5 pl-9 pr-3 text-sm outline-none ring-offset-background placeholder:text-muted-foreground/60 focus:ring-2 focus:ring-ring focus:ring-offset-2 transition"
-                  />
+                    onChange={(val) => setToken2fa(val.replace(/\D/g, ""))}
+                  >
+                    <InputOTPGroup>
+                      <InputOTPSlot index={0} />
+                      <InputOTPSlot index={1} />
+                      <InputOTPSlot index={2} />
+                    </InputOTPGroup>
+                    <InputOTPSeparator />
+                    <InputOTPGroup>
+                      <InputOTPSlot index={3} />
+                      <InputOTPSlot index={4} />
+                      <InputOTPSlot index={5} />
+                    </InputOTPGroup>
+                  </InputOTP>
                 </div>
                 <p className="text-xs text-muted-foreground mt-2">
                   Enter the 6-digit code from your authenticator app.
