@@ -193,11 +193,11 @@ export function UsageView() {
                   </span>
                   <span>
                     {q.percent < 60 ? (
-                      <span className="text-emerald-600">(Healthy)</span>
+                      <span className="text-emerald-600 font-bold">({q.percent.toFixed(1)}%)</span>
                     ) : q.percent < 85 ? (
-                      <span className="text-amber-600">(Approaching limit)</span>
+                      <span className="text-amber-600 font-bold">({q.percent.toFixed(1)}%)</span>
                     ) : (
-                      <span className="text-destructive">(Near limit)</span>
+                      <span className="text-destructive font-bold">({q.percent.toFixed(1)}%)</span>
                     )}
                   </span>
                 </div>

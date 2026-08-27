@@ -1520,7 +1520,7 @@ function BillingSection() {
                     label={quota.name}
                     value={display}
                     icon={icon}
-                    hint={`Current month`}
+                    hint={`Current month • ${quota.percent.toFixed(1)}% used`}
                   />
                 );
               })}
