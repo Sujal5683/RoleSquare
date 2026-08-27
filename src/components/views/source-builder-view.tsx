@@ -27,6 +27,7 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
+  SelectSeparator,
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { DateRuleEditor } from "@/components/source/date-rule-editor";
@@ -227,8 +228,19 @@ export function SourceBuilderView() {
 
   const isEdit = !!selectedSourceId;
 
-  const [step, setStep] = useState(0);
-  const [form, setForm] = useState<SourceFormState>(EMPTY_FORM);
+  const step = useAppStore((s) => s.sourceBuilderStep) || 0;
+  const _setStep = useAppStore((s) => s.setSourceBuilderStep);
+  const setStep = (updater: number | ((prev: number) => number)) => {
+    _setStep(typeof updater === "function" ? updater(step) : updater);
+  };
+  const draft = useAppStore((s) => s.sourceBuilderDraft);
+  const setDraft = useAppStore((s) => s.setSourceBuilderDraft);
+
+  const form: SourceFormState = draft || EMPTY_FORM;
+  const setForm = (updater: SourceFormState | ((prev: SourceFormState) => SourceFormState)) => {
+    setDraft(typeof updater === "function" ? updater(form) : updater);
+  };
+
   const [prefilledSourceId, setPrefilledSourceId] = useState<string | null>(
     null
   );
@@ -956,29 +968,45 @@ export function SourceBuilderView() {
                             }))
                           }
                         />
-                      ) : (
-                        <>
+                      ) : form.scheduleMode === "interval" ? (
+                        <div className="flex gap-2">
                           <Input
                             id="sched-expr"
-                            placeholder={
-                              form.scheduleMode === "manual"
-                                ? "(manual)"
-                                : "6h"
-                            }
-                            value={form.scheduleExpr}
-                            onChange={(e) =>
-                              setForm((f) => ({
-                                ...f,
-                                scheduleExpr: e.target.value,
-                              }))
-                            }
+                            type="number"
+                            min={1}
+                            value={form.scheduleExpr.replace(/\D/g, "") || "1"}
+                            onChange={(e) => {
+                               const unit = form.scheduleExpr.replace(/[0-9]/g, "") || "h";
+                               setForm((f) => ({ ...f, scheduleExpr: e.target.value + unit }))
+                            }}
+                            className="w-full"
                           />
-                          <p className="text-[10px] text-muted-foreground">
-                            {form.scheduleMode === "interval"
-                              ? "Use '6h', '15m', '1d' etc."
-                              : "Manual sources only run when triggered."}
-                          </p>
-                        </>
+                          <Select
+                            value={form.scheduleExpr.replace(/[0-9]/g, "") || "h"}
+                            onValueChange={(v) => {
+                               const val = form.scheduleExpr.replace(/\D/g, "") || "1";
+                               setForm((f) => ({ ...f, scheduleExpr: val + v }))
+                            }}
+                          >
+                            <SelectTrigger className="w-[140px]">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="s">Seconds</SelectItem>
+                              <SelectItem value="m">Minutes</SelectItem>
+                              <SelectItem value="h">Hours</SelectItem>
+                              <SelectItem value="d">Days</SelectItem>
+                              <SelectItem value="w">Weeks</SelectItem>
+                              <SelectItem value="M">Months</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      ) : (
+                        <Input
+                          id="sched-expr"
+                          disabled
+                          value="Manual sources only run when triggered."
+                        />
                       )}
                     </div>
                   </div>
@@ -990,8 +1018,8 @@ export function SourceBuilderView() {
                         <Label htmlFor="max-emails">
                           {form.sourceType === "gmail" ? "Max emails per scan" : "Max files per scan"}
                         </Label>
-                        <p className="text-[10px] text-muted-foreground mt-0.5 max-w-[280px]">
-                          Limits the {form.sourceType === "gmail" ? "Gmail " : ""}API list call to this many {form.sourceType === "gmail" ? "messages" : "files"} per scan run. Lower values are faster.
+                        <p className="text-[10px] text-muted-foreground mt-0.5">
+                          Maximum items to process per run.
                         </p>
                       </div>
                       <div className="flex items-center gap-3">
@@ -1060,7 +1088,8 @@ export function SourceBuilderView() {
                         <SelectValue placeholder="Choose a schema (optional)" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="none">— No schema —</SelectItem>
+                        <SelectItem value="none" className="font-bold">Generate Automatically</SelectItem>
+                        <SelectSeparator />
                         {(schemas ?? []).map((s) => (
                           <SelectItem key={s.id} value={s.id}>
                             {s.name} · v{s.version} ({s.fields.length} fields)
@@ -1097,7 +1126,8 @@ export function SourceBuilderView() {
                         <SelectValue placeholder="Choose a dataset (optional)" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="none">— No dataset —</SelectItem>
+                        <SelectItem value="none" className="font-bold">Generate Automatically</SelectItem>
+                        <SelectSeparator />
                         {(datasets ?? []).map((d) => {
                           const isReadOnly = d.accessLevel === "read" || d.accessLevel === "comment";
                           return (
@@ -1170,11 +1200,11 @@ export function SourceBuilderView() {
                   />
                   <ReviewRow
                     label="Schema"
-                    value={selectedSchema?.name ?? "—"}
+                    value={selectedSchema?.name ?? "Generate Automatically"}
                   />
                   <ReviewRow
                     label="Dataset"
-                    value={selectedDataset?.name ?? "—"}
+                    value={selectedDataset?.name ?? "Generate Automatically"}
                   />
                   {!canSubmit && (
                     <div className="flex items-center gap-2 rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-xs text-destructive">
@@ -1258,11 +1288,11 @@ export function SourceBuilderView() {
                 />
                 <SummaryRow
                   label="Schema"
-                  value={selectedSchema?.name ?? "—"}
+                  value={selectedSchema?.name ?? "Generate Automatically"}
                 />
                 <SummaryRow
                   label="Dataset"
-                  value={selectedDataset?.name ?? "—"}
+                  value={selectedDataset?.name ?? "Generate Automatically"}
                 />
               </CardContent>
             </Card>

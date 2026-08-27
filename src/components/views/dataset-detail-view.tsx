@@ -1325,78 +1325,77 @@ export function DatasetDetailView() {
           <ArrowRightToLine className="mr-1.5 h-3.5 w-3.5" />
           Insert Col Right
         </Button>
+
+        {selectedRecords.size > 0 && (
+          <div className="flex items-center gap-2 ml-auto">
+            <Separator orientation="vertical" className="mx-1 h-5" />
+            <span className="text-xs font-medium text-muted-foreground">
+              {selectedRecords.size} record{selectedRecords.size > 1 ? "s" : ""} selected
+            </span>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="h-7 px-2 text-xs bg-background"
+              disabled={statusMutation.isPending || cannotEdit}
+              onClick={() => {
+                const promises = [...selectedRecords].map(id => statusMutation.mutateAsync({ recordId: id, status: "approved" }).catch(() => {}));
+                toast.promise(Promise.all(promises), {
+                  loading: "Approving records...",
+                  success: () => {
+                    setSelectedRecords(new Set());
+                    return `Approved ${selectedRecords.size} records`;
+                  },
+                  error: "Failed to approve some records"
+                });
+              }}
+            >
+              <CheckCircle2 className="mr-1.5 h-3.5 w-3.5 text-emerald-600" />
+              Approve
+            </Button>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="h-7 px-2 text-xs bg-background"
+              disabled={statusMutation.isPending || cannotEdit}
+              onClick={() => {
+                const promises = [...selectedRecords].map(id => statusMutation.mutateAsync({ recordId: id, status: "rejected" }).catch(() => {}));
+                toast.promise(Promise.all(promises), {
+                  loading: "Rejecting records...",
+                  success: () => {
+                    setSelectedRecords(new Set());
+                    return `Rejected ${selectedRecords.size} records`;
+                  },
+                  error: "Failed to reject some records"
+                });
+              }}
+            >
+              <ThumbsDown className="mr-1.5 h-3.5 w-3.5 text-destructive" />
+              Reject
+            </Button>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="h-7 px-2 text-xs bg-destructive/10 text-destructive border-destructive/20 hover:bg-destructive/20 hover:text-destructive"
+              disabled={deleteMutation.isPending || cannotEdit}
+              onClick={() => {
+                setConfirmDialog({
+                  open: true,
+                  title: "Delete Records",
+                  description: `Are you sure you want to delete ${selectedRecords.size} records?`,
+                  onConfirm: () => {
+                    deleteMutation.mutate(Array.from(selectedRecords));
+                  }
+                });
+              }}
+            >
+              <Trash2 className="mr-1.5 h-3.5 w-3.5" />
+              Delete
+            </Button>
+          </div>
+        )}
       </div>
 
-      {selectedRecords.size > 0 && (
-        <div className="flex items-center gap-3 p-3 bg-primary/10 rounded-md border border-primary/20 text-sm">
-          <span className="font-medium text-primary">
-            {selectedRecords.size} record{selectedRecords.size > 1 ? "s" : ""} selected
-          </span>
-          <Separator orientation="vertical" className="h-4 bg-primary/20" />
-          <Button 
-            variant="outline" 
-            size="sm" 
-            className="h-8 bg-background"
-            disabled={statusMutation.isPending || cannotEdit}
-            onClick={() => {
-              const promises = [...selectedRecords].map(id => statusMutation.mutateAsync({ recordId: id, status: "approved" }).catch(() => {}));
-              toast.promise(Promise.all(promises), {
-                loading: "Approving records...",
-                success: () => {
-                  setSelectedRecords(new Set());
-                  return `Approved ${selectedRecords.size} records`;
-                },
-                error: "Failed to approve some records"
-              });
-            }}
-          >
-            <CheckCircle2 className="mr-1.5 h-3.5 w-3.5 text-emerald-600" />
-            Approve
-          </Button>
-          <Button 
-            variant="outline" 
-            size="sm" 
-            className="h-8 bg-background"
-            disabled={statusMutation.isPending || cannotEdit}
-            onClick={() => {
-              const promises = [...selectedRecords].map(id => statusMutation.mutateAsync({ recordId: id, status: "rejected" }).catch(() => {}));
-              toast.promise(Promise.all(promises), {
-                loading: "Rejecting records...",
-                success: () => {
-                  setSelectedRecords(new Set());
-                  return `Rejected ${selectedRecords.size} records`;
-                },
-                error: "Failed to reject some records"
-              });
-            }}
-          >
-            <ThumbsDown className="mr-1.5 h-3.5 w-3.5 text-destructive" />
-            Reject
-          </Button>
-
-          <Separator orientation="vertical" className="h-4 bg-primary/20 mx-1" />
-
-          <Button 
-            variant="outline" 
-            size="sm" 
-            className="h-8 bg-destructive/10 text-destructive border-destructive/20 hover:bg-destructive/20 hover:text-destructive"
-            disabled={deleteMutation.isPending || cannotEdit}
-            onClick={() => {
-              setConfirmDialog({
-                open: true,
-                title: "Delete Records",
-                description: `Are you sure you want to delete ${selectedRecords.size} records?`,
-                onConfirm: () => {
-                  deleteMutation.mutate(Array.from(selectedRecords));
-                }
-              });
-            }}
-          >
-            <Trash2 className="mr-1.5 h-3.5 w-3.5" />
-            Delete
-          </Button>
-        </div>
-      )}
+      {/* Selection actions moved to toolbar */}
 
       {/* Airtable-style grid */}
       <Card className="overflow-hidden">
@@ -1437,17 +1436,19 @@ export function DatasetDetailView() {
           >
             <TableHeader>
               <TableRow className="bg-muted/60 hover:bg-muted/60 sticky top-0 z-10">
-                <TableHead className="w-12 border-r text-center">
-                  <Checkbox 
-                    checked={selectedRecords.size > 0 && selectedRecords.size === filteredRecords.length}
-                    onCheckedChange={(checked) => {
-                      if (checked) {
-                        setSelectedRecords(new Set(filteredRecords.map((r) => r.id)));
-                      } else {
-                        setSelectedRecords(new Set());
-                      }
-                    }}
-                  />
+                <TableHead className="w-[50px] min-w-[50px] max-w-[50px] border-r p-0">
+                  <div className="flex h-full w-full items-center justify-center">
+                    <Checkbox 
+                      checked={selectedRecords.size > 0 && selectedRecords.size === filteredRecords.length}
+                      onCheckedChange={(checked) => {
+                        if (checked) {
+                          setSelectedRecords(new Set(filteredRecords.map((r) => r.id)));
+                        } else {
+                          setSelectedRecords(new Set());
+                        }
+                      }}
+                    />
+                  </div>
                 </TableHead>
                 <TableHead className="w-[120px] min-w-[120px] border-r">
                   <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
@@ -1561,16 +1562,18 @@ export function DatasetDetailView() {
                     className={`h-12 cursor-pointer hover:bg-muted/40 ${idx % 2 === 1 ? "bg-muted/20" : ""} ${selectedRecordId === r.id ? "ring-1 ring-inset ring-primary" : ""}`}
                     onClick={(e) => handleCellClick(r.id, e)}
                   >
-                    <TableCell className="border-r w-12 text-center" onClick={(e) => e.stopPropagation()}>
-                      <Checkbox 
-                        checked={selectedRecords.has(r.id)}
-                        onCheckedChange={(checked) => {
-                          const next = new Set(selectedRecords);
-                          if (checked) next.add(r.id);
-                          else next.delete(r.id);
-                          setSelectedRecords(next);
-                        }}
-                      />
+                    <TableCell className="w-[50px] min-w-[50px] max-w-[50px] border-r p-0" onClick={(e) => e.stopPropagation()}>
+                      <div className="flex h-full w-full items-center justify-center">
+                        <Checkbox 
+                          checked={selectedRecords.has(r.id)}
+                          onCheckedChange={(checked) => {
+                            const next = new Set(selectedRecords);
+                            if (checked) next.add(r.id);
+                            else next.delete(r.id);
+                            setSelectedRecords(next);
+                          }}
+                        />
+                      </div>
                     </TableCell>
                     {/* Record-status cell */}
                     <TableCell className="border-r align-middle">

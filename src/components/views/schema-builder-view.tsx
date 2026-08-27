@@ -1003,7 +1003,7 @@ export function SchemaBuilderView() {
                     />
                   </div>
                 ) : (
-                  <div className="max-h-[480px] overflow-y-auto divide-y">
+                  <div className="max-h-[480px] overflow-y-auto divide-y rounded-b-xl overflow-hidden">
                     <DndContext
                       sensors={sensors}
                       collisionDetection={closestCenter}

@@ -33,6 +33,10 @@ interface AppState {
 
   selectedSourceId: string | null;
   openSource: (id: string | null, name?: string) => void;
+  sourceBuilderDraft: any | null;
+  setSourceBuilderDraft: (draft: any | null) => void;
+  sourceBuilderStep: number;
+  setSourceBuilderStep: (step: number) => void;
 
   selectedDatasetId: string | null;
   openDataset: (id: string | null, name?: string) => void;
@@ -92,9 +96,15 @@ export const useAppStore = create<AppState>()(
       setOrganization: (id) => set({ selectedOrganizationId: id }),
 
       selectedSourceId: null,
+      sourceBuilderDraft: null,
+      sourceBuilderStep: 0,
+      setSourceBuilderDraft: (draft) => set({ sourceBuilderDraft: draft }),
+      setSourceBuilderStep: (step) => set({ sourceBuilderStep: step }),
       openSource: (id, name) =>
         set((s) => ({
           selectedSourceId: id,
+          // When opening a different source (or starting a new one explicitly), reset the draft.
+          ...(id !== s.selectedSourceId ? { sourceBuilderDraft: null, sourceBuilderStep: 0 } : {}),
           view: "source-builder",
           ...(id
             ? {
