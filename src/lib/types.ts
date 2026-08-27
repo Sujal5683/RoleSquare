@@ -399,6 +399,15 @@ export interface DashboardData {
   usageMetrics: UsageMetricDTO[];
   connectionAlerts: GoogleConnectionDTO[];
   pendingSharingRequests?: SharingRequestDTO[];
+  roleChangeAlerts?: {
+    id: string;
+    organizationId: string;
+    organizationName: string;
+    actorName: string;
+    oldRole: string;
+    newRole: string;
+    createdAt: string;
+  }[];
 }
 
 // ── AI Extraction Contract ──────────────────────────────────────────────

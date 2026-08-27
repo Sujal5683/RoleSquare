@@ -41,6 +41,7 @@ export async function GET(req: NextRequest) {
       usageRaw,
       connectionAlertsRaw,
       pendingRequestsRaw,
+      roleChangeAlertsRaw,
     ] = await Promise.all([
       db.googleConnection.count({ where: { organizationId } }),
       db.source.count({ where: { organizationId, status: "active" } }),
@@ -99,6 +100,17 @@ export async function GET(req: NextRequest) {
           ]
         },
         include: { dataset: { select: { id: true, name: true } }, requester: { select: { id: true, name: true, email: true } } }
+      }),
+      db.auditLog.findMany({
+        where: {
+          entity: "member",
+          entityId: { in: user.memberships.map((m: any) => m.id) },
+          action: "update",
+          createdAt: { gte: new Date(Date.now() - 30 * 86400_000) }
+        },
+        orderBy: { createdAt: "desc" },
+        take: 20,
+        include: { actor: { select: { id: true, name: true, email: true } }, organization: { select: { id: true, name: true } } }
       })
     ]);
 
@@ -186,6 +198,26 @@ export async function GET(req: NextRequest) {
       usageMetrics: usageRaw.map(serializeUsageMetric),
       connectionAlerts: connectionAlertsRaw.map(serializeGoogleConnection),
       pendingSharingRequests: pendingRequestsRaw.map(serializeSharingRequest),
+      roleChangeAlerts: roleChangeAlertsRaw
+        .map(log => {
+          try {
+            const before = log.before ? JSON.parse(log.before) : {};
+            const after = log.after ? JSON.parse(log.after) : {};
+            if (before.role && after.role && before.role !== after.role) {
+              return {
+                id: log.id,
+                organizationId: log.organizationId,
+                organizationName: log.organization.name,
+                actorName: log.actor?.name || log.actor?.email || "System",
+                oldRole: before.role,
+                newRole: after.role,
+                createdAt: log.createdAt.toISOString()
+              };
+            }
+          } catch (e) {}
+          return null;
+        })
+        .filter(Boolean),
       chartData,
     };
 

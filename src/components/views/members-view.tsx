@@ -181,6 +181,7 @@ function canChangeRole(actorRole: Role | undefined, targetRole: Role, isSelf: bo
 // Can actorRole assign a specific role to someone?
 function canAssignRole(actorRole: Role | undefined, roleToAssign: Role): boolean {
   if (!actorRole) return false;
+  if (actorRole === "owner" && roleToAssign === "owner") return true;
   // Actors can only assign roles strictly below their own rank
   return ROLE_RANK[actorRole] > ROLE_RANK[roleToAssign];
 }
@@ -319,13 +320,16 @@ export function MembersView() {
         `/api/organizations/${activeOrgId}/members/${memberId}`,
         { role }
       ),
-    onSuccess: (m) => {
+    onSuccess: (m, variables) => {
       toast.success("Role updated", {
         description: `${m.user.name ?? m.user.email} is now ${m.role}.`,
       });
       queryClient.invalidateQueries({
         queryKey: ["organizations", activeOrgId, "members"],
       });
+      if (variables.role === "owner") {
+         useAppStore.getState().fetchSession();
+      }
     },
     onError: (err: unknown) => {
       toast.error("Failed to change role", {
@@ -360,6 +364,17 @@ export function MembersView() {
   const [inviteOpen, setInviteOpen] = useState(false);
   const [rbacOpen, setRbacOpen] = useState(false);
   const [removeTarget, setRemoveTarget] = useState<MemberDTO | null>(null);
+  const [transferTarget, setTransferTarget] = useState<MemberDTO | null>(null);
+  const [transferInput, setTransferInput] = useState("");
+  
+  const handleRoleChange = (member: MemberDTO, newRole: Role) => {
+    if (newRole === "owner") {
+      setTransferTarget(member);
+      setTransferInput("");
+    } else {
+      changeRoleMutation.mutate({ memberId: member.id, role: newRole });
+    }
+  };
   
   const [search, setSearch] = useState("");
   const [filterRole, setFilterRole] = useState("all");
@@ -621,10 +636,7 @@ export function MembersView() {
                                     <Select
                                       value={m.role}
                                       onValueChange={(v) =>
-                                        changeRoleMutation.mutate({
-                                          memberId: m.id,
-                                          role: v as Role,
-                                        })
+                                        handleRoleChange(m, v as Role)
                                       }
                                       disabled={!canChange || changeRoleMutation.isPending}
                                     >
@@ -696,10 +708,7 @@ export function MembersView() {
                                   disabled={disabled}
                                   title={tip}
                                   onClick={() =>
-                                    !disabled && changeRoleMutation.mutate({
-                                      memberId: m.id,
-                                      role: r,
-                                    })
+                                    !disabled && handleRoleChange(m, r)
                                   }
                                 >
                                   <span className="capitalize">{r.charAt(0).toUpperCase() + r.slice(1)}</span>
@@ -783,10 +792,7 @@ export function MembersView() {
                               disabled={disabled}
                               title={tip}
                               onClick={() =>
-                                !disabled && changeRoleMutation.mutate({
-                                  memberId: m.id,
-                                  role: r,
-                                })
+                                !disabled && handleRoleChange(m, r)
                               }
                             >
                               <span className="capitalize">{r}</span>
@@ -829,10 +835,7 @@ export function MembersView() {
                                   <Select
                                     value={m.role}
                                     onValueChange={(v) =>
-                                      changeRoleMutation.mutate({
-                                        memberId: m.id,
-                                        role: v as Role,
-                                      })
+                                      handleRoleChange(m, v as Role)
                                     }
                                     disabled={!canChange || changeRoleMutation.isPending}
                                   >
@@ -886,6 +889,65 @@ export function MembersView() {
         onClose={() => setInviteOpen(false)}
       />
 
+
+      {/* Transfer ownership confirmation */}
+      <AlertDialog
+        open={!!transferTarget}
+        onOpenChange={(open) => {
+          if (!open) setTransferTarget(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Transfer Ownership?</AlertDialogTitle>
+            <AlertDialogDescription>
+              <div className="space-y-4">
+                <p>
+                  You are about to transfer ownership of this organization to{" "}
+                  <span className="font-medium text-foreground">
+                    {transferTarget?.user.name ?? transferTarget?.user.email}
+                  </span>
+                  .
+                </p>
+                <div className="rounded-md bg-destructive/15 p-3 text-sm text-destructive font-medium">
+                  Warning: You will be demoted to an Admin and lose owner privileges. This action cannot be reversed unless the new owner transfers it back to you.
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="transfer-confirm">
+                    Type <strong>transfer</strong> to confirm
+                  </Label>
+                  <Input
+                    id="transfer-confirm"
+                    value={transferInput}
+                    onChange={(e) => setTransferInput(e.target.value)}
+                    placeholder="transfer"
+                    autoComplete="off"
+                  />
+                </div>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={changeRoleMutation.isPending}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={changeRoleMutation.isPending || transferInput.trim().toLowerCase() !== "transfer"}
+              onClick={(e) => {
+                e.preventDefault();
+                if (transferTarget && transferInput.trim().toLowerCase() === "transfer") {
+                  changeRoleMutation.mutate({ memberId: transferTarget.id, role: "owner" });
+                  setTransferTarget(null);
+                }
+              }}
+            >
+              {changeRoleMutation.isPending ? "Transferring…" : "Transfer Ownership"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       {/* Remove confirmation */}
       <AlertDialog
         open={!!removeTarget}
@@ -896,14 +958,23 @@ export function MembersView() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>
-              {removeTarget?.user.id === currentUserId ? "Leave organization?" : "Remove member?"}
+              {removeTarget?.user.id === currentUserId 
+                ? (myRole === "owner" ? "Cannot leave organization" : "Leave organization?") 
+                : "Remove member?"}
             </AlertDialogTitle>
             <AlertDialogDescription>
               {removeTarget?.user.id === currentUserId ? (
-                <>
-                  Are you sure you want to leave this organization? You will lose access to all sources,
-                  datasets, and audit history. This action cannot be undone.
-                </>
+                myRole === "owner" ? (
+                  <>
+                    You cannot leave the organization because you are the owner. 
+                    Please transfer your ownership to another member or delete the organization first.
+                  </>
+                ) : (
+                  <>
+                    Are you sure you want to leave this organization? You will lose access to all sources,
+                    datasets, and audit history. This action cannot be undone.
+                  </>
+                )
               ) : (
                 <>
                   This will remove{" "}
@@ -917,23 +988,31 @@ export function MembersView() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={removeMemberMutation.isPending}>
-              Cancel
-            </AlertDialogCancel>
-            <AlertDialogAction
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              disabled={removeMemberMutation.isPending}
-              onClick={(e) => {
-                e.preventDefault();
-                if (removeTarget)
-                  removeMemberMutation.mutate(removeTarget.id);
-              }}
-            >
-              {removeMemberMutation.isPending 
-                ? (removeTarget?.user.id === currentUserId ? "Leaving…" : "Removing…") 
-                : (removeTarget?.user.id === currentUserId ? "Leave organization" : "Remove member")
-              }
-            </AlertDialogAction>
+            {removeTarget?.user.id === currentUserId && myRole === "owner" ? (
+              <AlertDialogAction onClick={() => setRemoveTarget(null)}>
+                Got it
+              </AlertDialogAction>
+            ) : (
+              <>
+                <AlertDialogCancel disabled={removeMemberMutation.isPending}>
+                  Cancel
+                </AlertDialogCancel>
+                <AlertDialogAction
+                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  disabled={removeMemberMutation.isPending}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    if (removeTarget)
+                      removeMemberMutation.mutate(removeTarget.id);
+                  }}
+                >
+                  {removeMemberMutation.isPending 
+                    ? (removeTarget?.user.id === currentUserId ? "Leaving…" : "Removing…") 
+                    : (removeTarget?.user.id === currentUserId ? "Leave organization" : "Remove member")
+                  }
+                </AlertDialogAction>
+              </>
+            )}
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

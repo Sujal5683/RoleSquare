@@ -145,6 +145,22 @@ export function NotificationsDropdown() {
       });
     }
   }
+  
+  // Role change alerts
+  if (data?.roleChangeAlerts) {
+    for (const alert of data.roleChangeAlerts) {
+      notifications.push({
+        id: `rolechange-${alert.id}`,
+        type: "info",
+        icon: Bell,
+        title: "Role Updated",
+        description: `${alert.actorName} changed your role in ${alert.organizationName} from ${alert.oldRole} to ${alert.newRole}.`,
+        timestamp: alert.createdAt,
+        action: { label: "View Members", view: "organizations" },
+        read: false,
+      });
+    }
+  }
 
   // Pending Invitations
   const { data: session } = useQuery({

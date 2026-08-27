@@ -65,13 +65,47 @@ export async function PATCH(
         { status: 403 }
       );
     }
+
+    if (before.role === "owner" && data.role && data.role !== "owner") {
+      return NextResponse.json(
+        { error: "Cannot demote yourself. Transfer ownership instead." },
+        { status: 400 }
+      );
+    }
     
-    // Cannot promote someone to a role higher than your own
+    // Cannot promote someone to a role higher than your own, but owner can transfer ownership
     if (data.role && (ROLE_LEVEL[data.role] ?? 0) > (ROLE_LEVEL[actorMembership.role as string] ?? 0)) {
        return NextResponse.json(
         { error: "You cannot promote a member to a role higher than your own" },
         { status: 403 }
       );
+    }
+
+    if (data.role === "owner" && actorMembership.role === "owner" && before.role !== "owner") {
+      // Transfer ownership
+      const [member] = await db.$transaction([
+        db.organizationMember.update({
+          where: { id: memberId },
+          data: { ...data, role: "owner" },
+          include: { user: true },
+        }),
+        db.organizationMember.update({
+          where: { id: actorMembership.id },
+          data: { role: "admin" },
+        })
+      ]);
+
+      await logAudit({
+        organizationId,
+        actorId: user.id,
+        action: "update",
+        entity: "member",
+        entityId: memberId,
+        before: { role: before.role, status: before.status },
+        after: { ...data, role: "owner" },
+      });
+
+      return NextResponse.json(serializeMember(member));
     }
 
     const member = await db.organizationMember.update({
