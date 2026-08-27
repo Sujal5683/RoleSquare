@@ -14,6 +14,7 @@ import { useState, useCallback } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { api } from "@/lib/api-client";
+import { Stepper } from "@/components/ui/stepper";
 import {
   Dialog,
   DialogContent,
@@ -174,35 +175,12 @@ export function OrgSheetsWizard({
         </DialogHeader>
 
         {/* Step indicator */}
-        <div className="flex items-center justify-between gap-1 sm:gap-2">
-          {STEPS.map((label, i) => (
-            <div key={label} className="flex items-center">
-              <div
-                className={cn(
-                  "flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[10px] font-semibold transition-colors",
-                  i < step
-                    ? "bg-emerald-500 text-white"
-                    : i === step
-                    ? "bg-primary text-primary-foreground"
-                    : "bg-muted text-muted-foreground"
-                )}
-              >
-                {i < step ? <CheckCircle2 className="h-3.5 w-3.5" /> : i + 1}
-              </div>
-              <span
-                className={cn(
-                  "ml-1.5 text-xs hidden sm:inline",
-                  i === step ? "text-foreground font-medium" : "text-muted-foreground"
-                )}
-              >
-                {label}
-              </span>
-              {i < STEPS.length - 1 && (
-                <div className="mx-1 sm:mx-2 h-px w-2 sm:w-6 bg-border hidden sm:block" />
-              )}
-            </div>
-          ))}
-        </div>
+        <Stepper
+          className="pb-2 pt-1"
+          steps={STEPS}
+          currentStep={step}
+          onChangeStep={setStep}
+        />
 
         <Separator />
 

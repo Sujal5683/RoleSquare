@@ -22,6 +22,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { ExternalLink, ChevronLeft, Download, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { GoogleSheetsAccountSelector } from "@/components/google-sheets/google-sheets-account-selector";
+import { Stepper } from "@/components/ui/stepper";
 
 type ExportMode = "new_sheet" | "new_tab" | "replace_tab" | "append_tab";
 
@@ -145,17 +146,12 @@ export function ExportWizard({
         </DialogHeader>
 
         {/* Progress */}
-        <div className="flex gap-1">
-          {STEPS.map((_, i) => (
-            <div
-              key={i}
-              className={cn(
-                "h-1 flex-1 rounded-full transition-colors",
-                i <= step ? "bg-emerald-500" : "bg-muted"
-              )}
-            />
-          ))}
-        </div>
+        <Stepper
+          className="py-2 mb-2"
+          steps={STEPS}
+          currentStep={step}
+          onChangeStep={setStep}
+        />
 
         <div className="flex-1 overflow-y-auto min-h-[220px] pr-2 -mr-2">
           {step === 0 && (
