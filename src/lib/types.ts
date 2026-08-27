@@ -78,8 +78,9 @@ export interface UserDTO {
   name: string | null;
   avatarUrl: string | null;
   role: string;
+  plan: string;
   notificationPrefs: Record<string, boolean>;
-  twoFactorEnabled?: boolean;
+  twoFactorEnabled: boolean;
 }
 
 export interface OrganizationDTO {

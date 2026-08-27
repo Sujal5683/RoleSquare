@@ -44,6 +44,7 @@ export interface SessionUser {
   name: string | null;
   avatarUrl: string | null;
   role: string; // global role: user | admin
+  plan: string; // user's billing plan
   notificationPrefs: Record<string, boolean>;
   twoFactorEnabled: boolean;
   memberships: OrgMembership[];
@@ -99,6 +100,7 @@ export async function getCurrentUser(skip2FA = false): Promise<SessionUser> {
     name: user.name,
     avatarUrl: user.avatarUrl,
     role: user.role,
+    plan: user.plan,
     notificationPrefs: JSON.parse(user.notificationPrefs || "{}"),
     twoFactorEnabled: !!user.twoFactorEnabled,
     memberships,

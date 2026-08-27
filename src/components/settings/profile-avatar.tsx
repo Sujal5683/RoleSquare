@@ -6,17 +6,8 @@ import { toast } from "sonner";
 import { api } from "@/lib/api-client";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
-} from "@/components/ui/dialog";
+import { ImageCropper } from "@/components/ui/image-cropper";
 import { Pencil } from "lucide-react";
-import ReactCrop, { type Crop, centerCrop, makeAspectCrop, type PixelCrop } from "react-image-crop";
-import "react-image-crop/dist/ReactCrop.css";
 
 export function initials(name: string | null | undefined): string {
   if (!name) return "?";
@@ -41,9 +32,6 @@ interface ProfileAvatarProps {
 export function ProfileAvatar({ user }: ProfileAvatarProps) {
   const queryClient = useQueryClient();
   const [cropImageSrc, setCropImageSrc] = useState<string | null>(null);
-  const [crop, setCrop] = useState<Crop>();
-  const [completedCrop, setCompletedCrop] = useState<PixelCrop | null>(null);
-  const imgRef = useRef<HTMLImageElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const updateAvatarMutation = useMutation({
@@ -51,24 +39,10 @@ export function ProfileAvatar({ user }: ProfileAvatarProps) {
     onSuccess: () => {
       toast.success("Profile picture updated");
       queryClient.invalidateQueries({ queryKey: ["session"] });
+      setCropImageSrc(null);
     },
     onError: () => toast.error("Failed to update profile picture"),
   });
-
-  const onImageLoad = (e: React.SyntheticEvent<HTMLImageElement>) => {
-    const { width, height } = e.currentTarget;
-    const initialCrop = centerCrop(
-      makeAspectCrop(
-        { unit: "%", width: 90 },
-        1,
-        width,
-        height
-      ),
-      width,
-      height
-    );
-    setCrop(initialCrop);
-  };
 
   const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -87,32 +61,6 @@ export function ProfileAvatar({ user }: ProfileAvatarProps) {
     };
     reader.readAsDataURL(file);
     if (fileInputRef.current) fileInputRef.current.value = "";
-  };
-
-  const handleCropSave = () => {
-    if (!imgRef.current || !cropImageSrc || !completedCrop) return;
-    const image = imgRef.current;
-    
-    const canvas = document.createElement("canvas");
-    const TARGET_SIZE = 150;
-    canvas.width = TARGET_SIZE;
-    canvas.height = TARGET_SIZE;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-
-    const scaleX = image.naturalWidth / image.width;
-    const scaleY = image.naturalHeight / image.height;
-    
-    const sx = completedCrop.x * scaleX;
-    const sy = completedCrop.y * scaleY;
-    const sWidth = completedCrop.width * scaleX;
-    const sHeight = completedCrop.height * scaleY;
-
-    ctx.drawImage(image, sx, sy, sWidth, sHeight, 0, 0, TARGET_SIZE, TARGET_SIZE);
-    
-    const compressedBase64 = canvas.toDataURL("image/jpeg", 0.7);
-    updateAvatarMutation.mutate(compressedBase64);
-    setCropImageSrc(null);
   };
 
   return (
@@ -141,46 +89,14 @@ export function ProfileAvatar({ user }: ProfileAvatarProps) {
         />
       </div>
 
-      <Dialog open={!!cropImageSrc} onOpenChange={(open) => !open && setCropImageSrc(null)}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Crop Profile Picture</DialogTitle>
-            <DialogDescription>
-              Adjust the square crop for your profile picture.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="flex justify-center items-center py-4 max-h-[60vh] overflow-auto">
-            {cropImageSrc && (
-              <ReactCrop
-                crop={crop}
-                onChange={(_, percentCrop) => setCrop(percentCrop)}
-                onComplete={(c) => setCompletedCrop(c)}
-                aspect={1}
-                circularCrop
-              >
-                <img 
-                  ref={imgRef}
-                  src={cropImageSrc} 
-                  alt="Crop preview" 
-                  onLoad={onImageLoad}
-                  className="max-w-full max-h-[50vh] object-contain"
-                />
-              </ReactCrop>
-            )}
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setCropImageSrc(null)}>
-              Cancel
-            </Button>
-            <Button 
-              onClick={handleCropSave} 
-              disabled={updateAvatarMutation.isPending}
-            >
-              {updateAvatarMutation.isPending ? "Saving..." : "Save Picture"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <ImageCropper
+        imageSrc={cropImageSrc}
+        onClose={() => setCropImageSrc(null)}
+        onSave={(base64) => updateAvatarMutation.mutate(base64)}
+        isSaving={updateAvatarMutation.isPending}
+        title="Crop Profile Picture"
+        description="Adjust the square crop for your profile picture."
+      />
     </>
   );
 }

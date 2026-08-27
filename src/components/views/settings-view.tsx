@@ -100,7 +100,9 @@ import {
   AlertTriangle,
   Pencil,
   MoreHorizontal,
-  Clock
+  Clock,
+  Database,
+  Server
 } from "lucide-react";
 import { ProfileAvatar } from "@/components/settings/profile-avatar";
 import {
@@ -1230,34 +1232,6 @@ function NotificationsSection() {
 
 // ── Billing section ──────────────────────────────────────────────────────
 
-const USAGE_METRIC_META: Record<
-  string,
-  { label: string; icon: React.ReactNode; suffix?: string }
-> = {
-  tokens: {
-    label: "Tokens used",
-    icon: <Cpu className="h-4 w-4" />,
-    suffix: "tok",
-  },
-  emails_scanned: {
-    label: "Emails scanned",
-    icon: <Mail className="h-4 w-4" />,
-  },
-  documents_parsed: {
-    label: "Documents parsed",
-    icon: <FileText className="h-4 w-4" />,
-  },
-  exports: {
-    label: "Exports run",
-    icon: <FileDown className="h-4 w-4" />,
-  },
-  storage: {
-    label: "Storage used",
-    icon: <HardDriveDownload className="h-4 w-4" />,
-    suffix: "MB",
-  },
-};
-
 function BillingSection() {
   const { data: session } = useSession();
   const activeOrgId = useActiveOrg();
@@ -1268,14 +1242,14 @@ function BillingSection() {
   const [selectedPlan, setSelectedPlan] = useState<"free" | "team" | "enterprise">("free");
 
   const {
-    data: usage,
+    data: usageTrends,
     isLoading,
     isError,
     refetch,
     isFetching,
   } = useQuery({
-    queryKey: ["usage", activeOrgId],
-    queryFn: () => api.get<{ metrics: UsageMetricDTO[]; aiCost: any }>("/api/usage"),
+    queryKey: ["usageTrends", activeOrgId],
+    queryFn: () => api.get<any>("/api/usage/trends"),
     enabled: !!activeOrgId,
   });
 
@@ -1286,11 +1260,11 @@ function BillingSection() {
   });
 
   const activeOrg = session?.organizations?.[0];
-  const plan = (activeOrg?.plan ?? "free") as "free" | "team" | "enterprise";
-  const currentPlanDef = PLANS[plan] || PLANS.free;
+  const userPlan = (session?.user?.plan ?? "free") as "free" | "team" | "enterprise";
+  const currentPlanDef = PLANS[userPlan] || PLANS.free;
 
   const upgradeMutation = useMutation({
-    mutationFn: (newPlan: string) => api.patch(`/api/organizations/${activeOrgId}`, { plan: newPlan }),
+    mutationFn: (newPlan: string) => api.patch(`/api/session`, { plan: newPlan }),
     onSuccess: (_, newPlan) => {
       toast.success(`Plan updated to ${PLANS[newPlan].name}`);
       queryClient.invalidateQueries({ queryKey: ["session"] });
@@ -1301,14 +1275,9 @@ function BillingSection() {
   });
 
   const handleUpgradeClick = () => {
-    setSelectedPlan(plan);
+    setSelectedPlan(userPlan);
     setUpgradeOpen(true);
   };
-
-  const usageByType: Record<string, number> = {};
-  for (const m of usage?.metrics ?? []) {
-    usageByType[m.metricType] = (usageByType[m.metricType] ?? 0) + m.value;
-  }
 
   return (
     <div className="space-y-4">
@@ -1331,7 +1300,7 @@ function BillingSection() {
               </div>
               <div>
                 <div className="flex items-center gap-2">
-                  <PlanBadge plan={plan} />
+                  <PlanBadge plan={userPlan} />
                   <span className="text-xs text-muted-foreground capitalize">
                     {currentPlanDef.name} plan
                   </span>
@@ -1341,8 +1310,9 @@ function BillingSection() {
                     ? "Unlimited records" 
                     : `${currentPlanDef.limits.maxRecordsPerMonth.toLocaleString()} records / month`}
                   {", "}
-                  {currentPlanDef.limits.supportLevel}
-                  {currentPlanDef.limits.ssoEnabled ? ", SSO" : ""}
+                  {currentPlanDef.limits.maxAiTokensPerMonth === -1 
+                    ? "Unlimited AI tokens" 
+                    : `${currentPlanDef.limits.maxAiTokensPerMonth.toLocaleString()} AI tokens / month`}
                 </p>
               </div>
             </div>
@@ -1387,7 +1357,7 @@ function BillingSection() {
                     {p.description}
                   </p>
                   <p className="text-[10px] text-muted-foreground mt-1">
-                    {p.limits.maxRecordsPerMonth === -1 ? "Unlimited" : p.limits.maxRecordsPerMonth.toLocaleString()} records, {p.limits.supportLevel}
+                    {p.limits.maxRecordsPerMonth === -1 ? "Unlimited" : p.limits.maxRecordsPerMonth.toLocaleString()} records, {p.limits.maxAiTokensPerMonth === -1 ? "Unlimited" : p.limits.maxAiTokensPerMonth.toLocaleString()} AI tokens, {p.limits.maxAiJobsPerMonth === -1 ? "Unlimited" : p.limits.maxAiJobsPerMonth.toLocaleString()} jobs
                   </p>
                 </div>
               </div>
@@ -1398,7 +1368,7 @@ function BillingSection() {
             <Button variant="outline" onClick={() => setUpgradeOpen(false)}>Cancel</Button>
             <Button 
               onClick={() => upgradeMutation.mutate(selectedPlan)} 
-              disabled={upgradeMutation.isPending || selectedPlan === plan}
+              disabled={upgradeMutation.isPending || selectedPlan === userPlan}
             >
               {upgradeMutation.isPending ? "Updating..." : "Confirm changes"}
             </Button>
@@ -1484,25 +1454,29 @@ function BillingSection() {
             <ErrorState message="Failed to load usage" onRetry={() => refetch()} />
           ) : (
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {Object.entries(USAGE_METRIC_META).map(([key, meta]) => {
-                const value = usageByType[key] ?? 0;
+              {usageTrends?.quotas?.map((quota: any) => {
+                const value = quota.used;
                 const display =
-                  key === "tokens" && value >= 1000
+                  quota.id === "tokens" && value >= 1000
                     ? `${(value / 1000).toFixed(1)}k`
-                    : key === "storage"
-                      ? `${(value / 1024 / 1024).toFixed(1)} MB`
-                      : String(value);
+                    : String(value);
+                    
+                // Determine icon based on quota key
+                let icon = <Cpu className="h-4 w-4" />;
+                if (quota.id === "jobs") icon = <Server className="h-4 w-4" />;
+                if (quota.id === "records") icon = <Database className="h-4 w-4" />;
+
                 return (
                   <StatCard
-                    key={key}
-                    label={meta.label}
+                    key={quota.id}
+                    label={quota.name}
                     value={display}
-                    icon={meta.icon}
+                    icon={icon}
                     hint={`Current month`}
                   />
                 );
               })}
-              {usage?.metrics && usage.metrics.length === 0 && (
+              {usageTrends?.quotas && usageTrends.quotas.length === 0 && (
                 <div className="sm:col-span-2 lg:col-span-3">
                   <EmptyState
                     icon={<CreditCard className="h-5 w-5" />}

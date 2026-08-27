@@ -13,7 +13,7 @@ import { PLANS } from "@/lib/plans";
 
 export async function GET(req: NextRequest) {
   try {
-    const { organizationId } = await requireOrgContext(req);
+    const { organizationId, user } = await requireOrgContext(req);
 
     const now = new Date();
     const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);

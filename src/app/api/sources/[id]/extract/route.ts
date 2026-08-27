@@ -94,6 +94,18 @@ export async function POST(
     }
 
     // Queue the AI_EXTRACTION job (Mode B)
+    try {
+      const { checkUserLimits } = await import("@/lib/usage");
+      await checkUserLimits(user.id, "jobs");
+      await checkUserLimits(user.id, "tokens");
+      await checkUserLimits(user.id, "records");
+    } catch (limitErr) {
+      return NextResponse.json(
+        { error: limitErr instanceof Error ? limitErr.message : "Usage limit exceeded" },
+        { status: 403 }
+      );
+    }
+
     const job = await db.aiJob.create({
       data: {
         organizationId,

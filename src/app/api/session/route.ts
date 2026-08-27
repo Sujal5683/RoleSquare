@@ -14,6 +14,7 @@ export async function GET() {
         name: user.name,
         avatarUrl: user.avatarUrl,
         role: user.role,
+        plan: user.plan,
         notificationPrefs: user.notificationPrefs,
         twoFactorEnabled: user.twoFactorEnabled,
       },
@@ -40,6 +41,9 @@ export async function PATCH(req: Request) {
     }
     if (body.notificationPrefs && typeof body.notificationPrefs === "object") {
       dataToUpdate.notificationPrefs = JSON.stringify(body.notificationPrefs);
+    }
+    if (typeof body.plan === "string") {
+      dataToUpdate.plan = body.plan;
     }
     
     if (Object.keys(dataToUpdate).length > 0) {

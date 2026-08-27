@@ -82,6 +82,7 @@ import {
   X,
   Copy,
   Filter,
+  Square,
 } from "lucide-react";
 import {
   Sheet,
@@ -175,6 +176,19 @@ export function SourcesView() {
     onError: (err: unknown) => {
       const msg = err instanceof Error ? err.message : "Failed to trigger scan";
       toast.error("Scan failed", { description: msg });
+    },
+  });
+
+  const cancelScanMutation = useMutation({
+    mutationFn: (id: string) =>
+      api.post(`/api/sources/${id}/cancel-scan`),
+    onSuccess: () => {
+      toast.success("Scan cancellation requested");
+      queryClient.invalidateQueries({ queryKey: ["sources"] });
+    },
+    onError: (err: unknown) => {
+      const msg = err instanceof Error ? err.message : "Failed to cancel scan";
+      toast.error("Cancellation failed", { description: msg });
     },
   });
 
@@ -706,20 +720,37 @@ export function SourcesView() {
                                                                 >
                                                                   <History className="h-4 w-4" />
                                                                 </Button></TooltipTrigger><TooltipContent>View Runs</TooltipContent></Tooltip>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="h-8"
-                              onClick={() => scanMutation.mutate(s.id)}
-                              disabled={isScanning || scanMutation.isPending}
-                            >
-                              {isScanning ? (
-                                <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
-                              ) : (
-                                <Play className="mr-2 h-4 w-4" />
+                            <div className="flex items-center gap-1">
+                              <Button
+                                variant="secondary"
+                                size="sm"
+                                className="h-7 px-2.5 text-xs w-[90px]"
+                                onClick={() => scanMutation.mutate(s.id)}
+                                disabled={isScanning || scanMutation.isPending}
+                              >
+                                {isScanning ? (
+                                  <div className="mr-1.5 h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent opacity-60" />
+                                ) : (
+                                  <RefreshCw className="mr-1.5 h-3 w-3" />
+                                )}
+                                {isScanning ? "Scanning…" : "Scan"}
+                              </Button>
+                              {isScanning && (
+                                <Button
+                                  variant="destructive"
+                                  size="icon"
+                                  className="h-7 w-7"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    cancelScanMutation.mutate(s.id);
+                                  }}
+                                  disabled={cancelScanMutation.isPending}
+                                  title="Stop Scan"
+                                >
+                                  <Square className="h-3 w-3 fill-current" />
+                                </Button>
                               )}
-                              {isScanning ? "Scanning…" : "Scan"}
-                            </Button>
+                            </div>
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
                                 <Button
@@ -894,19 +925,32 @@ export function SourcesView() {
               </SheetBody>
 
               <SheetFooter>
-                <Button
-                  variant="outline"
-                  className="flex-1"
-                  onClick={() => scanMutation.mutate(detailsSource.id)}
-                  disabled={detailsSource.runState !== "idle" || scanMutation.isPending}
-                >
-                  {detailsSource.runState !== "idle" ? (
-                    <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
-                  ) : (
-                    <Play className="mr-2 h-4 w-4" />
+                <div className="flex flex-1 items-center gap-2">
+                  <Button
+                    variant="outline"
+                    className="flex-1"
+                    onClick={() => scanMutation.mutate(detailsSource.id)}
+                    disabled={detailsSource.runState !== "idle" || scanMutation.isPending}
+                  >
+                    {detailsSource.runState !== "idle" ? (
+                      <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <Play className="mr-2 h-4 w-4" />
+                    )}
+                    {detailsSource.runState !== "idle" ? "Scanning…" : "Scan Now"}
+                  </Button>
+                  {detailsSource.runState !== "idle" && (
+                    <Button
+                      variant="destructive"
+                      size="icon"
+                      onClick={() => cancelScanMutation.mutate(detailsSource.id)}
+                      disabled={cancelScanMutation.isPending}
+                      title="Stop Scan"
+                    >
+                      <Square className="h-4 w-4 fill-current" />
+                    </Button>
                   )}
-                  {detailsSource.runState !== "idle" ? "Scanning…" : "Scan Now"}
-                </Button>
+                </div>
                 <Button className="flex-1" onClick={() => {
                   openSource(detailsSource.id, detailsSource.name);
                   setDetailsSource(null);

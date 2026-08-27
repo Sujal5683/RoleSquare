@@ -14,17 +14,22 @@ import { modelDisplayName } from "@/lib/model-pricing";
 
 export async function GET(req: NextRequest) {
   try {
-    const { organizationId } = await requireOrgContext(req);
+    const { organizationId, user } = await requireOrgContext(req);
 
     // Period: first day of current month to now
     const now = new Date();
     const periodStart = new Date(now.getFullYear(), now.getMonth(), 1);
 
     const [metrics, aiOutputRows] = await Promise.all([
-      currentMonthUsage(organizationId),
+      db.usageMetric.findMany({
+        where: {
+          organizationId,
+          periodStart: { gte: periodStart },
+        },
+      }),
       db.aiOutput.findMany({
         where: {
-          job: { organizationId },
+          job: { userId: user.id },
           createdAt: { gte: periodStart },
         },
         select: {

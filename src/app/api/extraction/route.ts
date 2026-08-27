@@ -41,6 +41,17 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    try {
+      const { checkUserLimits } = await import("@/lib/usage");
+      await checkUserLimits(user.id, "tokens");
+      await checkUserLimits(user.id, "records");
+    } catch (limitErr) {
+      return NextResponse.json(
+        { error: limitErr instanceof Error ? limitErr.message : "Usage limit exceeded" },
+        { status: 403 }
+      );
+    }
+
     const schema = await db.schema.findUnique({
       where: { id: schemaId },
       include: { fields: { orderBy: { position: "asc" } } },
