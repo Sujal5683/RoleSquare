@@ -13,6 +13,7 @@ import type {
   UserDTO,
 } from "@/lib/types";
 import { PLANS } from "@/lib/plans";
+import { formatCompactNumber } from "@/lib/utils";
 import {
   PageHeader,
   EmptyState,
@@ -1308,11 +1309,11 @@ function BillingSection() {
                 <p className="text-sm text-muted-foreground mt-0.5">
                   {currentPlanDef.limits.maxRecordsPerMonth === -1 
                     ? "Unlimited records" 
-                    : `${currentPlanDef.limits.maxRecordsPerMonth.toLocaleString()} records / month`}
+                    : `${formatCompactNumber(currentPlanDef.limits.maxRecordsPerMonth)} records / month`}
                   {", "}
                   {currentPlanDef.limits.maxAiTokensPerMonth === -1 
                     ? "Unlimited AI tokens" 
-                    : `${currentPlanDef.limits.maxAiTokensPerMonth.toLocaleString()} AI tokens / month`}
+                    : `${formatCompactNumber(currentPlanDef.limits.maxAiTokensPerMonth)} AI tokens / month`}
                 </p>
               </div>
             </div>
@@ -1373,15 +1374,15 @@ function BillingSection() {
                   <div className="flex-1 space-y-2 text-xs">
                     <div className="flex items-center">
                       <Check className="h-3 w-3 text-emerald-500 mr-2 flex-shrink-0" />
-                      <span>{p.limits.maxRecordsPerMonth === -1 ? "Unlimited" : p.limits.maxRecordsPerMonth.toLocaleString()} records/mo</span>
+                      <span>{p.limits.maxRecordsPerMonth === -1 ? "Unlimited" : formatCompactNumber(p.limits.maxRecordsPerMonth)} records/mo</span>
                     </div>
                     <div className="flex items-center">
                       <Check className="h-3 w-3 text-emerald-500 mr-2 flex-shrink-0" />
-                      <span>{p.limits.maxAiTokensPerMonth === -1 ? "Unlimited" : p.limits.maxAiTokensPerMonth.toLocaleString()} AI tokens/mo</span>
+                      <span>{p.limits.maxAiTokensPerMonth === -1 ? "Unlimited" : formatCompactNumber(p.limits.maxAiTokensPerMonth)} AI tokens/mo</span>
                     </div>
                     <div className="flex items-center">
                       <Check className="h-3 w-3 text-emerald-500 mr-2 flex-shrink-0" />
-                      <span>{p.limits.maxAiJobsPerMonth === -1 ? "Unlimited" : p.limits.maxAiJobsPerMonth.toLocaleString()} AI jobs/mo</span>
+                      <span>{p.limits.maxAiJobsPerMonth === -1 ? "Unlimited" : formatCompactNumber(p.limits.maxAiJobsPerMonth)} AI jobs/mo</span>
                     </div>
                     <div className="flex items-center">
                       <Check className="h-3 w-3 text-emerald-500 mr-2 flex-shrink-0" />

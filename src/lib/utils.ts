@@ -8,7 +8,7 @@ export function cn(...inputs: ClassValue[]) {
 export function formatCompactNumber(n: number): string {
   if (n === -1) return "Unlimited";
   if (n >= 1000000) {
-    return `${parseFloat((n / 1000000).toFixed(1))}M`;
+    return `${parseFloat((n / 1000000).toFixed(2))}M`;
   }
   return n.toLocaleString();
 }
