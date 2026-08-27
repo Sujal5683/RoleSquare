@@ -3,6 +3,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api-client";
 import { useAppStore } from "@/lib/store";
+import { formatCompactNumber } from "@/lib/utils";
 import { PageHeader, StatCard, LoadingState, EmptyState } from "@/components/ui/page-elements";
 import { JobTypeBadge, StatusBadge } from "@/components/ui/status-badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -113,7 +114,7 @@ export function UsageView() {
   }
 
   const ms = data.monthlySummary;
-  const fmt = (n: number) => n.toLocaleString();
+  const fmt = formatCompactNumber;
   const fmtMoney = (n: number) => `$${n.toFixed(2)}`;
 
   return (
