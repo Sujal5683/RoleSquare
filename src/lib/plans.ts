@@ -22,9 +22,9 @@ export const PLANS: Record<string, PlanDef> = {
     priceUsd: 0,
     description: "Perfect for exploring the platform and small projects.",
     limits: {
-      maxRecordsPerMonth: 1000,
-      maxAiTokensPerMonth: 10000, // Developer can change this
-      maxAiJobsPerMonth: 50,
+      maxRecordsPerMonth: 10000,
+      maxAiTokensPerMonth: 25000000,
+      maxAiJobsPerMonth: 1000,
       supportLevel: "Community support",
       ssoEnabled: false,
     },
@@ -35,9 +35,9 @@ export const PLANS: Record<string, PlanDef> = {
     priceUsd: 49,
     description: "For growing teams needing more volume and priority support.",
     limits: {
-      maxRecordsPerMonth: 10000,
-      maxAiTokensPerMonth: 100000,
-      maxAiJobsPerMonth: 500,
+      maxRecordsPerMonth: 100000,
+      maxAiTokensPerMonth: 100000000,
+      maxAiJobsPerMonth: 10000,
       supportLevel: "Priority support",
       ssoEnabled: false,
     },
