@@ -26,6 +26,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Dialog,
   DialogContent,
@@ -343,26 +344,16 @@ export function OrganizationsView() {
               </SelectContent>
             </Select>
 
-            <div className="flex items-center rounded-md border p-1 ml-auto shrink-0 bg-muted/20">
-              <Button
-                variant={viewMode === "card" ? "secondary" : "ghost"}
-                size="icon"
-                className="h-8 w-8"
-                onClick={() => setViewMode("card")}
-                title="Card view"
-              >
-                <LayoutGrid className="h-4 w-4" />
-              </Button>
-              <Button
-                variant={viewMode === "list" ? "secondary" : "ghost"}
-                size="icon"
-                className="h-8 w-8"
-                onClick={() => setViewMode("list")}
-                title="List view"
-              >
-                <LayoutList className="h-4 w-4" />
-              </Button>
-            </div>
+            <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as any)} className="ml-auto shrink-0">
+              <TabsList className="h-8 p-1">
+                <TabsTrigger value="card" className="h-6 w-6 p-0" title="Grid view">
+                  <LayoutGrid className="h-3.5 w-3.5" />
+                </TabsTrigger>
+                <TabsTrigger value="list" className="h-6 w-6 p-0" title="List view">
+                  <LayoutList className="h-3.5 w-3.5" />
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
           </div>
         </CardContent>
       </Card>

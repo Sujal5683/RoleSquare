@@ -242,14 +242,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                     className={cn(
                       "flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-sm font-medium transition-colors group",
                       active
-                        ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-sm"
-                        : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                        ? "bg-sidebar-primary/15 border border-sidebar-primary/20 text-sidebar-primary shadow-sm backdrop-blur-xl"
+                        : "border border-transparent text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
                     )}
                   >
                     <Icon className={cn("h-4 w-4 shrink-0 transition-transform group-hover:scale-110", active && "scale-110")} />
                     <span className="truncate">{item.label}</span>
                     {active && (
-                      <span className="ml-auto h-1.5 w-1.5 rounded-full bg-sidebar-primary-foreground/70" />
+                      <span className="ml-auto h-1.5 w-1.5 rounded-full bg-sidebar-primary" />
                     )}
                   </button>
                 );

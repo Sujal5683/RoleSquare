@@ -40,6 +40,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Table,
   TableBody,
@@ -1099,7 +1100,7 @@ export function DatasetDetailView() {
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <div>
-                          <Button size="sm" className="gap-1.5 bg-gradient-to-r from-cyan-600/50 to-blue-600/50 text-white/70 shadow-sm" disabled>
+                          <Button size="sm" className="gap-1.5 bg-gradient-to-r from-cyan-600/10 to-blue-600/10 border border-blue-500/15 text-blue-700/50 dark:text-blue-300/50 backdrop-blur-xl shadow-sm" disabled>
                             <Bot className="h-3.5 w-3.5" />
                             Extract Custom Fields (AI)
                           </Button>
@@ -1113,7 +1114,7 @@ export function DatasetDetailView() {
                 ) : (
                   <Button
                     size="sm"
-                    className="gap-1.5 bg-gradient-to-r from-cyan-600 to-blue-600 text-white hover:from-cyan-700 hover:to-blue-700 shadow-sm"
+                    className="gap-1.5 bg-gradient-to-r from-cyan-600/15 to-blue-600/15 border border-blue-500/20 text-blue-700 dark:text-blue-300 backdrop-blur-xl hover:from-cyan-600/25 hover:to-blue-600/25 shadow-sm"
                     onClick={() => setExtractDialog(true)}
                     title="Run AI extraction from this Default Dataset into a new Custom Dataset"
                   >
@@ -1124,26 +1125,16 @@ export function DatasetDetailView() {
               )}
 
               {/* List / Card view toggle */}
-              <div className="flex items-center rounded-md border p-0.5 shrink-0 bg-muted/20">
-                <Button
-                  variant={viewMode === "list" ? "secondary" : "ghost"}
-                  size="icon"
-                  className="h-7 w-7"
-                  onClick={() => setViewMode("list")}
-                  title="List view (Spreadsheet)"
-                >
-                  <LayoutList className="h-3.5 w-3.5" />
-                </Button>
-                <Button
-                  variant={viewMode === "card" ? "secondary" : "ghost"}
-                  size="icon"
-                  className="h-7 w-7"
-                  onClick={() => setViewMode("card")}
-                  title="Card view"
-                >
-                  <LayoutGrid className="h-3.5 w-3.5" />
-                </Button>
-              </div>
+              <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as any)} className="shrink-0">
+                <TabsList className="h-8 p-1">
+                  <TabsTrigger value="card" className="h-6 w-6 p-0" title="Card view">
+                    <LayoutGrid className="h-3.5 w-3.5" />
+                  </TabsTrigger>
+                  <TabsTrigger value="list" className="h-6 w-6 p-0" title="List view (Spreadsheet)">
+                    <LayoutList className="h-3.5 w-3.5" />
+                  </TabsTrigger>
+                </TabsList>
+              </Tabs>
 
               {/* Column visibility */}
               <Popover>

@@ -333,7 +333,7 @@ function TestSandboxTab() {
             disabled={
               runMutation.isPending || !schemaId || !sourceText.trim()
             }
-            className="w-full gap-1.5 bg-gradient-to-r from-cyan-600 to-blue-600 text-white hover:from-cyan-700 hover:to-blue-700 shadow-sm"
+            className="w-full gap-1.5 bg-gradient-to-r from-cyan-600/15 to-blue-600/15 border border-blue-500/20 text-blue-700 dark:text-blue-300 backdrop-blur-xl hover:from-cyan-600/25 hover:to-blue-600/25 shadow-sm"
           >
             {runMutation.isPending ? (
               <RefreshCw className="h-3.5 w-3.5 animate-spin" />

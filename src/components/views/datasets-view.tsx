@@ -27,6 +27,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Dialog,
   DialogContent,
@@ -292,35 +293,19 @@ export function DatasetsView() {
                   <Filter className="h-4 w-4" />
                 </Button>
                 {/* View mode toggle */}
-                <div className="flex items-center gap-0.5 rounded-lg border p-0.5">
-                  <Button
-                    variant={viewMode === "grid" ? "secondary" : "ghost"}
-                    size="icon"
-                    className="h-7 w-7"
-                    onClick={() => setViewMode("grid")}
-                    title="Grid view"
-                  >
-                    <LayoutGrid className="h-3.5 w-3.5" />
-                  </Button>
-                  <Button
-                    variant={viewMode === "columns" ? "secondary" : "ghost"}
-                    size="icon"
-                    className="h-7 w-7"
-                    onClick={() => setViewMode("columns")}
-                    title="Columns view (2 columns)"
-                  >
-                    <Columns3 className="h-3.5 w-3.5" />
-                  </Button>
-                  <Button
-                    variant={viewMode === "list" ? "secondary" : "ghost"}
-                    size="icon"
-                    className="h-7 w-7"
-                    onClick={() => setViewMode("list")}
-                    title="List view"
-                  >
-                    <LayoutList className="h-3.5 w-3.5" />
-                  </Button>
-                </div>
+                <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as any)} className="shrink-0">
+                  <TabsList className="h-8 p-1">
+                    <TabsTrigger value="grid" className="h-6 w-6 p-0" title="Grid view">
+                      <LayoutGrid className="h-3.5 w-3.5" />
+                    </TabsTrigger>
+                    <TabsTrigger value="columns" className="h-6 w-6 p-0" title="Columns view (2 columns)">
+                      <Columns3 className="h-3.5 w-3.5" />
+                    </TabsTrigger>
+                    <TabsTrigger value="list" className="h-6 w-6 p-0" title="List view">
+                      <LayoutList className="h-3.5 w-3.5" />
+                    </TabsTrigger>
+                  </TabsList>
+                </Tabs>
               </div>
             </div>
 
