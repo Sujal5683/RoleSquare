@@ -122,6 +122,7 @@ function formatDate(iso: string | null): string {
 }
 
 import { useActiveOrg } from "@/hooks/use-active-org";
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 
 // ── Component ────────────────────────────────────────────────────────────
 
@@ -432,14 +433,13 @@ export function SourcesView() {
                     <SelectItem value="error">Error</SelectItem>
                   </SelectContent>
                 </Select>
-                <Button
-                  variant={showFilters ? "secondary" : "outline"}
-                  size="icon"
-                  onClick={() => setShowFilters(!showFilters)}
-                  title="Toggle advanced filters"
-                >
-                  <Filter className="h-4 w-4" />
-                </Button>
+                <Tooltip><TooltipTrigger asChild><Button
+                                                variant={showFilters ? "secondary" : "outline"}
+                                                size="icon"
+                                                onClick={() => setShowFilters(!showFilters)}
+                                              >
+                                                <Filter className="h-4 w-4" />
+                                              </Button></TooltipTrigger><TooltipContent>Toggle advanced filters</TooltipContent></Tooltip>
               </div>
             </div>
 
@@ -511,15 +511,14 @@ export function SourcesView() {
                 <span className="text-xs font-medium text-muted-foreground">
                   {selectedIds.size} selected
                 </span>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-7 w-7 text-muted-foreground"
-                  onClick={clearSelection}
-                  title="Clear selection"
-                >
-                  <X className="h-3.5 w-3.5" />
-                </Button>
+                <Tooltip><TooltipTrigger asChild><Button
+                                                variant="ghost"
+                                                size="icon"
+                                                className="h-7 w-7 text-muted-foreground"
+                                                onClick={clearSelection}
+                                              >
+                                                <X className="h-3.5 w-3.5" />
+                                              </Button></TooltipTrigger><TooltipContent>Clear selection</TooltipContent></Tooltip>
               </div>
               <Button
                 variant="outline"
@@ -699,15 +698,14 @@ export function SourcesView() {
                         </TableCell>
                         <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
                           <div className="flex items-center justify-end gap-1.5">
-                            <Button
-                              variant="outline"
-                              size="icon"
-                              className="h-8 w-8"
-                              onClick={() => setRunsDialogSource(s)}
-                              title="View Runs"
-                            >
-                              <History className="h-4 w-4" />
-                            </Button>
+                            <Tooltip><TooltipTrigger asChild><Button
+                                                                  variant="outline"
+                                                                  size="icon"
+                                                                  className="h-8 w-8"
+                                                                  onClick={() => setRunsDialogSource(s)}
+                                                                >
+                                                                  <History className="h-4 w-4" />
+                                                                </Button></TooltipTrigger><TooltipContent>View Runs</TooltipContent></Tooltip>
                             <Button
                               variant="outline"
                               size="sm"

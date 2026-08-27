@@ -89,15 +89,34 @@ const SOURCE_TYPES: { value: SourceType; label: string; icon: React.ReactNode }[
   { value: "forms", label: "Forms", icon: <FormInput className="h-4 w-4" /> },
 ];
 
-const FILTER_TYPES = [
-  { value: "sender", label: "Sender" },
-  { value: "subject", label: "Subject" },
-  { value: "body", label: "Body" },
-  { value: "date", label: "Date" },
-  { value: "attachment", label: "Attachment" },
-  { value: "link", label: "Link" },
-  { value: "drive_link", label: "Google Drive link" },
-];
+const FILTER_TYPES_BY_SOURCE: Record<SourceType, { value: string; label: string }[]> = {
+  gmail: [
+    { value: "sender", label: "Sender" },
+    { value: "subject", label: "Subject" },
+    { value: "body", label: "Body" },
+    { value: "date", label: "Date" },
+    { value: "attachment", label: "Attachment" },
+    { value: "link", label: "Link" },
+    { value: "drive_link", label: "Google Drive link" },
+  ],
+  drive: [
+    { value: "folder_id", label: "Folder ID" },
+    { value: "file_name", label: "File Name" },
+    { value: "mime_type", label: "MIME Type" },
+    { value: "owner", label: "Owner" },
+  ],
+  docs: [
+    { value: "folder_id", label: "Folder ID" },
+    { value: "document_id", label: "Document ID" },
+  ],
+  sheets: [
+    { value: "spreadsheet_id", label: "Spreadsheet ID" },
+    { value: "sheet_name", label: "Sheet Name" },
+  ],
+  forms: [
+    { value: "form_id", label: "Form ID" },
+  ],
+};
 
 const OPERATORS = [
   { value: "eq", label: "Equals" },
@@ -158,8 +177,8 @@ function ruleValueFromString(raw: string): unknown {
   return trimmed;
 }
 
-function ruleToText(r: RuleDraft): string {
-  const ft = FILTER_TYPES.find((f) => f.value === r.filterType)?.label ?? r.filterType;
+function ruleToText(r: RuleDraft, sourceType: SourceType): string {
+  const ft = FILTER_TYPES_BY_SOURCE[sourceType]?.find((f) => f.value === r.filterType)?.label ?? r.filterType;
   
   if (r.filterType === "attachment") {
     if (r.value === "true") {
@@ -282,6 +301,7 @@ export function SourceBuilderView() {
     try {
       const res = await api.post("/api/sources/test-scan", {
         googleConnectionId: form.googleConnectionId,
+        sourceType: form.sourceType,
         rules: form.rules,
         ruleOperator: form.ruleOperator,
       });
@@ -479,7 +499,7 @@ export function SourceBuilderView() {
         icon={<Sparkles className="h-5 w-5" />}
         actions={
           <Button
-            variant="ghost"
+            variant="outline"
             size="sm"
             onClick={() => {
               openSource(null);
@@ -754,7 +774,7 @@ export function SourceBuilderView() {
                                   <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>
-                                  {FILTER_TYPES.map((f) => (
+                                  {(FILTER_TYPES_BY_SOURCE[form.sourceType] || []).map((f) => (
                                     <SelectItem key={f.value} value={f.value}>
                                       {f.label}
                                     </SelectItem>
@@ -851,7 +871,7 @@ export function SourceBuilderView() {
                       <ul className="space-y-1 text-xs">
                         {form.rules.map((r) => (
                           <li key={r.id} className="font-mono">
-                            • {ruleToText(r)}
+                            • {ruleToText(r, form.sourceType)}
                           </li>
                         ))}
                       </ul>
@@ -881,7 +901,7 @@ export function SourceBuilderView() {
                   {simulationResult && (
                     <div className="rounded-md border p-3 mt-2 bg-muted/10 space-y-2">
                       <p className="text-xs font-mono text-muted-foreground">
-                        Gmail Query: {simulationResult.query || "(matches all emails)"}
+                        {form.sourceType === "gmail" ? "Gmail Query:" : "Query:"} {simulationResult.query || "(matches all)"}
                       </p>
                       <p className="text-xs font-medium">Found ~{simulationResult.count} matches. Previewing top 5:</p>
                       <div className="space-y-1.5 divide-y max-h-60 overflow-y-auto pr-2">
@@ -1136,7 +1156,7 @@ export function SourceBuilderView() {
                     <ul className="ml-4 space-y-1 text-xs text-muted-foreground">
                       {form.rules.map((r) => (
                         <li key={r.id} className="font-mono">
-                          • {ruleToText(r)}
+                          • {ruleToText(r, form.sourceType)}
                         </li>
                       ))}
                     </ul>
@@ -1166,7 +1186,7 @@ export function SourceBuilderView() {
               <Separator />
               <div className="flex items-center justify-between pt-1">
                 <Button
-                  variant="ghost"
+                  variant="outline"
                   size="sm"
                   onClick={handleBack}
                   disabled={step === 0 || isSubmitting}
@@ -1253,7 +1273,7 @@ export function SourceBuilderView() {
                   <ul className="space-y-1.5 text-xs">
                     {form.rules.map((r) => (
                       <li key={r.id} className="font-mono text-muted-foreground">
-                        • {ruleToText(r)}
+                        • {ruleToText(r, form.sourceType)}
                       </li>
                     ))}
                   </ul>

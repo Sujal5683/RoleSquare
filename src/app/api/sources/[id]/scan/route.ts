@@ -9,6 +9,7 @@ import { logAudit } from "@/lib/audit";
 import { serializeSourceRun } from "@/lib/serialize";
 import { dispatchWebhookEvent } from "@/lib/webhook-dispatcher";
 import { ensureJobRunnerStarted } from "@/lib/job-runner";
+import { getJobTypeForSource } from "@/lib/types";
 
 export async function POST(
   req: NextRequest,
@@ -56,7 +57,7 @@ export async function POST(
         data: {
           organizationId,
           userId: user.id,
-          type: "GMAIL_SCAN",
+          type: getJobTypeForSource(source.sourceType as any),
           status: "queued", // Job runner picks up "queued" jobs
           payload: JSON.stringify({ sourceId: id, runId: run.id, mode, triggeredBy: "scan" }),
           progress: 0,

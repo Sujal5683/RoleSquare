@@ -39,12 +39,25 @@ export type JobType =
   | "SHEETS_SCAN"
   | "DOCS_SCAN"
   | "FORMS_SCAN"
+  | "DETERMINISTIC_SYNC"
   | "EMAIL_PARSE"
   | "ATTACHMENT_PROCESS"
   | "DOCUMENT_PARSE"
+  | "DRIVE_DISCOVERY"
   | "AI_EXTRACTION"
   | "AI_VALIDATION"
   | "EXPORT";
+
+export function getJobTypeForSource(sourceType: SourceType): JobType {
+  const map: Record<SourceType, JobType> = {
+    gmail: "GMAIL_SCAN",
+    drive: "DRIVE_SCAN",
+    sheets: "SHEETS_SCAN",
+    docs: "DOCS_SCAN",
+    forms: "FORMS_SCAN",
+  };
+  return map[sourceType] ?? "GMAIL_SCAN";
+}
 
 export type JobStatus = "queued" | "running" | "success" | "failed" | "retry" | "dlq" | "cancelled";
 

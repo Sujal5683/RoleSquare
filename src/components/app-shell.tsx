@@ -65,6 +65,7 @@ import { UsageView } from "./views/usage-view";
 import { OrganizationsView } from "./views/organizations-view";
 import { AssistantButton } from "./assistant/assistant-button";
 import { AssistantPanel } from "./assistant/assistant-panel";
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 
 interface NavItem {
   id: ViewId;
@@ -377,19 +378,18 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
         <div className="ml-auto flex items-center gap-1">
           <NotificationsDropdown />
-          <Button
-            variant="ghost"
-            size="icon"
-            title="Help & shortcuts (?)"
-            onClick={() => {
-              window.dispatchEvent(new KeyboardEvent("keydown", { key: "?", shiftKey: true }));
-            }}
-          >
-            <HelpCircle className="h-4 w-4" />
-          </Button>
-          <Button variant="ghost" size="icon" onClick={toggleTheme} title="Toggle theme (Alt+T)">
-            {theme === "light" ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />}
-          </Button>
+          <Tooltip><TooltipTrigger asChild><Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => {
+                                window.dispatchEvent(new KeyboardEvent("keydown", { key: "?", shiftKey: true }));
+                              }}
+                            >
+                              <HelpCircle className="h-4 w-4" />
+                            </Button></TooltipTrigger><TooltipContent>Help & shortcuts (?)</TooltipContent></Tooltip>
+          <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" onClick={toggleTheme}>
+                              {theme === "light" ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />}
+                            </Button></TooltipTrigger><TooltipContent>Toggle theme (Alt+T)</TooltipContent></Tooltip>
 
           {/* User menu */}
           <DropdownMenu>

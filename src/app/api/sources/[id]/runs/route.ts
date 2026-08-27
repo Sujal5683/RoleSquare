@@ -9,6 +9,7 @@ import { requireOrgContext, AuthError, authErrorResponse , requireRole} from "@/
 import { logAudit } from "@/lib/audit";
 import { serializeSourceRun } from "@/lib/serialize";
 import { ensureJobRunnerStarted } from "@/lib/job-runner";
+import { getJobTypeForSource } from "@/lib/types";
 
 async function requireSource(id: string, organizationId: string) {
   const s = await db.source.findUnique({ where: { id } });
@@ -88,7 +89,7 @@ export async function POST(
         data: {
           organizationId,
           userId: user.id,
-          type: "GMAIL_SCAN",
+          type: getJobTypeForSource(source.sourceType as any),
           status: "queued", // Job runner picks up "queued" jobs
           payload: JSON.stringify({ sourceId: id, runId: run.id, mode }),
           progress: 0,

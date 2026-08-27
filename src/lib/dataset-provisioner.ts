@@ -56,6 +56,7 @@ export async function ensureDefaultDataset(sourceId: string): Promise<string> {
       organizationId: true,
       ownerUserId: true,
       datasetId: true,
+      sourceType: true,
     },
   });
   if (!source) throw new Error(`Source ${sourceId} not found`);
@@ -66,11 +67,11 @@ export async function ensureDefaultDataset(sourceId: string): Promise<string> {
   }
 
   // Ensure the default schema exists
-  const { id: schemaId } = await ensureDefaultSchema(source.organizationId);
+  const { id: schemaId } = await ensureDefaultSchema(source.organizationId, source.sourceType as any);
 
   // Find or create the default dataset
   const existing = await db.dataset.findFirst({
-    where: { organizationId: source.organizationId, isDefault: true },
+    where: { organizationId: source.organizationId, isDefault: true, schemaId },
     select: { id: true },
   });
 
@@ -84,7 +85,7 @@ export async function ensureDefaultDataset(sourceId: string): Promise<string> {
         schemaId,
         createdBy: source.ownerUserId,
         name: `${source.name} ${DEFAULT_DATASET_SUFFIX}`,
-        description: "Auto-created default dataset for deterministic email extraction",
+        description: `Auto-created default dataset for ${source.sourceType} extraction`,
         isDefault: true,
         datasetType: "default",
       },

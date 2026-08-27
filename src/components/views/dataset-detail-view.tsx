@@ -894,7 +894,7 @@ export function DatasetDetailView() {
         title="No dataset selected"
         description="Pick a dataset to explore its records."
         action={
-          <Button size="sm" onClick={() => setView("datasets")}>
+          <Button variant="outline" size="sm" onClick={() => setView("datasets")}>
             <ArrowLeft className="mr-2 h-3.5 w-3.5" />
             Back to datasets
           </Button>
@@ -1012,13 +1012,12 @@ export function DatasetDetailView() {
                   {view.statusFilter}
                 </Badge>
               )}
-              <button
-                onClick={() => deleteView(view.id)}
-                className="ml-1 opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive transition-opacity"
-                title="Delete view"
-              >
-                ×
-              </button>
+              <Tooltip><TooltipTrigger asChild><button
+                                  onClick={() => deleteView(view.id)}
+                                  className="ml-1 opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive transition-opacity"
+                                >
+                                  ×
+                                </button></TooltipTrigger><TooltipContent>Delete view</TooltipContent></Tooltip>
             </div>
           ))}
         </div>
@@ -1082,15 +1081,14 @@ export function DatasetDetailView() {
                   </Tooltip>
                 </TooltipProvider>
               ) : (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setSheetsPanelOpen(true)}
-                  title="Connect to Google Sheets"
-                >
-                  <FileSpreadsheet className="mr-1.5 h-3.5 w-3.5 text-emerald-500" />
-                  Connect Sheets
-                </Button>
+                <Tooltip><TooltipTrigger asChild><Button
+                                                    variant="outline"
+                                                    size="sm"
+                                                    onClick={() => setSheetsPanelOpen(true)}
+                                                  >
+                                                    <FileSpreadsheet className="mr-1.5 h-3.5 w-3.5 text-emerald-500" />
+                                                    Connect Sheets
+                                                  </Button></TooltipTrigger><TooltipContent>Connect to Google Sheets</TooltipContent></Tooltip>
               )}
 
               {/* AI Extract — primary action when available */}
@@ -1112,36 +1110,49 @@ export function DatasetDetailView() {
                     </Tooltip>
                   </TooltipProvider>
                 ) : (
-                  <Button
-                    size="sm"
-                    className="gap-1.5 bg-transparent hover:bg-transparent bg-gradient-to-r from-cyan-600/15 to-blue-600/15 border border-blue-500/20 text-blue-700 dark:text-blue-300 backdrop-blur-xl hover:from-cyan-600/25 hover:to-blue-600/25 shadow-sm"
-                    onClick={() => setExtractDialog(true)}
-                    title="Run AI extraction from this Default Dataset into a new Custom Dataset"
-                  >
-                    <Bot className="h-3.5 w-3.5" />
-                    Extract Custom Fields (AI)
-                  </Button>
+                  <Tooltip><TooltipTrigger asChild><Button
+                                                          size="sm"
+                                                          className="gap-1.5 bg-transparent hover:bg-transparent bg-gradient-to-r from-cyan-600/15 to-blue-600/15 border border-blue-500/20 text-blue-700 dark:text-blue-300 backdrop-blur-xl hover:from-cyan-600/25 hover:to-blue-600/25 shadow-sm"
+                                                          onClick={() => setExtractDialog(true)}
+                                                        >
+                                                          <Bot className="h-3.5 w-3.5" />
+                                                          Extract Custom Fields (AI)
+                                                        </Button></TooltipTrigger><TooltipContent>Run AI extraction from this Default Dataset into a new Custom Dataset</TooltipContent></Tooltip>
                 )
               )}
 
               {/* List / Card view toggle */}
               <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as any)} className="shrink-0">
                 <TabsList className="h-8 p-1">
-                  <TabsTrigger value="card" className="h-6 w-6 p-0" title="Card view">
-                    <LayoutGrid className="h-3.5 w-3.5" />
-                  </TabsTrigger>
-                  <TabsTrigger value="list" className="h-6 w-6 p-0" title="List view (Spreadsheet)">
-                    <LayoutList className="h-3.5 w-3.5" />
-                  </TabsTrigger>
+                  <TabsTrigger value="card" className="h-6 w-6 p-0" >
+  <Tooltip>
+    <TooltipTrigger asChild>
+      <span className="flex h-full w-full items-center justify-center">
+        <LayoutGrid className="h-3.5 w-3.5" />
+      </span>
+    </TooltipTrigger>
+    <TooltipContent>Card view</TooltipContent>
+  </Tooltip>
+</TabsTrigger>
+                  <TabsTrigger value="list" className="h-6 w-6 p-0" >
+  <Tooltip>
+    <TooltipTrigger asChild>
+      <span className="flex h-full w-full items-center justify-center">
+        <LayoutList className="h-3.5 w-3.5" />
+      </span>
+    </TooltipTrigger>
+    <TooltipContent>List view (Spreadsheet)</TooltipContent>
+  </Tooltip>
+</TabsTrigger>
                 </TabsList>
               </Tabs>
 
               {/* Column visibility */}
               <Popover>
               <PopoverTrigger asChild>
-                <Button variant="outline" size="sm" className="shrink-0 px-2" title="Show/Hide columns">
-                  <Columns3 className="h-3.5 w-3.5" />
-                </Button>
+                <Tooltip><TooltipTrigger asChild><Button variant="outline" size="sm" className="shrink-0 px-2">
+                                                    <Columns3 className="h-3.5 w-3.5" />
+                                                  </Button></TooltipTrigger><TooltipContent>Show/Hide columns</TooltipContent></Tooltip>
               </PopoverTrigger>
               <PopoverContent align="end" className="w-64 p-3">
                 <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
@@ -1201,9 +1212,9 @@ export function DatasetDetailView() {
               {/* Three-dot overflow menu — Min Confidence, Save view, Add row, Import */}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="outline" size="icon" className="h-8 w-8 shrink-0" title="More options">
-                    <MoreHorizontal className="h-4 w-4" />
-                  </Button>
+                  <Tooltip><TooltipTrigger asChild><Button variant="outline" size="icon" className="h-8 w-8 shrink-0">
+                                                      <MoreHorizontal className="h-4 w-4" />
+                                                    </Button></TooltipTrigger><TooltipContent>More options</TooltipContent></Tooltip>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-56">
                   <DropdownMenuLabel className="text-xs text-muted-foreground font-normal">Filter</DropdownMenuLabel>
@@ -1245,26 +1256,24 @@ export function DatasetDetailView() {
 
       {/* Secondary Spreadsheet Toolbar */}
       <div className="flex items-center gap-1 overflow-x-auto rounded-md border bg-card px-2 py-1.5 shadow-sm">
-        <Button 
-          variant="ghost" 
-          size="icon" 
-          className="h-7 w-7 rounded-sm text-muted-foreground" 
-          disabled={undoStack.length === 0 || applyEditMutation.isPending} 
-          title="Undo (Ctrl+Z)"
-          onClick={handleUndo}
-        >
-          <Undo className="h-3.5 w-3.5" />
-        </Button>
-        <Button 
-          variant="ghost" 
-          size="icon" 
-          className="h-7 w-7 rounded-sm text-muted-foreground" 
-          disabled={redoStack.length === 0 || applyEditMutation.isPending} 
-          title="Redo (Ctrl+Shift+Z)"
-          onClick={handleRedo}
-        >
-          <Redo className="h-3.5 w-3.5" />
-        </Button>
+        <Tooltip><TooltipTrigger asChild><Button 
+                        variant="ghost" 
+                        size="icon" 
+                        className="h-7 w-7 rounded-sm text-muted-foreground" 
+                        disabled={undoStack.length === 0 || applyEditMutation.isPending}
+                        onClick={handleUndo}
+                      >
+                        <Undo className="h-3.5 w-3.5" />
+                      </Button></TooltipTrigger><TooltipContent>Undo (Ctrl+Z)</TooltipContent></Tooltip>
+        <Tooltip><TooltipTrigger asChild><Button 
+                        variant="ghost" 
+                        size="icon" 
+                        className="h-7 w-7 rounded-sm text-muted-foreground" 
+                        disabled={redoStack.length === 0 || applyEditMutation.isPending}
+                        onClick={handleRedo}
+                      >
+                        <Redo className="h-3.5 w-3.5" />
+                      </Button></TooltipTrigger><TooltipContent>Redo (Ctrl+Shift+Z)</TooltipContent></Tooltip>
         
         <Separator orientation="vertical" className="mx-1 h-5" />
         
@@ -1458,9 +1467,9 @@ export function DatasetDetailView() {
                             {f.name}
                           </span>
                           {f.required && (
-                            <span className="text-destructive shrink-0" title="Required">
-                              *
-                            </span>
+                            <Tooltip><TooltipTrigger asChild><span className="text-destructive shrink-0">
+                                                                      *
+                                                                    </span></TooltipTrigger><TooltipContent>Required</TooltipContent></Tooltip>
                           )}
                           <ChevronDown className="h-3.5 w-3.5 text-muted-foreground opacity-0 group-hover/th:opacity-100 transition-opacity shrink-0" />
                         </div>
@@ -1645,20 +1654,19 @@ export function DatasetDetailView() {
                                 </TooltipProvider>
                               )}
                               {cellIsUrl && (
-                                <button
-                                  className="absolute top-1 right-1 opacity-0 group-hover/cell:opacity-100 transition-opacity p-0.5 rounded text-muted-foreground hover:text-foreground bg-background/80"
-                                  title="Copy link"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    navigator.clipboard.writeText(fmt.text).then(() => {
-                                      toast.success("Link copied to clipboard");
-                                    }).catch(() => {
-                                      toast.error("Failed to copy link");
-                                    });
-                                  }}
-                                >
-                                  <Copy className="h-3 w-3" />
-                                </button>
+                                <Tooltip><TooltipTrigger asChild><button
+                                                                                className="absolute top-1 right-1 opacity-0 group-hover/cell:opacity-100 transition-opacity p-0.5 rounded text-muted-foreground hover:text-foreground bg-background/80"
+                                                                                onClick={(e) => {
+                                                                                  e.stopPropagation();
+                                                                                  navigator.clipboard.writeText(fmt.text).then(() => {
+                                                                                    toast.success("Link copied to clipboard");
+                                                                                  }).catch(() => {
+                                                                                    toast.error("Failed to copy link");
+                                                                                  });
+                                                                                }}
+                                                                              >
+                                                                                <Copy className="h-3 w-3" />
+                                                                              </button></TooltipTrigger><TooltipContent>Copy link</TooltipContent></Tooltip>
                               )}
                             </div>
                           )}
@@ -2049,7 +2057,7 @@ function DetailTopBar({
     <div className="flex flex-col gap-3 border-b pb-4 sm:flex-row sm:items-center sm:justify-between">
       <div className="flex items-start gap-3">
         <Button
-          variant="ghost"
+          variant="outline"
           size="icon"
           className="mt-0.5 h-8 w-8"
           onClick={onBack}

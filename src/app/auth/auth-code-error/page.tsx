@@ -16,7 +16,7 @@ export default function AuthCodeErrorPage() {
         </p>
         <Link 
           href="/login" 
-          className="inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition"
+          className="inline-flex items-center justify-center gap-2 rounded-lg border border-input bg-background px-4 py-2 text-sm font-medium shadow-sm hover:bg-accent hover:text-accent-foreground transition"
         >
           <ArrowLeft className="h-4 w-4" />
           Back to Login

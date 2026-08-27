@@ -7,7 +7,7 @@ export async function POST(req: NextRequest) {
     const { organizationId } = await requireRole(req, "member");
     
     const body = await req.json().catch(() => ({}));
-    const { rules, googleConnectionId } = body;
+    const { rules, googleConnectionId, sourceType = "gmail" } = body;
     
     if (!googleConnectionId) {
       return NextResponse.json({ error: "Missing googleConnectionId" }, { status: 400 });
@@ -65,6 +65,14 @@ export async function POST(req: NextRequest) {
     }
     const operatorStr = body.ruleOperator === "OR" ? " OR " : " ";
     const gmailQuery = queryParts.length > 0 ? queryParts.join(operatorStr) : "";
+
+    if (sourceType !== "gmail") {
+      return NextResponse.json({
+        query: "(Query translation for this source type is not previewed here)",
+        count: 0,
+        previews: [],
+      });
+    }
 
     const gmail = await getGmailClient(googleConnectionId);
     

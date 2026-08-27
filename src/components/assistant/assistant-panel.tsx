@@ -20,6 +20,7 @@ import { Badge } from "@/components/ui/badge";
 
 import { useAssistantChat, STARTER_PROMPTS } from "./use-assistant-chat";
 import { MessageBubble } from "./message-bubble";
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 
 export function AssistantPanel() {
   const assistantOpen = useAppStore((s) => s.assistantOpen);
@@ -100,24 +101,22 @@ export function AssistantPanel() {
             </p>
           </div>
           <div className="flex items-center gap-1">
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-7 w-7 text-muted-foreground hover:text-foreground"
-              onClick={clearChat}
-              title="Clear conversation"
-            >
-              <RefreshCw className="h-3.5 w-3.5" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-7 w-7 text-muted-foreground hover:text-foreground"
-              onClick={() => setAssistantOpen(false)}
-              title="Close (Alt+A)"
-            >
-              <X className="h-4 w-4" />
-            </Button>
+            <Tooltip><TooltipTrigger asChild><Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                                    onClick={clearChat}
+                                  >
+                                    <RefreshCw className="h-3.5 w-3.5" />
+                                  </Button></TooltipTrigger><TooltipContent>Clear conversation</TooltipContent></Tooltip>
+            <Tooltip><TooltipTrigger asChild><Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                                    onClick={() => setAssistantOpen(false)}
+                                  >
+                                    <X className="h-4 w-4" />
+                                  </Button></TooltipTrigger><TooltipContent>Close (Alt+A)</TooltipContent></Tooltip>
           </div>
         </div>
 
@@ -232,20 +231,19 @@ export function AssistantPanel() {
               </Button>
             )}
 
-            <Button
-              type="button"
-              size="icon"
-              disabled={(!input.trim() && !interimTranscript) || isLoading}
-              onClick={handleSend}
-              className="h-10 w-10 shrink-0 rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-40"
-              title="Send (Enter)"
-            >
-              {isLoading ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Send className="h-4 w-4" />
-              )}
-            </Button>
+            <Tooltip><TooltipTrigger asChild><Button
+                                    type="button"
+                                    size="icon"
+                                    disabled={(!input.trim() && !interimTranscript) || isLoading}
+                                    onClick={handleSend}
+                                    className="h-10 w-10 shrink-0 rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-40"
+                                  >
+                                    {isLoading ? (
+                                      <Loader2 className="h-4 w-4 animate-spin" />
+                                    ) : (
+                                      <Send className="h-4 w-4" />
+                                    )}
+                                  </Button></TooltipTrigger><TooltipContent>Send (Enter)</TooltipContent></Tooltip>
           </div>
 
           <p className="mt-1.5 text-center text-[9px] text-muted-foreground/50">

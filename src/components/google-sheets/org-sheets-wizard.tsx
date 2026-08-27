@@ -442,7 +442,7 @@ export function OrgSheetsWizard({
           {!resultUrl && (
             <>
               <Button
-                variant="ghost"
+                variant="outline"
                 size="sm"
                 onClick={() => (step === 0 ? onOpenChange(false) : setStep((s) => s - 1))}
                 disabled={exportMutation.isPending}

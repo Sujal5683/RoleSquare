@@ -16,7 +16,7 @@ import {
   XAxis,
   YAxis,
   CartesianGrid,
-  Tooltip,
+  Tooltip as RechartsTooltip,
   ResponsiveContainer,
   AreaChart,
   Area,
@@ -43,6 +43,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { modelDisplayName } from "@/lib/model-pricing";
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 
 interface UsageTrends {
   dailyTokens: { date: string; tokens: number; cost: number }[];
@@ -256,7 +257,7 @@ export function UsageView() {
                   interval={4}
                 />
                 <YAxis tick={{ fontSize: 10 }} />
-                <Tooltip
+                <RechartsTooltip
                   content={({ active, payload, label }: TooltipProps<number, string>) =>
                     active && payload && payload.length > 0 ? (
                       <div className="rounded-lg border bg-popover p-3 shadow-md">
@@ -314,7 +315,7 @@ export function UsageView() {
                     tick={{ fontSize: 9 }}
                     width={110}
                   />
-                  <Tooltip
+                  <RechartsTooltip
                     content={({ active, payload }: TooltipProps<number, string>) =>
                       active && payload && payload.length > 0 ? (
                         <div className="rounded-lg border bg-popover p-2 shadow-md">
@@ -365,7 +366,7 @@ export function UsageView() {
                       />
                     ))}
                   </Pie>
-                  <Tooltip
+                  <RechartsTooltip
                     content={({ active, payload }: TooltipProps<number, string>) =>
                       active && payload && payload.length > 0 ? (
                         <div className="rounded-lg border bg-popover p-2 shadow-md">
@@ -428,7 +429,7 @@ export function UsageView() {
                       </p>
                       <p className="text-xs text-muted-foreground">
                         {m.calls} calls ·{" "}
-                        <span title="Total tokens">{fmt(m.tokens)} tokens</span>
+                        <Tooltip><TooltipTrigger asChild><span>{fmt(m.tokens)} tokens</span></TooltipTrigger><TooltipContent>Total tokens</TooltipContent></Tooltip>
                       </p>
                     </div>
                     <div className="text-right">

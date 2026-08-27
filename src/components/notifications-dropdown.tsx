@@ -25,6 +25,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import type { DashboardData } from "@/lib/types";
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 
 interface Notification {
   id: string;
@@ -207,14 +208,14 @@ export function NotificationsDropdown() {
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <Button variant="ghost" size="icon" className="relative" title="Notifications">
-          <Bell className="h-4 w-4" />
-          {unreadCount > 0 && (
-            <span className="absolute -top-0.5 -right-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-bold text-destructive-foreground">
-              {unreadCount > 9 ? "9+" : unreadCount}
-            </span>
-          )}
-        </Button>
+        <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="relative">
+                        <Bell className="h-4 w-4" />
+                        {unreadCount > 0 && (
+                          <span className="absolute -top-0.5 -right-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-bold text-destructive-foreground">
+                            {unreadCount > 9 ? "9+" : unreadCount}
+                          </span>
+                        )}
+                      </Button></TooltipTrigger><TooltipContent>Notifications</TooltipContent></Tooltip>
       </PopoverTrigger>
       <PopoverContent
         align="end"
@@ -286,13 +287,12 @@ export function NotificationsDropdown() {
                         )}
                       </div>
                     </div>
-                    <button
-                      onClick={(e) => dismiss(n.id, e)}
-                      className="opacity-0 group-hover:opacity-100 transition-opacity shrink-0 text-muted-foreground hover:text-foreground"
-                      title="Dismiss"
-                    >
-                      <X className="h-3.5 w-3.5" />
-                    </button>
+                    <Tooltip><TooltipTrigger asChild><button
+                                              onClick={(e) => dismiss(n.id, e)}
+                                              className="opacity-0 group-hover:opacity-100 transition-opacity shrink-0 text-muted-foreground hover:text-foreground"
+                                            >
+                                              <X className="h-3.5 w-3.5" />
+                                            </button></TooltipTrigger><TooltipContent>Dismiss</TooltipContent></Tooltip>
                   </div>
                 );
               })

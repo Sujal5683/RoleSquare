@@ -152,12 +152,26 @@ export function InvitationsView() {
           
           <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as any)} className="shrink-0">
             <TabsList className="h-8 p-1">
-              <TabsTrigger value="card" className="h-6 w-6 p-0" title="Grid view">
-                <LayoutGrid className="h-3.5 w-3.5" />
-              </TabsTrigger>
-              <TabsTrigger value="list" className="h-6 w-6 p-0" title="List view">
-                <List className="h-3.5 w-3.5" />
-              </TabsTrigger>
+              <TabsTrigger value="card" className="h-6 w-6 p-0" >
+  <Tooltip>
+    <TooltipTrigger asChild>
+      <span className="flex h-full w-full items-center justify-center">
+        <LayoutGrid className="h-3.5 w-3.5" />
+      </span>
+    </TooltipTrigger>
+    <TooltipContent>Grid view</TooltipContent>
+  </Tooltip>
+</TabsTrigger>
+              <TabsTrigger value="list" className="h-6 w-6 p-0" >
+  <Tooltip>
+    <TooltipTrigger asChild>
+      <span className="flex h-full w-full items-center justify-center">
+        <List className="h-3.5 w-3.5" />
+      </span>
+    </TooltipTrigger>
+    <TooltipContent>List view</TooltipContent>
+  </Tooltip>
+</TabsTrigger>
             </TabsList>
           </Tabs>
         </div>

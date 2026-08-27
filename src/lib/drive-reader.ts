@@ -99,15 +99,7 @@ async function resolveAccessToken(connectionId: string): Promise<string> {
   return newToken;
 }
 
-/**
- * Returns an authenticated Drive v3 client for a Google connection.
- */
-async function getDriveClient(connectionId: string): Promise<drive_v3.Drive> {
-  const accessToken = await resolveAccessToken(connectionId);
-  const auth = new google.auth.OAuth2(process.env.GOOGLE_CLIENT_ID, process.env.GOOGLE_CLIENT_SECRET);
-  auth.setCredentials({ access_token: accessToken });
-  return google.drive({ version: "v3", auth });
-}
+import { getDriveClient } from "@/lib/google-client";
 
 /**
  * Finds the best available Google connection for Drive access within an org.

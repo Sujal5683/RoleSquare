@@ -9,7 +9,7 @@ import {
   Bar,
   XAxis,
   YAxis,
-  Tooltip,
+  Tooltip as RechartsTooltip,
   ResponsiveContainer,
   CartesianGrid,
 } from "recharts";
@@ -106,6 +106,7 @@ import { ExtractionRunsTab } from "@/components/ai-studio/extraction-runs-tab";
 import { AgentLogsTab } from "@/components/ai-studio/agent-logs-tab";
 import { ModelCostTab } from "@/components/ai-studio/model-cost-tab";
 import { ExtractionWizard } from "@/components/ai-studio/extraction-wizard";
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 
 // ── Helpers ──────────────────────────────────────────────────────────────
 
@@ -553,24 +554,22 @@ function SandboxFieldCard({
         )}
         <div className="flex-1" />
         <div className="flex items-center gap-1">
-          <Button
-            variant="ghost"
-            size="icon"
-            className={`h-6 w-6 ${feedback === "up" ? "text-emerald-500 bg-emerald-500/10" : "text-muted-foreground"}`}
-            onClick={() => setFeedback(f => f === "up" ? null : "up")}
-            title="Good extraction"
-          >
-            <ThumbsUp className="h-3 w-3" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            className={`h-6 w-6 ${feedback === "down" ? "text-red-500 bg-red-500/10" : "text-muted-foreground"}`}
-            onClick={() => setFeedback(f => f === "down" ? null : "down")}
-            title="Poor extraction"
-          >
-            <ThumbsDown className="h-3 w-3" />
-          </Button>
+          <Tooltip><TooltipTrigger asChild><Button
+                              variant="ghost"
+                              size="icon"
+                              className={`h-6 w-6 ${feedback === "up" ? "text-emerald-500 bg-emerald-500/10" : "text-muted-foreground"}`}
+                              onClick={() => setFeedback(f => f === "up" ? null : "up")}
+                            >
+                              <ThumbsUp className="h-3 w-3" />
+                            </Button></TooltipTrigger><TooltipContent>Good extraction</TooltipContent></Tooltip>
+          <Tooltip><TooltipTrigger asChild><Button
+                              variant="ghost"
+                              size="icon"
+                              className={`h-6 w-6 ${feedback === "down" ? "text-red-500 bg-red-500/10" : "text-muted-foreground"}`}
+                              onClick={() => setFeedback(f => f === "down" ? null : "down")}
+                            >
+                              <ThumbsDown className="h-3 w-3" />
+                            </Button></TooltipTrigger><TooltipContent>Poor extraction</TooltipContent></Tooltip>
         </div>
       </div>
     </div>

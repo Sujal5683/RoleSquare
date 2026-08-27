@@ -3,6 +3,7 @@ import ReactMarkdown from "react-markdown";
 import { cn } from "@/lib/utils";
 import { Bot, User, CheckCircle2, Terminal, ChevronDown, ChevronUp, Copy, Check } from "lucide-react";
 import type { Message } from "./types";
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 
 function ActionPill({ text }: { text: string }) {
   return (
@@ -41,17 +42,16 @@ function ToolResultBlock({ name, result }: { name: string; result: unknown }) {
 function CopyButton({ text }: { text: string }) {
   const [copied, setCopied] = useState(false);
   return (
-    <button
-      onClick={() => {
-        navigator.clipboard.writeText(text);
-        setCopied(true);
-        setTimeout(() => setCopied(false), 1500);
-      }}
-      className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
-      title="Copy"
-    >
-      {copied ? <Check className="h-3 w-3 text-emerald-500" /> : <Copy className="h-3 w-3" />}
-    </button>
+    <Tooltip><TooltipTrigger asChild><button
+            onClick={() => {
+              navigator.clipboard.writeText(text);
+              setCopied(true);
+              setTimeout(() => setCopied(false), 1500);
+            }}
+            className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+          >
+            {copied ? <Check className="h-3 w-3 text-emerald-500" /> : <Copy className="h-3 w-3" />}
+          </button></TooltipTrigger><TooltipContent>Copy</TooltipContent></Tooltip>
   );
 }
 

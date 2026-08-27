@@ -70,6 +70,11 @@ export function ConfidenceBadge({ value }: { value: number }) {
 
 const jobTypeColor: Record<JobType, string> = {
   GMAIL_SCAN: "bg-sky-100 text-sky-800 dark:bg-sky-950 dark:text-sky-300",
+  DRIVE_SCAN: "bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300",
+  DOCS_SCAN: "bg-indigo-100 text-indigo-800 dark:bg-indigo-950 dark:text-indigo-300",
+  SHEETS_SCAN: "bg-green-100 text-green-800 dark:bg-green-950 dark:text-green-300",
+  FORMS_SCAN: "bg-purple-100 text-purple-800 dark:bg-purple-950 dark:text-purple-300",
+  DETERMINISTIC_SYNC: "bg-gray-100 text-gray-800 dark:bg-gray-950 dark:text-gray-300",
   EMAIL_PARSE: "bg-cyan-100 text-cyan-800 dark:bg-cyan-950 dark:text-cyan-300",
   ATTACHMENT_PROCESS: "bg-teal-100 text-teal-800 dark:bg-teal-950 dark:text-teal-300",
   DRIVE_DISCOVERY: "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300",

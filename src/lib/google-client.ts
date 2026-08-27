@@ -84,6 +84,34 @@ export async function getGmailClient(connectionId: string): Promise<gmail_v1.Gma
   return google.gmail({ version: "v1", auth });
 }
 
+export async function getDriveClient(connectionId: string) {
+  const accessToken = await resolveAccessToken(connectionId);
+  const auth = new google.auth.OAuth2(process.env.GOOGLE_CLIENT_ID, process.env.GOOGLE_CLIENT_SECRET);
+  auth.setCredentials({ access_token: accessToken });
+  return google.drive({ version: "v3", auth });
+}
+
+export async function getSheetsClient(connectionId: string) {
+  const accessToken = await resolveAccessToken(connectionId);
+  const auth = new google.auth.OAuth2(process.env.GOOGLE_CLIENT_ID, process.env.GOOGLE_CLIENT_SECRET);
+  auth.setCredentials({ access_token: accessToken });
+  return google.sheets({ version: "v4", auth });
+}
+
+export async function getDocsClient(connectionId: string) {
+  const accessToken = await resolveAccessToken(connectionId);
+  const auth = new google.auth.OAuth2(process.env.GOOGLE_CLIENT_ID, process.env.GOOGLE_CLIENT_SECRET);
+  auth.setCredentials({ access_token: accessToken });
+  return google.docs({ version: "v1", auth });
+}
+
+export async function getFormsClient(connectionId: string) {
+  const accessToken = await resolveAccessToken(connectionId);
+  const auth = new google.auth.OAuth2(process.env.GOOGLE_CLIENT_ID, process.env.GOOGLE_CLIENT_SECRET);
+  auth.setCredentials({ access_token: accessToken });
+  return google.forms({ version: "v1", auth });
+}
+
 // ────────────────────────────────────────────────────────────────────────────
 // Gmail helpers
 // ────────────────────────────────────────────────────────────────────────────

@@ -677,7 +677,7 @@ export function SchemaBuilderView() {
         icon={<FileJson className="h-5 w-5" />}
         actions={
           <Button
-            variant="ghost"
+            variant="outline"
             size="sm"
             onClick={() => {
               openSchema(null);
@@ -1349,7 +1349,7 @@ export function SchemaBuilderView() {
             <>
               <DialogHeader>
                 <div className="flex items-center gap-2">
-                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setViewTemplate(null)}>
+                  <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setViewTemplate(null)}>
                     <ChevronLeft className="h-4 w-4" />
                   </Button>
                   <div>

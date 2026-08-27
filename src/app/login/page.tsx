@@ -196,7 +196,7 @@ function LoginPageContent() {
         {/* Back to Home Button */}
         <Link 
           href="/" 
-          className="absolute -top-16 left-0 flex items-center text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+          className="absolute -top-16 left-0 flex items-center text-sm font-medium border border-input bg-background shadow-sm hover:bg-accent hover:text-accent-foreground px-3 py-1.5 rounded-md transition-colors"
         >
           <ArrowLeft className="mr-2 h-4 w-4" />
           Back to Home
@@ -428,7 +428,7 @@ function LoginPageContent() {
                   setSuccess(null); 
                   setToken2fa("");
                 }}
-                className="font-medium text-primary hover:underline"
+                className="inline-flex items-center justify-center gap-2 rounded-md border border-input bg-background px-3 py-1.5 text-sm font-medium shadow-sm hover:bg-accent hover:text-accent-foreground transition"
               >
                 ← Back to sign in
               </button>
