@@ -586,6 +586,7 @@ export function DashboardView() {
               </Button>
             </CardHeader>
             <CardContent className="p-0">
+              <div className="max-h-[400px] overflow-y-auto">
                 {activityData?.data && activityData.data.length > 0 ? (
                   <div className="relative max-h-[40rem] overflow-y-auto pr-2">
                     {/* Vertical line */}
