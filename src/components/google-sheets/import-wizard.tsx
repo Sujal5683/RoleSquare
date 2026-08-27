@@ -11,10 +11,11 @@
 //   6. Column mapping — AI-assisted
 //   7. Confirm & Start
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { api } from "@/lib/api-client";
+import { Stepper } from "@/components/ui/stepper";
 import { useAppStore } from "@/lib/store";
 import {
   Dialog,
@@ -286,17 +287,12 @@ export function ImportWizard({
 
           {/* Step progress bar — hide in progress view */}
           {!isProgressView && (
-            <div className="flex gap-1">
-              {effectiveSteps.map((_, i) => (
-                <div
-                  key={i}
-                  className={cn(
-                    "h-1 flex-1 rounded-full transition-colors",
-                    i <= step ? "bg-blue-500" : "bg-muted"
-                  )}
-                />
-              ))}
-            </div>
+            <Stepper
+              className="py-2"
+              steps={effectiveSteps}
+              currentStep={step}
+              onChangeStep={setStep}
+            />
           )}
 
           {/* Content */}

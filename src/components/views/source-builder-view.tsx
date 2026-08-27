@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { Stepper } from "@/components/ui/stepper";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { api } from "@/lib/api-client";
@@ -493,44 +494,12 @@ export function SourceBuilderView() {
 
       {/* Step indicator */}
       <Card>
-        <CardContent className="p-4">
-          <div className="flex items-center justify-between gap-1 overflow-x-auto">
-            {STEPS.map((s, i) => {
-              const done = i < step;
-              const active = i === step;
-              return (
-                <div key={s.id} className="flex flex-1 items-center">
-                  <div className="flex flex-col items-center gap-1.5 min-w-0">
-                    <div
-                      className={`flex h-8 w-8 items-center justify-center rounded-full border text-xs font-medium transition-colors ${
-                        active
-                          ? "border-primary bg-primary text-primary-foreground"
-                          : done
-                          ? "border-primary bg-primary/10 text-primary"
-                          : "border-border bg-background text-muted-foreground"
-                      }`}
-                    >
-                      {done ? <Check className="h-4 w-4" /> : i + 1}
-                    </div>
-                    <span
-                      className={`text-[10px] sm:text-xs font-medium whitespace-nowrap ${
-                        active ? "text-foreground" : "text-muted-foreground"
-                      }`}
-                    >
-                      {s.label}
-                    </span>
-                  </div>
-                  {i < STEPS.length - 1 && (
-                    <div
-                      className={`h-px flex-1 mx-2 mb-5 ${
-                        i < step ? "bg-primary" : "bg-border"
-                      }`}
-                    />
-                  )}
-                </div>
-              );
-            })}
-          </div>
+        <CardContent className="p-4 flex justify-center">
+          <Stepper
+            steps={STEPS.map(s => s.label)}
+            currentStep={step}
+            onChangeStep={setStep}
+          />
         </CardContent>
       </Card>
 

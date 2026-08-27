@@ -29,6 +29,8 @@ const ALL_AGENTS = [
   { key: "researcher", label: "Researcher", desc: "Enrich with external lookups (if low confidence)" },
 ];
 
+import { Stepper } from "@/components/ui/stepper";
+
 export function ExtractionWizard() {
   const queryClient = useQueryClient();
   const setView = useAppStore((s) => s.setView);
@@ -110,30 +112,12 @@ export function ExtractionWizard() {
     <div className="mx-auto max-w-4xl space-y-6">
       {/* Compact Wizard Header Progress */}
       {step < 5 && (
-        <div className="flex items-center justify-center gap-2 mb-6">
-          {[
-            { num: 1, label: "Source" },
-            { num: 2, label: "Schema" },
-            { num: 3, label: "Configure" },
-            { num: 4, label: "Review" },
-          ].map((s, i) => (
-            <div key={s.num} className="flex items-center gap-2">
-              <div
-                className={`flex h-6 items-center rounded-full px-3 text-xs font-medium transition-colors ${
-                  step === s.num
-                    ? "bg-primary text-primary-foreground"
-                    : step > s.num
-                    ? "bg-primary/10 text-primary"
-                    : "bg-muted text-muted-foreground"
-                }`}
-              >
-                <span className="mr-1.5">{step > s.num ? <CheckCircle2 className="h-3.5 w-3.5" /> : s.num + "."}</span>
-                {s.label}
-              </div>
-              {i < 3 && <div className="h-px w-4 bg-border" />}
-            </div>
-          ))}
-        </div>
+        <Stepper
+          className="mb-6"
+          steps={["Source", "Schema", "Configure", "Review"]}
+          currentStep={step - 1}
+          onChangeStep={(newStep) => setStep(newStep + 1)}
+        />
       )}
 
       {/* Step 1: Source */}

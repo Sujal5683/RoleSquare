@@ -14,6 +14,7 @@ import { useState, useCallback } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { api } from "@/lib/api-client";
+import { Stepper } from "@/components/ui/stepper";
 import { useAppStore } from "@/lib/store";
 import {
   Dialog,
@@ -211,22 +212,12 @@ export function LinkSheetWizard({
         </DialogHeader>
 
         {/* Step progress bar */}
-        <div className="flex gap-1">
-          {STEPS.map((s, i) => (
-            <div
-              key={s}
-              className={cn(
-                "h-1 flex-1 rounded-full transition-colors",
-                i <= step ? "bg-emerald-500" : "bg-muted"
-              )}
-            />
-          ))}
-        </div>
-
-        {/* Step label */}
-        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-          {STEPS[step]}
-        </p>
+        <Stepper
+          className="py-2 mb-2"
+          steps={STEPS}
+          currentStep={step}
+          onChangeStep={setStep}
+        />
 
         {/* Step content */}
         <div className="min-h-[260px] overflow-y-auto overflow-x-hidden pr-2 flex-1">

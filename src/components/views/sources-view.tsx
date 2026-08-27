@@ -497,7 +497,7 @@ export function SourcesView() {
 
       {/* Sources table */}
       <Card>
-        <CardHeader >
+        <CardHeader className="flex flex-row items-center justify-between py-4 space-y-0">
           <CardTitle className="text-base flex items-center gap-2">
             <Activity className="h-4 w-4" />
             Sources
@@ -505,6 +505,86 @@ export function SourcesView() {
               ({filtered.length})
             </span>
           </CardTitle>
+          {selectedIds.size > 0 && (
+            <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+              <div className="flex items-center gap-1.5 mr-1">
+                <span className="text-xs font-medium text-muted-foreground">
+                  {selectedIds.size} selected
+                </span>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7 text-muted-foreground"
+                  onClick={clearSelection}
+                  title="Clear selection"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </Button>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-7 px-2.5 text-xs"
+                onClick={() => {
+                  if (selectedIds.size === 0) return;
+                  bulkScanMutation.mutate(Array.from(selectedIds));
+                }}
+                disabled={bulkScanMutation.isPending}
+              >
+                <Play className="mr-1.5 h-3 w-3" />
+                <span className="hidden sm:inline">Scan all</span>
+                <span className="sm:hidden">Scan</span>
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-7 px-2.5 text-xs"
+                onClick={() =>
+                  bulkUpdateMutation.mutate({
+                    ids: Array.from(selectedIds),
+                    status: "active",
+                  })
+                }
+                disabled={bulkUpdateMutation.isPending}
+              >
+                <Play className="mr-1.5 h-3 w-3" />
+                Resume
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-7 px-2.5 text-xs"
+                onClick={() =>
+                  bulkUpdateMutation.mutate({
+                    ids: Array.from(selectedIds),
+                    status: "paused",
+                  })
+                }
+                disabled={bulkUpdateMutation.isPending}
+              >
+                <Pause className="mr-1.5 h-3 w-3" />
+                Pause
+              </Button>
+              <Button
+                variant="destructive"
+                size="sm"
+                className="h-7 px-2.5 text-xs"
+                onClick={() => {
+                  if (
+                    confirm(
+                      `Delete ${selectedIds.size} source(s)? This cannot be undone.`
+                    )
+                  ) {
+                    bulkDeleteMutation.mutate(Array.from(selectedIds));
+                  }
+                }}
+                disabled={bulkDeleteMutation.isPending}
+              >
+                <Trash2 className="mr-1.5 h-3 w-3" />
+                Delete
+              </Button>
+            </div>
+          )}
         </CardHeader>
         <CardContent className="p-0">
           {isLoading ? (
@@ -542,81 +622,6 @@ export function SourcesView() {
             </div>
           ) : (
             <div className="space-y-3">
-              {/* Bulk action bar */}
-              {selectedIds.size > 0 && (
-                <div className="flex items-center justify-between rounded-lg border bg-primary/5 px-4 py-2.5">
-                  <div className="flex items-center gap-3">
-                    <span className="text-sm font-medium">
-                      {selectedIds.size} selected
-                    </span>
-                    <button
-                      onClick={clearSelection}
-                      className="text-xs text-muted-foreground hover:text-foreground"
-                    >
-                      Clear
-                    </button>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        if (selectedIds.size === 0) return;
-                        bulkScanMutation.mutate(Array.from(selectedIds));
-                      }}
-                      disabled={bulkScanMutation.isPending}
-                    >
-                      <Play className="mr-1.5 h-3 w-3" />
-                      Scan all
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() =>
-                        bulkUpdateMutation.mutate({
-                          ids: Array.from(selectedIds),
-                          status: "active",
-                        })
-                      }
-                      disabled={bulkUpdateMutation.isPending}
-                    >
-                      <Play className="mr-1.5 h-3 w-3" />
-                      Resume
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() =>
-                        bulkUpdateMutation.mutate({
-                          ids: Array.from(selectedIds),
-                          status: "paused",
-                        })
-                      }
-                      disabled={bulkUpdateMutation.isPending}
-                    >
-                      <Pause className="mr-1.5 h-3 w-3" />
-                      Pause
-                    </Button>
-                    <Button
-                      variant="destructive"
-                      size="sm"
-                      onClick={() => {
-                        if (
-                          confirm(
-                            `Delete ${selectedIds.size} source(s)? This cannot be undone.`
-                          )
-                        ) {
-                          bulkDeleteMutation.mutate(Array.from(selectedIds));
-                        }
-                      }}
-                      disabled={bulkDeleteMutation.isPending}
-                    >
-                      <Trash2 className="mr-1.5 h-3 w-3" />
-                      Delete
-                    </Button>
-                  </div>
-                </div>
-              )}
               <div className="overflow-x-auto">
               <Table>
                 <TableHeader>

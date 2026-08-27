@@ -6,6 +6,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { formatDistanceToNow } from "date-fns";
 import { toast } from "sonner";
 import { api } from "@/lib/api-client";
+import { createClient } from "@/lib/supabase/client";
 import type {
   GoogleConnectionDTO,
   UsageMetricDTO,
@@ -666,6 +667,7 @@ function SecuritySection() {
   const queryClient = useQueryClient();
   const twoFactor = session?.user?.twoFactorEnabled ?? false;
   const [setupOpen, setSetupOpen] = useState(false);
+  const [passwordOpen, setPasswordOpen] = useState(false);
   const [qrCodeDataUri, setQrCodeDataUri] = useState("");
   const [secret, setSecret] = useState("");
   const [token, setToken] = useState("");
@@ -790,6 +792,32 @@ function SecuritySection() {
         </CardContent>
       </Card>
 
+      {/* Password Management */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Lock className="h-4 w-4 text-primary" />
+            Password
+          </CardTitle>
+          <CardDescription>
+            Update your password to keep your account secure.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-row items-center justify-between gap-4">
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-medium">Change password</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                You will be required to log in again after changing your password if you use it on other devices.
+              </p>
+            </div>
+            <Button variant="outline" onClick={() => setPasswordOpen(true)}>
+              Update password
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* API keys */}
       <Card>
         <CardHeader>
@@ -892,7 +920,171 @@ function SecuritySection() {
           </div>
         </DialogContent>
       </Dialog>
+
+      <ChangePasswordDialog
+        open={passwordOpen}
+        onClose={() => setPasswordOpen(false)}
+        email={session?.user?.email}
+      />
     </div>
+  );
+}
+
+function ChangePasswordDialog({
+  open,
+  onClose,
+  email,
+}: {
+  open: boolean;
+  onClose: () => void;
+  email?: string | null;
+}) {
+  const [loading, setLoading] = useState(false);
+  const [resetLoading, setResetLoading] = useState(false);
+  const [oldPassword, setOldPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  
+  // Use useMemo to avoid recreating client on every render unnecessarily
+  const supabase = useMemo(() => createClient(), []);
+
+  useEffect(() => {
+    if (!open) {
+      setOldPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+    }
+  }, [open]);
+
+  const handleUpdate = async () => {
+    if (!email) {
+      toast.error("User email not found");
+      return;
+    }
+    if (!oldPassword) {
+      toast.error("Please enter your current password");
+      return;
+    }
+    if (newPassword.length < 6) {
+      toast.error("Password must be at least 6 characters");
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      toast.error("Passwords do not match");
+      return;
+    }
+    
+    setLoading(true);
+    
+    // Verify old password
+    const { error: signInError } = await supabase.auth.signInWithPassword({
+      email,
+      password: oldPassword,
+    });
+
+    if (signInError) {
+      setLoading(false);
+      toast.error("Incorrect current password");
+      return;
+    }
+
+    // Update to new password
+    const { error } = await supabase.auth.updateUser({
+      password: newPassword,
+    });
+    
+    setLoading(false);
+    if (error) {
+      toast.error("Failed to update password", { description: error.message });
+    } else {
+      toast.success("Password updated successfully");
+      setOldPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+      onClose();
+    }
+  };
+
+  const handleForgotPassword = async () => {
+    if (!email) return;
+    setResetLoading(true);
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/settings`,
+    });
+    setResetLoading(false);
+    if (error) {
+      toast.error("Failed to send reset email", { description: error.message });
+    } else {
+      toast.success("Password reset email sent", { description: "Check your inbox for the reset link." });
+    }
+  };
+
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(o) => {
+        if (!o) onClose();
+      }}
+    >
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Update Password</DialogTitle>
+          <DialogDescription>
+            Enter your current password and a new password for your account.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4 py-2">
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <Label htmlFor="old-password">Current password</Label>
+              <Button 
+                variant="link" 
+                className="px-0 h-auto font-normal text-xs text-muted-foreground" 
+                onClick={handleForgotPassword}
+                disabled={resetLoading}
+              >
+                {resetLoading ? "Sending..." : "Forgot password?"}
+              </Button>
+            </div>
+            <Input
+              id="old-password"
+              type="password"
+              value={oldPassword}
+              onChange={(e) => setOldPassword(e.target.value)}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="new-password">New password</Label>
+            <Input
+              id="new-password"
+              type="password"
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="confirm-password">Confirm new password</Label>
+            <Input
+              id="confirm-password"
+              type="password"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+            />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose} disabled={loading}>
+            Cancel
+          </Button>
+          <Button onClick={handleUpdate} disabled={loading || !oldPassword || !newPassword || !confirmPassword}>
+            {loading ? (
+              <RefreshCw className="mr-2 h-3.5 w-3.5 animate-spin" />
+            ) : null}
+            Update password
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
