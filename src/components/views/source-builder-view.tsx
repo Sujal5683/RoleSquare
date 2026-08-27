@@ -104,6 +104,7 @@ const FILTER_TYPES_BY_SOURCE: Record<SourceType, { value: string; label: string 
     { value: "file_name", label: "File Name" },
     { value: "mime_type", label: "MIME Type" },
     { value: "owner", label: "Owner" },
+    { value: "raw_query", label: "Raw API Query (q)" },
   ],
   docs: [
     { value: "folder_id", label: "Folder ID" },
@@ -986,9 +987,11 @@ export function SourceBuilderView() {
                   <div className="space-y-4">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                       <div>
-                        <Label htmlFor="max-emails">Max emails per scan</Label>
+                        <Label htmlFor="max-emails">
+                          {form.sourceType === "gmail" ? "Max emails per scan" : "Max files per scan"}
+                        </Label>
                         <p className="text-[10px] text-muted-foreground mt-0.5 max-w-[280px]">
-                          Limits the Gmail API list call to this many messages per scan run. Lower values are faster.
+                          Limits the {form.sourceType === "gmail" ? "Gmail " : ""}API list call to this many {form.sourceType === "gmail" ? "messages" : "files"} per scan run. Lower values are faster.
                         </p>
                       </div>
                       <div className="flex items-center gap-3">

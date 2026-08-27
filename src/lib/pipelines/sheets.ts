@@ -36,7 +36,7 @@ export async function processSheetsScan(
     try { value = JSON.parse(rule.value as string); } catch { value = String(rule.value); }
     if (rule.filterType === "spreadsheet_id") {
       spreadsheetId = value;
-    } else if (rule.filterType === "range") {
+    } else if (rule.filterType === "sheet_name" || rule.filterType === "range") {
       range = value;
     }
   }

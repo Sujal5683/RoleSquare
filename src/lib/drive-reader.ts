@@ -247,7 +247,7 @@ async function extractFileContent(
       // pdf-parse v2 exports as an ESM module — use the named export directly
       const pdfParseModule = await import("pdf-parse");
       const pdfParse = (pdfParseModule as any).default ?? pdfParseModule;
-      const data = await pdfParse(buffer);
+      const data = await pdfParse(buffer, { max: 10 });
       return `[${name} (PDF)]\n${data.text.trim()}`;
     } catch (err) {
       console.warn(`[drive-reader] pdf-parse failed for ${name}:`, err instanceof Error ? err.message : err);

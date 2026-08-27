@@ -40,11 +40,18 @@ export async function processDriveScan(
       case "folder_id":
         queryParts.push(`'${value}' in parents`);
         break;
+      case "file_name":
       case "name":
         queryParts.push(rule.operator === "contains" ? `name contains '${value}'` : `name = '${value}'`);
         break;
       case "mime_type":
         queryParts.push(`mimeType = '${value}'`);
+        break;
+      case "owner":
+        queryParts.push(`'${value}' in owners`);
+        break;
+      case "raw_query":
+        queryParts.push(`(${value})`);
         break;
     }
   }
