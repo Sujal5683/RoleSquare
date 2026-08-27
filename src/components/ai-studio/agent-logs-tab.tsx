@@ -198,7 +198,11 @@ export function AgentLogsTab({ jobId }: AgentLogsTabProps) {
               </span>
 
               {/* Message */}
-              <span className="text-foreground break-all flex-1">{log.message}</span>
+              <span className="text-foreground break-all flex-1">
+                {log.message?.replace(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi, "[ID]")
+                  .replace(/\bc[a-z0-9]{24}\b/gi, "[ID]")
+                  .replace(/\b(req|org|user|proj)_[a-zA-Z0-9]{16,}\b/gi, "[ID]")}
+              </span>
 
               {/* Metadata (Confidence, Tokens, Cost) */}
               {log.metadata && Object.keys(log.metadata).length > 0 && (

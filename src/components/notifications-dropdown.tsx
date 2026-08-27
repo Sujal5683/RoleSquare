@@ -43,6 +43,9 @@ export function NotificationsDropdown() {
   const setView = useAppStore((s) => s.setView);
   const openDataset = useAppStore((s) => s.openDataset);
   const dismissedNotifications = useAppStore((s) => s.dismissedNotifications);
+  const readNotifications = useAppStore((s) => s.readNotifications);
+  const markAsRead = useAppStore((s) => s.markAsRead);
+  const markAllAsRead = useAppStore((s) => s.markAllAsRead);
   const dismissNotification = useAppStore((s) => s.dismissNotification);
   const dismissAllNotifications = useAppStore((s) => s.dismissAllNotifications);
 
@@ -179,10 +182,12 @@ export function NotificationsDropdown() {
     });
   }
 
+  notifications.forEach(n => { if (n.id !== 'all-clear') n.read = readNotifications.includes(n.id); });
   const visibleNotifications = notifications.filter((n) => !dismissedNotifications.includes(n.id));
   const unreadCount = visibleNotifications.filter((n) => !n.read).length;
 
   const handleAction = (n: Notification) => {
+    markAsRead(n.id);
     if (n.action) {
       if (n.action.view === "datasets" && data?.reviewQueue?.[0]) {
         openDataset(data.reviewQueue[0].datasetId);
@@ -207,16 +212,18 @@ export function NotificationsDropdown() {
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
+      <Tooltip><TooltipTrigger asChild>
       <PopoverTrigger asChild>
-        <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="relative">
+        <Button variant="ghost" size="icon" className="relative">
                         <Bell className="h-4 w-4" />
                         {unreadCount > 0 && (
                           <span className="absolute -top-0.5 -right-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-bold text-destructive-foreground">
                             {unreadCount > 9 ? "9+" : unreadCount}
                           </span>
                         )}
-                      </Button></TooltipTrigger><TooltipContent>Notifications</TooltipContent></Tooltip>
+                      </Button>
       </PopoverTrigger>
+      </TooltipTrigger><TooltipContent>Notifications</TooltipContent></Tooltip>
       <PopoverContent
         align="end"
         className="w-[90vw] sm:w-96 p-0 flex flex-col overflow-hidden max-h-[85vh]"
@@ -242,7 +249,7 @@ export function NotificationsDropdown() {
             Refresh
           </Button>
         </div>
-        <ScrollArea className="flex-1 min-h-0">
+        <div className="flex-1 overflow-y-auto min-h-0">
           <div className="divide-y">
             {visibleNotifications.length === 0 ? (
               <div className="flex flex-col items-center py-5 text-center">
@@ -298,18 +305,28 @@ export function NotificationsDropdown() {
               })
             )}
           </div>
-        </ScrollArea>
+        </div>
         {visibleNotifications.length > 0 && (
-          <div className="border-t px-4 py-2 shrink-0">
+          <div className="border-t bg-card px-4 py-2 shrink-0 flex items-center justify-between gap-2 z-10 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
             <Button
               variant="ghost"
               size="sm"
-              className="w-full text-xs"
+              className="w-1/2 text-xs shrink"
+              onClick={() => {
+                markAllAsRead(notifications.map((n) => n.id));
+              }}
+            >
+              Mark all as read
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="w-1/2 text-xs shrink"
               onClick={() => {
                 dismissAllNotifications(notifications.map((n) => n.id));
               }}
             >
-              Mark all as read
+              Clear all
             </Button>
           </div>
         )}

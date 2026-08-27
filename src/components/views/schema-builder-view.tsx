@@ -1100,8 +1100,7 @@ export function SchemaBuilderView() {
                         </span>
                       </div>
                       <p className="text-[10px] text-muted-foreground font-mono">
-                        model: {testResult.modelUsed} · prompt:{" "}
-                        {testResult.promptVersion}
+                        prompt: {testResult.promptVersion}
                       </p>
                     </div>
                     <div className="max-h-72 overflow-y-auto space-y-2">

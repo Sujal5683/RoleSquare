@@ -201,7 +201,7 @@ export function ExtractionRunsTab() {
                       const payload = selectedJob.payload as any;
                       const targetDs = datasets?.find(d => d.id === payload?.targetDatasetId);
                       const sourceDs = datasets?.find(d => d.id === payload?.sourceDatasetId);
-                      const targetName = String(payload?.targetDatasetName || targetDs?.name || (payload?.targetDatasetId ? String(payload.targetDatasetId).slice(0, 8) + "…" : "New"));
+                      const targetName = String(payload?.targetDatasetName || targetDs?.name || "New Dataset");
                       return `Ext: ${sourceDs?.name?.slice(0, 10) ?? 'Src'} → ${targetName.slice(0, 10)}`;
                     })()}
                   </span>
@@ -359,8 +359,8 @@ export function ExtractionRunsTab() {
                             <div className="flex items-center gap-3">
                               {isExpanded ? <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" /> : <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />}
                               <div>
-                                <p className="text-[11px] font-medium">{output.modelUsed}</p>
-                                <p className="text-[10px] text-muted-foreground">AI Generation</p>
+                                <p className="text-[11px] font-medium">AI Generation</p>
+                                <p className="text-[10px] text-muted-foreground">Extracted Data</p>
                               </div>
                             </div>
                             <div className="flex items-center gap-4 text-right">

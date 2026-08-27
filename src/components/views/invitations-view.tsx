@@ -204,6 +204,35 @@ export function InvitationsView() {
 function IncomingInvites({ onSelect, viewMode = "card" }: { onSelect: (inv: InvitationDTO) => void, viewMode?: "card" | "list" }) {
   const queryClient = useQueryClient();
 
+  const acceptMutation = useMutation({
+    mutationFn: (token: string) =>
+      api.post("/api/invitations/accept", { token }),
+    onSuccess: () => {
+      toast.success("Invitation accepted! You now have access to the organization.");
+      queryClient.invalidateQueries({ queryKey: ["invitations"] });
+      queryClient.invalidateQueries({ queryKey: ["organizations"] });
+      queryClient.invalidateQueries({ queryKey: ["session"] });
+      setTimeout(() => window.location.reload(), 800);
+    },
+    onError: (err: unknown) => {
+      const msg = err instanceof Error ? err.message : "Failed to accept invitation";
+      toast.error("Error", { description: msg });
+    },
+  });
+
+  const declineMutation = useMutation({
+    mutationFn: (token: string) =>
+      api.post("/api/invitations/decline", { token }),
+    onSuccess: () => {
+      toast.success("Invitation declined.");
+      queryClient.invalidateQueries({ queryKey: ["invitations"] });
+    },
+    onError: (err: unknown) => {
+      const msg = err instanceof Error ? err.message : "Failed to decline invitation";
+      toast.error("Error", { description: msg });
+    },
+  });
+
   const { data: invitations, isLoading, isError, refetch } = useQuery({
     queryKey: ["invitations", "incoming"],
     queryFn: () => api.get<InvitationDTO[]>("/api/invitations"),
@@ -234,6 +263,7 @@ function IncomingInvites({ onSelect, viewMode = "card" }: { onSelect: (inv: Invi
               <TableHead>Role</TableHead>
               <TableHead>Invited By</TableHead>
               <TableHead>Expires</TableHead>
+              <TableHead className="text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -275,6 +305,26 @@ function IncomingInvites({ onSelect, viewMode = "card" }: { onSelect: (inv: Invi
                     ) : (
                       "Expired"
                     )}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <div className="flex justify-end gap-2" onClick={(e) => e.stopPropagation()}>
+                      <Button
+                        size="sm"
+                        variant="default"
+                        disabled={expired || acceptMutation.isPending || declineMutation.isPending}
+                        onClick={() => acceptMutation.mutate(invite.token)}
+                      >
+                        Accept
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={acceptMutation.isPending || declineMutation.isPending}
+                        onClick={() => declineMutation.mutate(invite.token)}
+                      >
+                        Decline
+                      </Button>
+                    </div>
                   </TableCell>
                 </TableRow>
               );
@@ -329,6 +379,26 @@ function IncomingInvites({ onSelect, viewMode = "card" }: { onSelect: (inv: Invi
                 Expires {formatDistanceToNow(new Date(invite.expiresAt), { addSuffix: true })}
               </div>
             )}
+            <div className="mt-2 flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+              <Button
+                className="w-full"
+                size="sm"
+                variant="default"
+                disabled={expired || acceptMutation.isPending || declineMutation.isPending}
+                onClick={() => acceptMutation.mutate(invite.token)}
+              >
+                Accept
+              </Button>
+              <Button
+                className="w-full"
+                size="sm"
+                variant="outline"
+                disabled={acceptMutation.isPending || declineMutation.isPending}
+                onClick={() => declineMutation.mutate(invite.token)}
+              >
+                Decline
+              </Button>
+            </div>
           </Card>
         );
       })}
@@ -411,39 +481,6 @@ function OutgoingInvites({ onSelect, viewMode = "list" }: { onSelect: (inv: Invi
               className="flex flex-col gap-3 p-4 transition-shadow hover:shadow-md cursor-pointer hover:border-primary/50 relative"
               onClick={() => onSelect(inv)}
             >
-              <div className="absolute top-2 right-2" onClick={(e) => e.stopPropagation()}>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="icon" className="h-8 w-8 opacity-50 hover:opacity-100">
-                      <MoreHorizontal className="h-4 w-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem
-                      onClick={() =>
-                        resendMutation.mutate({
-                          orgId: activeOrgId,
-                          email: inv.email,
-                          role: inv.role,
-                        })
-                      }
-                      disabled={resendMutation.isPending}
-                    >
-                      <RefreshCw className="mr-2 h-4 w-4" />
-                      Resend Invite
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      className="text-destructive focus:text-destructive"
-                      onClick={() => cancelMutation.mutate(inv.token)}
-                      disabled={cancelMutation.isPending}
-                    >
-                      <X className="mr-2 h-4 w-4" />
-                      Cancel Invite
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </div>
-
               <div className="flex items-start justify-between gap-2 pt-2">
                 <div className="flex min-w-0 items-start gap-3">
                   <div className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
@@ -471,6 +508,32 @@ function OutgoingInvites({ onSelect, viewMode = "list" }: { onSelect: (inv: Invi
                 <Clock className="h-3 w-3" />
                 Sent {formatDistanceToNow(new Date(inv.createdAt), { addSuffix: true })}
               </div>
+              <div className="mt-2 flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                <Button
+                  className="w-full"
+                  size="sm"
+                  variant="default"
+                  disabled={resendMutation.isPending}
+                  onClick={() =>
+                    resendMutation.mutate({
+                      orgId: activeOrgId,
+                      email: inv.email,
+                      role: inv.role,
+                    })
+                  }
+                >
+                  Resend
+                </Button>
+                <Button
+                  className="w-full"
+                  size="sm"
+                  variant="outline"
+                  disabled={cancelMutation.isPending}
+                  onClick={() => cancelMutation.mutate(inv.token)}
+                >
+                  Cancel
+                </Button>
+              </div>
             </Card>
           );
         })}
@@ -487,7 +550,7 @@ function OutgoingInvites({ onSelect, viewMode = "list" }: { onSelect: (inv: Invi
             <TableHead>Role</TableHead>
             <TableHead>Expires</TableHead>
             <TableHead>Sent</TableHead>
-            <TableHead className="w-[50px]"></TableHead>
+            <TableHead className="text-right">Actions</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -531,38 +594,30 @@ function OutgoingInvites({ onSelect, viewMode = "list" }: { onSelect: (inv: Invi
                 <TableCell className="text-muted-foreground text-sm">
                   {formatDistanceToNow(new Date(inv.createdAt), { addSuffix: true })}
                 </TableCell>
-                <TableCell>
-                  <div onClick={(e) => e.stopPropagation()}>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-8 w-8">
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem
-                          onClick={() =>
-                            resendMutation.mutate({
-                              orgId: activeOrgId,
-                              email: inv.email,
-                              role: inv.role,
-                            })
-                          }
-                          disabled={resendMutation.isPending}
-                        >
-                          <RefreshCw className="mr-2 h-4 w-4" />
-                          Resend Invite
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          className="text-destructive focus:text-destructive"
-                          onClick={() => cancelMutation.mutate(inv.token)}
-                          disabled={cancelMutation.isPending}
-                        >
-                          <X className="mr-2 h-4 w-4" />
-                          Cancel Invite
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
+                <TableCell className="text-right">
+                  <div className="flex justify-end gap-2" onClick={(e) => e.stopPropagation()}>
+                    <Button
+                      size="sm"
+                      variant="default"
+                      disabled={resendMutation.isPending}
+                      onClick={() =>
+                        resendMutation.mutate({
+                          orgId: activeOrgId,
+                          email: inv.email,
+                          role: inv.role,
+                        })
+                      }
+                    >
+                      Resend
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={cancelMutation.isPending}
+                      onClick={() => cancelMutation.mutate(inv.token)}
+                    >
+                      Cancel
+                    </Button>
                   </div>
                 </TableCell>
               </TableRow>

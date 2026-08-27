@@ -444,8 +444,7 @@ function TestSandboxTab() {
 
               <div className="flex items-center gap-3 text-xs text-muted-foreground">
                 <Cpu className="h-3 w-3" />
-                <span className="font-mono">{result.modelUsed}</span>
-                <Separator orientation="vertical" className="h-3" />
+
                 <FileText className="h-3 w-3" />
                 <span className="font-mono">prompt {result.promptVersion}</span>
               </div>

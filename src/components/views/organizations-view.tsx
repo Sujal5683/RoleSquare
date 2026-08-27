@@ -311,8 +311,8 @@ export function OrganizationsView() {
 
       {/* Search */}
       <Card>
-        <CardContent className="p-4 flex flex-col sm:flex-row gap-4">
-          <div className="relative flex-1 max-w-md">
+        <CardContent className="p-4 flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center">
+          <div className="relative w-full sm:max-w-md flex-1">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
               placeholder="Search by name, slug, or plan…"
@@ -321,7 +321,7 @@ export function OrganizationsView() {
               className="pl-9"
             />
           </div>
-          <div className="flex flex-row gap-2">
+          <div className="flex flex-row gap-2 items-center w-full sm:w-auto">
             <Select value={filterRole} onValueChange={setFilterRole}>
               <SelectTrigger className="w-[140px]">
                 <SelectValue placeholder="Role" />

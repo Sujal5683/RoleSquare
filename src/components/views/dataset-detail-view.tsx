@@ -1149,11 +1149,13 @@ export function DatasetDetailView() {
 
               {/* Column visibility */}
               <Popover>
+              <Tooltip><TooltipTrigger asChild>
               <PopoverTrigger asChild>
-                <Tooltip><TooltipTrigger asChild><Button variant="outline" size="sm" className="shrink-0 px-2">
+                <Button variant="outline" size="sm" className="shrink-0 px-2">
                                                     <Columns3 className="h-3.5 w-3.5" />
-                                                  </Button></TooltipTrigger><TooltipContent>Show/Hide columns</TooltipContent></Tooltip>
+                                                  </Button>
               </PopoverTrigger>
+              </TooltipTrigger><TooltipContent>Show/Hide columns</TooltipContent></Tooltip>
               <PopoverContent align="end" className="w-64 p-3">
                 <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
                   Toggle columns
@@ -1211,11 +1213,13 @@ export function DatasetDetailView() {
 
               {/* Three-dot overflow menu — Min Confidence, Save view, Add row, Import */}
               <DropdownMenu>
+                <Tooltip><TooltipTrigger asChild>
                 <DropdownMenuTrigger asChild>
-                  <Tooltip><TooltipTrigger asChild><Button variant="outline" size="icon" className="h-8 w-8 shrink-0">
+                  <Button variant="outline" size="icon" className="h-8 w-8 shrink-0">
                                                       <MoreHorizontal className="h-4 w-4" />
-                                                    </Button></TooltipTrigger><TooltipContent>More options</TooltipContent></Tooltip>
+                                                    </Button>
                 </DropdownMenuTrigger>
+                </TooltipTrigger><TooltipContent>More options</TooltipContent></Tooltip>
                 <DropdownMenuContent align="end" className="w-56">
                   <DropdownMenuLabel className="text-xs text-muted-foreground font-normal">Filter</DropdownMenuLabel>
                   <DropdownMenuItem

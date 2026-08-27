@@ -77,6 +77,10 @@ interface AppState {
   dismissedNotifications: string[];
   dismissNotification: (id: string) => void;
   dismissAllNotifications: (ids: string[]) => void;
+
+  readNotifications: string[];
+  markAsRead: (id: string) => void;
+  markAllAsRead: (ids: string[]) => void;
 }
 
 const MAX_RECENT = 10;
@@ -186,6 +190,16 @@ export const useAppStore = create<AppState>()(
         set((s) => ({
           dismissedNotifications: [...new Set([...s.dismissedNotifications, ...ids])],
         })),
+
+      readNotifications: [],
+      markAsRead: (id) =>
+        set((s) => ({
+          readNotifications: [...new Set([...s.readNotifications, id])],
+        })),
+      markAllAsRead: (ids) =>
+        set((s) => ({
+          readNotifications: [...new Set([...s.readNotifications, ...ids])],
+        })),
     }),
     {
       name: "wip-app-store",
@@ -196,6 +210,7 @@ export const useAppStore = create<AppState>()(
         recentItems: s.recentItems,
         desktopSidebarOpen: s.desktopSidebarOpen,
         dismissedNotifications: s.dismissedNotifications,
+        readNotifications: s.readNotifications,
       }),
     }
   )
