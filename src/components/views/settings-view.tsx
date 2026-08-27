@@ -873,7 +873,11 @@ function SecuritySection() {
               <div className="flex gap-2">
                 <Input
                   value={token}
-                  onChange={(e) => setToken(e.target.value)}
+                  onChange={(e) => {
+                    const val = e.target.value.replace(/\D/g, "");
+                    setToken(val);
+                  }}
+                  inputMode="numeric"
                   placeholder="123456"
                   maxLength={6}
                 />
