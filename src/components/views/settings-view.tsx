@@ -103,7 +103,8 @@ import {
   MoreHorizontal,
   Clock,
   Database,
-  Server
+  Server,
+  Unplug
 } from "lucide-react";
 import { ProfileAvatar } from "@/components/settings/profile-avatar";
 import {
@@ -514,15 +515,13 @@ function ConnectedAccountsSection() {
                   <Button
                     size="sm"
                     variant="outline"
-                    onClick={() => refreshMutation.mutate({ id: c.id })}
-                    disabled={refreshMutation.isPending}
+                    className="border-destructive text-destructive hover:bg-destructive/10 hover:text-destructive h-8"
+                    onClick={() => setDisconnectTarget(c)}
+                    disabled={disconnectMutation.isPending}
                   >
-                    <RefreshCw
-                      className={`mr-1.5 h-3.5 w-3.5 ${refreshMutation.isPending ? "animate-spin" : ""}`}
-                    />
-                    Refresh
+                    <Unplug className="mr-1.5 h-3.5 w-3.5" />
+                    Disconnect
                   </Button>
-                  
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
