@@ -401,7 +401,7 @@ export function ExtractionWizard() {
             <Button 
               onClick={handleStart} 
               disabled={startMutation.isPending}
-              className="gap-1.5 bg-gradient-to-r from-cyan-600/15 to-blue-600/15 border border-blue-500/20 text-blue-700 dark:text-blue-300 backdrop-blur-xl hover:from-cyan-600/25 hover:to-blue-600/25 shadow-sm"
+              className="gap-1.5 bg-transparent hover:bg-transparent bg-gradient-to-r from-cyan-600/15 to-blue-600/15 border border-blue-500/20 text-blue-700 dark:text-blue-300 backdrop-blur-xl hover:from-cyan-600/25 hover:to-blue-600/25 shadow-sm"
             >
               {startMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Bot className="h-4 w-4" />}
               {startMutation.isPending ? "Starting..." : "Start Extraction"}

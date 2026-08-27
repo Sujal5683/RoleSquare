@@ -35,9 +35,12 @@ export type FieldType =
 
 export type JobType =
   | "GMAIL_SCAN"
+  | "DRIVE_SCAN"
+  | "SHEETS_SCAN"
+  | "DOCS_SCAN"
+  | "FORMS_SCAN"
   | "EMAIL_PARSE"
   | "ATTACHMENT_PROCESS"
-  | "DRIVE_DISCOVERY"
   | "DOCUMENT_PARSE"
   | "AI_EXTRACTION"
   | "AI_VALIDATION"

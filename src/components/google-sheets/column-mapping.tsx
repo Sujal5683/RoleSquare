@@ -110,29 +110,29 @@ function AIMappingLoadingSkeleton({ headers }: { headers: string[] }) {
   return (
     <div className="space-y-4">
       {/* AI Banner */}
-      <div className="relative overflow-hidden rounded-xl border border-violet-500/30 bg-gradient-to-r from-violet-950/60 via-indigo-950/60 to-violet-950/60 p-4">
+      <div className="relative overflow-hidden rounded-xl border bg-primary/5 p-4">
         {/* Animated shimmer */}
-        <div className="absolute inset-0 -translate-x-full animate-[shimmer_2s_infinite] bg-gradient-to-r from-transparent via-white/5 to-transparent" />
+        <div className="absolute inset-0 -translate-x-full animate-[shimmer_2s_infinite] bg-gradient-to-r from-transparent via-primary/10 to-transparent" />
         <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-violet-500/20 ring-1 ring-violet-500/30">
-            <Brain className="h-5 w-5 animate-pulse text-violet-300" />
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 ring-1 ring-primary/20">
+            <Brain className="h-5 w-5 animate-pulse text-primary" />
           </div>
           <div className="flex-1 space-y-1">
-            <p className="text-sm font-semibold text-violet-100">
+            <p className="text-sm font-semibold text-foreground">
               AI is auto-mapping your columns
             </p>
-            <p className="text-xs text-violet-300/70">
+            <p className="text-xs text-muted-foreground">
               Analyzing {headers.length} column{headers.length !== 1 ? "s" : ""} and finding best matches…
             </p>
           </div>
-          <Loader2 className="h-4 w-4 shrink-0 animate-spin text-violet-400" />
+          <Loader2 className="h-4 w-4 shrink-0 animate-spin text-primary" />
         </div>
         {/* Progress dots */}
         <div className="mt-3 flex items-center gap-1.5">
           {[0, 1, 2].map((i) => (
             <div
               key={i}
-              className="h-1 flex-1 rounded-full bg-violet-500/30"
+              className="h-1 flex-1 rounded-full bg-primary/20"
               style={{
                 animation: `pulse 1.5s ease-in-out ${i * 0.3}s infinite`,
               }}
@@ -183,32 +183,32 @@ function AISummaryBanner({
   const lowConf = suggestions.filter((s) => s.confidence < 0.6).length;
 
   return (
-    <div className="flex items-center gap-3 rounded-lg border border-violet-500/20 bg-violet-500/5 px-3 py-2">
-      <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-violet-500/15">
-        <Sparkles className="h-3.5 w-3.5 text-violet-400" />
+    <div className="flex items-center gap-3 rounded-lg border bg-muted/50 px-3 py-2 shadow-sm">
+      <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-primary/15 text-primary">
+        <Sparkles className="h-4 w-4" />
       </div>
       <div className="flex-1 min-w-0">
-        <p className="text-xs font-medium text-violet-300">AI Mapping Applied</p>
-        <p className="text-[10px] text-muted-foreground">
+        <p className="text-xs font-semibold text-foreground">AI Mapping Applied</p>
+        <p className="text-[10px] text-muted-foreground mt-0.5">
           {mappedCount} mapped · {skippedCount} skipped
         </p>
       </div>
       {/* Confidence breakdown */}
       <div className="flex items-center gap-1.5 shrink-0">
         {highConf > 0 && (
-          <span className="flex items-center gap-1 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-[10px] text-emerald-400">
-            <CheckCircle2 className="h-2.5 w-2.5" />
+          <span className="flex items-center gap-1 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-medium text-emerald-700 dark:text-emerald-400">
+            <CheckCircle2 className="h-3 w-3" />
             {highConf} high
           </span>
         )}
         {medConf > 0 && (
-          <span className="flex items-center gap-1 rounded-full border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-[10px] text-amber-400">
-            <AlertCircle className="h-2.5 w-2.5" />
+          <span className="flex items-center gap-1 rounded-full border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-[10px] font-medium text-amber-700 dark:text-amber-400">
+            <AlertCircle className="h-3 w-3" />
             {medConf} med
           </span>
         )}
         {lowConf > 0 && (
-          <span className="rounded-full border border-slate-500/30 bg-slate-500/10 px-2 py-0.5 text-[10px] text-slate-400">
+          <span className="rounded-full border border-slate-500/30 bg-slate-500/10 px-2 py-0.5 text-[10px] font-medium text-slate-700 dark:text-slate-400">
             {lowConf} low
           </span>
         )}

@@ -25,7 +25,7 @@ export function Stepper({ steps, currentStep, onChangeStep, className }: Stepper
               className={cn(
                 "flex h-7 items-center border border-transparent rounded-full px-3.5 text-xs font-medium transition-all duration-200",
                 isActive
-                  ? "bg-primary/15 border border-primary/20 text-primary shadow-sm backdrop-blur-xl"
+                  ? "bg-primary text-primary-foreground shadow-sm ring-2 ring-primary/20 ring-offset-1 ring-offset-background"
                   : isDone
                   ? "bg-primary/15 text-primary hover:bg-primary/25 cursor-pointer"
                   : "bg-muted text-muted-foreground cursor-default opacity-80",

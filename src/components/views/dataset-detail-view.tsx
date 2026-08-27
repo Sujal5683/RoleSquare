@@ -1100,7 +1100,7 @@ export function DatasetDetailView() {
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <div>
-                          <Button size="sm" className="gap-1.5 bg-gradient-to-r from-cyan-600/10 to-blue-600/10 border border-blue-500/15 text-blue-700/50 dark:text-blue-300/50 backdrop-blur-xl shadow-sm" disabled>
+                          <Button size="sm" className="gap-1.5 bg-transparent hover:bg-transparent bg-gradient-to-r from-cyan-600/10 to-blue-600/10 border border-blue-500/15 text-blue-700/50 dark:text-blue-300/50 backdrop-blur-xl shadow-sm" disabled>
                             <Bot className="h-3.5 w-3.5" />
                             Extract Custom Fields (AI)
                           </Button>
@@ -1114,7 +1114,7 @@ export function DatasetDetailView() {
                 ) : (
                   <Button
                     size="sm"
-                    className="gap-1.5 bg-gradient-to-r from-cyan-600/15 to-blue-600/15 border border-blue-500/20 text-blue-700 dark:text-blue-300 backdrop-blur-xl hover:from-cyan-600/25 hover:to-blue-600/25 shadow-sm"
+                    className="gap-1.5 bg-transparent hover:bg-transparent bg-gradient-to-r from-cyan-600/15 to-blue-600/15 border border-blue-500/20 text-blue-700 dark:text-blue-300 backdrop-blur-xl hover:from-cyan-600/25 hover:to-blue-600/25 shadow-sm"
                     onClick={() => setExtractDialog(true)}
                     title="Run AI extraction from this Default Dataset into a new Custom Dataset"
                   >
