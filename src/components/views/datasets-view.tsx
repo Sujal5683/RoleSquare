@@ -595,15 +595,32 @@ export function DatasetsView() {
               {viewMode === "list" && (
                 <div className="flex flex-col items-end justify-between shrink-0 pl-4 border-l">
                   <div className="flex items-center gap-1">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8"
-                      aria-label="Share dataset"
-                      onClick={() => handleShare(d)}
-                    >
-                      <Share2 className="h-4 w-4" />
-                    </Button>
+                    {d.accessLevel === "read" || d.accessLevel === "comment" ? (
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <div>
+                              <Button variant="ghost" size="icon" className="h-8 w-8 opacity-50" disabled aria-label="Share dataset">
+                                <Share2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>You must be an editor to share this dataset.</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    ) : (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8"
+                        aria-label="Share dataset"
+                        onClick={() => handleShare(d)}
+                      >
+                        <Share2 className="h-4 w-4" />
+                      </Button>
+                    )}
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <Button variant="ghost" size="icon" className="h-8 w-8" aria-label="Dataset actions">
@@ -611,14 +628,18 @@ export function DatasetsView() {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end" className="w-48">
-                        <DropdownMenuItem onClick={() => setAssignSchemaTarget(d)}>
-                          <FileCode2 className="mr-2 h-4 w-4" />
-                          {d.schema ? "Change Schema" : "Assign Schema"}
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => setSheetsPanelDataset(d)}>
-                          <FileSpreadsheet className="mr-2 h-4 w-4 text-emerald-500" />
-                          Google Sheets
-                        </DropdownMenuItem>
+                        {d.accessLevel !== "read" && d.accessLevel !== "comment" && (
+                          <>
+                            <DropdownMenuItem onClick={() => setAssignSchemaTarget(d)}>
+                              <FileCode2 className="mr-2 h-4 w-4" />
+                              {d.schema ? "Change Schema" : "Assign Schema"}
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => setSheetsPanelDataset(d)}>
+                              <FileSpreadsheet className="mr-2 h-4 w-4 text-emerald-500" />
+                              Google Sheets
+                            </DropdownMenuItem>
+                          </>
+                        )}
                         <DropdownMenuSeparator />
                         <DropdownMenuItem onClick={() => exportMutation.mutate({ id: d.id, format: "csv" })} disabled={exportMutation.isPending}>
                           <FileDown className="mr-2 h-4 w-4" />
@@ -629,14 +650,18 @@ export function DatasetsView() {
                           Export JSON
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
-                        <DropdownMenuItem onClick={() => handleShare(d)}>
-                          <Share2 className="mr-2 h-4 w-4" />
-                          Share
-                        </DropdownMenuItem>
-                        <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => setDeleteTarget(d)}>
-                          <Trash2 className="mr-2 h-4 w-4" />
-                          Delete
-                        </DropdownMenuItem>
+                        {d.accessLevel !== "read" && d.accessLevel !== "comment" && (
+                          <>
+                            <DropdownMenuItem onClick={() => handleShare(d)}>
+                              <Share2 className="mr-2 h-4 w-4" />
+                              Share
+                            </DropdownMenuItem>
+                            <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => setDeleteTarget(d)}>
+                              <Trash2 className="mr-2 h-4 w-4" />
+                              Delete
+                            </DropdownMenuItem>
+                          </>
+                        )}
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </div>

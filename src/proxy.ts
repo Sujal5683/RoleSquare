@@ -29,7 +29,7 @@ function isPublicPath(pathname: string): boolean {
   return PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(p + "/"));
 }
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // Always allow public paths
@@ -71,7 +71,14 @@ export async function middleware(request: NextRequest) {
     loginUrl.pathname = "/login";
     // Preserve the original destination so we can redirect back after login
     loginUrl.searchParams.set("next", pathname);
-    return NextResponse.redirect(loginUrl);
+    const redirectResponse = NextResponse.redirect(loginUrl);
+    
+    // Crucial: preserve any cookies that Supabase might have refreshed
+    supabaseResponse.cookies.getAll().forEach((cookie) => {
+      redirectResponse.cookies.set(cookie.name, cookie.value);
+    });
+    
+    return redirectResponse;
   }
 
   return supabaseResponse;

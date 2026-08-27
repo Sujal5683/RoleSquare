@@ -123,7 +123,7 @@ export async function GET(req: NextRequest) {
     if (redirectOrigin.includes("0.0.0.0")) {
       redirectOrigin = redirectOrigin.replace("0.0.0.0", "localhost");
     }
-    return NextResponse.redirect(`${redirectOrigin}/`);
+    return NextResponse.redirect(`${redirectOrigin}/workspace`);
   } catch (err) {
     console.error("[google/callback] Error:", err);
     const message = err instanceof Error ? encodeURIComponent(err.message) : "unknown";

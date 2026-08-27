@@ -115,10 +115,20 @@ export async function POST(req: NextRequest) {
         { status: 400 }
       );
     }
+    let schemaId = body?.schemaId || null;
+    if (schemaId) {
+      const schema = await db.schema.findFirst({
+        where: { id: schemaId, organizationId },
+      });
+      if (!schema) {
+        return NextResponse.json({ error: "Schema not found" }, { status: 404 });
+      }
+    }
+
     const dataset = await db.dataset.create({
       data: {
         organizationId,
-        schemaId: body?.schemaId || null,
+        schemaId,
         createdBy: user.id,
         name,
         description: body?.description ?? null,

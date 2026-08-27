@@ -38,6 +38,14 @@ export async function GET(req: NextRequest) {
     // 1. Decode state
     const { userId, organizationId, returnTo } = decodeSheetsOAuthState(stateParam);
 
+    // 1b. Verify state user matches current session to prevent CSRF / State tampering
+    const { getCurrentUser } = await import("@/lib/auth");
+    const currentUser = await getCurrentUser();
+    if (currentUser.id !== userId) {
+      console.error("[google-sheets/auth/callback] OAuth state user ID mismatch");
+      return NextResponse.redirect(`${safeOrigin}/?error=sheets_user_mismatch`);
+    }
+
     // 2. Exchange code for tokens
     const { accessToken, refreshToken, expiresAt, googleEmail, displayName, avatarUrl } =
       await exchangeSheetsCode(code);

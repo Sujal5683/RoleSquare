@@ -65,6 +65,14 @@ export async function PATCH(
         { status: 403 }
       );
     }
+    
+    // Cannot promote someone to a role higher than your own
+    if (data.role && (ROLE_LEVEL[data.role] ?? 0) > (ROLE_LEVEL[actorMembership.role as string] ?? 0)) {
+       return NextResponse.json(
+        { error: "You cannot promote a member to a role higher than your own" },
+        { status: 403 }
+      );
+    }
 
     const member = await db.organizationMember.update({
       where: { id: memberId },

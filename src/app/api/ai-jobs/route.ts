@@ -47,3 +47,35 @@ export async function GET(req: NextRequest) {
     );
   }
 }
+
+export async function POST(req: NextRequest) {
+  try {
+    const { organizationId, user } = await requireOrgContext(req);
+    const body = await req.json();
+
+    if (!body.type) {
+      return NextResponse.json(
+        { error: "type is required" },
+        { status: 400 }
+      );
+    }
+
+    const job = await db.aiJob.create({
+      data: {
+        organizationId,
+        userId: user.id,
+        type: body.type,
+        payload: body.payload ? JSON.stringify(body.payload) : "{}",
+        status: "queued",
+      },
+    });
+
+    return NextResponse.json(serializeAiJob(job));
+  } catch (err) {
+    if (err instanceof AuthError) return authErrorResponse(err);
+    return NextResponse.json(
+      { error: err instanceof Error ? err.message : "Failed to create job" },
+      { status: 500 }
+    );
+  }
+}

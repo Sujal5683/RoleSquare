@@ -50,6 +50,13 @@ export async function POST(
       return NextResponse.json({ error: "A dataset must be selected to approve this request." }, { status: 400 });
     }
 
+    if (existing.shareType === 'request') {
+      const dataset = await db.dataset.findUnique({ where: { id: datasetId } });
+      if (!dataset || dataset.organizationId !== organizationId) {
+        return NextResponse.json({ error: "You can only share datasets that belong to your organization." }, { status: 403 });
+      }
+    }
+
     const now = new Date();
     const updated = await db.$transaction(async (tx) => {
       const req2 = await tx.sharingRequest.update({

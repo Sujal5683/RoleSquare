@@ -46,7 +46,11 @@ async function request<T>(
 
   if (!res.ok) {
     // On 401, the session has expired or is missing — redirect to login
-    if (res.status === 401 && typeof window !== "undefined") {
+    // On 403 with 2FA_REQUIRED, the user needs to complete 2FA — redirect to login
+    const isUnauthorized = res.status === 401;
+    const is2FaRequired = res.status === 403 && data?.error === "2FA_REQUIRED";
+
+    if ((isUnauthorized || is2FaRequired) && typeof window !== "undefined") {
       const loginUrl = new URL("/login", window.location.origin);
       loginUrl.searchParams.set("next", window.location.pathname);
       window.location.href = loginUrl.toString();

@@ -47,13 +47,13 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // IDOR: verify dataset belongs to this org
-    const dataset = await db.dataset.findFirst({
-      where: { id: datasetId, organizationId },
-      select: { id: true },
+    // Verify dataset access
+    const { verifyDatasetAccess } = await import("@/lib/auth");
+    const dataset = await db.dataset.findUnique({
+      where: { id: datasetId },
     });
-    if (!dataset) {
-      return NextResponse.json({ error: "Dataset not found" }, { status: 404 });
+    if (!dataset || !(await verifyDatasetAccess(dataset, organizationId, user.id, "read"))) {
+      return NextResponse.json({ error: "Dataset not found or unauthorized" }, { status: 403 });
     }
 
     // IDOR: verify Sheets account belongs to this org

@@ -17,7 +17,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Progress } from "@/components/ui/progress";
 import { LoadingState, EmptyState, ErrorState } from "@/components/ui/page-elements";
 import { StatusBadge } from "@/components/ui/status-badge";
-import { ArrowRight, CheckCircle2, Database, FileJson, Sparkles, Workflow, Layers, Loader2, Play } from "lucide-react";
+import { ArrowRight, CheckCircle2, Database, FileJson, Sparkles, Workflow, Layers, Loader2, Play, Link2, Info, Bot } from "lucide-react";
 import { useAppStore } from "@/lib/store";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
@@ -42,6 +42,7 @@ export function ExtractionWizard() {
   const [targetDatasetName, setTargetDatasetName] = useState("");
   const [agentKeys, setAgentKeys] = useState<string[]>(["extractor", "analyst", "validator", "transformer"]);
   const [instructions, setInstructions] = useState("");
+  const [exploreDriveLinks, setExploreDriveLinks] = useState(true);
   const [jobId, setJobId] = useState<string | null>(null);
 
   // Queries
@@ -92,6 +93,7 @@ export function ExtractionWizard() {
       targetDatasetName: targetMode === "new" ? targetDatasetName : undefined,
       agentKeys,
       instructions: instructions || undefined,
+      exploreDriveLinks,
     });
   };
 
@@ -143,23 +145,39 @@ export function ExtractionWizard() {
           </CardHeader>
           <CardContent>
             <div className="grid gap-2 sm:grid-cols-2 max-h-[40vh] overflow-y-auto pr-2">
-              {datasets?.map((d) => (
-                <div
-                  key={d.id}
-                  onClick={() => setSourceDatasetId(d.id)}
-                  className={`cursor-pointer rounded-md border p-2.5 transition-all hover:border-primary/50 hover:bg-muted/30 ${
-                    sourceDatasetId === d.id ? "border-primary bg-primary/5 ring-1 ring-primary" : ""
-                  }`}
-                >
-                  <div className="flex items-center gap-2.5">
-                    <Database className="h-4 w-4 text-muted-foreground" />
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium text-sm truncate">{d.name}</p>
-                      <p className="text-[11px] text-muted-foreground">{d.recordCount} records</p>
-                    </div>
-                  </div>
-                </div>
-              ))}
+              {datasets?.map((d) => {
+                const isReadOnly = d.accessLevel === "read" || d.accessLevel === "comment";
+                return (
+                  <TooltipProvider key={d.id}>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <div
+                          onClick={() => !isReadOnly && setSourceDatasetId(d.id)}
+                          className={`rounded-md border p-2.5 transition-all ${
+                            isReadOnly ? "opacity-50 cursor-not-allowed" : "cursor-pointer hover:border-primary/50 hover:bg-muted/30"
+                          } ${sourceDatasetId === d.id ? "border-primary bg-primary/5 ring-1 ring-primary" : ""}`}
+                        >
+                          <div className="flex items-center gap-2.5">
+                            <Database className="h-4 w-4 text-muted-foreground" />
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2">
+                                <p className="font-medium text-sm truncate">{d.name}</p>
+                                {isReadOnly && <span className="text-[10px] text-muted-foreground">(View only)</span>}
+                              </div>
+                              <p className="text-[11px] text-muted-foreground">{d.recordCount} records</p>
+                            </div>
+                          </div>
+                        </div>
+                      </TooltipTrigger>
+                      {isReadOnly && (
+                        <TooltipContent>
+                          <p>View only - you must be an editor to select this dataset as a source.</p>
+                        </TooltipContent>
+                      )}
+                    </Tooltip>
+                  </TooltipProvider>
+                );
+              })}
             </div>
           </CardContent>
           <CardFooter className="flex justify-end border-t pt-4">
@@ -263,7 +281,53 @@ export function ExtractionWizard() {
               )}
             </div>
 
-            <div className="space-y-3 pt-4 border-t">
+            {/* ── Document Exploration (Drive Link Feature) ── */}
+            <div className={`rounded-lg border-2 p-4 transition-colors ${exploreDriveLinks ? "border-primary/40 bg-primary/5" : "border-border bg-muted/20"}`}>
+              <div className="flex items-start gap-3">
+                <div className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${exploreDriveLinks ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"}`}>
+                  <Link2 className="h-4 w-4" />
+                </div>
+                <div className="flex-1 space-y-2">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <Label htmlFor="explore-drive" className="text-sm font-semibold cursor-pointer">
+                        Explore Linked Documents
+                      </Label>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        Recommended — enabled by default
+                      </p>
+                    </div>
+                    <Checkbox
+                      id="explore-drive"
+                      checked={exploreDriveLinks}
+                      onCheckedChange={(c) => setExploreDriveLinks(!!c)}
+                      className="mt-0.5 h-5 w-5"
+                    />
+                  </div>
+
+                  {/* Always-visible info text */}
+                  <div className="flex gap-2 rounded-md bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 p-3">
+                    <Info className="h-4 w-4 shrink-0 text-blue-500 mt-0.5" />
+                    <p className="text-xs text-blue-700 dark:text-blue-300 leading-relaxed">
+                      When enabled, the AI will <strong>open every Google Drive link</strong> found in your dataset,
+                      list all files inside those folders, and read their full content — including{" "}
+                      <strong>PDFs, Word documents, Google Docs, Sheets, Slides, and images</strong>.
+                      All file content is combined and given to the AI to extract the requested fields,
+                      instead of only reading the link text. This is the recommended mode for datasets
+                      that contain Drive folder links.
+                    </p>
+                  </div>
+
+                  {!exploreDriveLinks && (
+                    <p className="text-xs text-amber-600 dark:text-amber-400 font-medium">
+                      ⚠️ Drive exploration is off — the AI will only read the text in your dataset cells, not the linked files.
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-3 pt-2 border-t">
               <Label className="text-base">AI Agents</Label>
               <div className="grid gap-2 sm:grid-cols-2">
                 {ALL_AGENTS.map((agent) => (
@@ -336,6 +400,15 @@ export function ExtractionWizard() {
                     {agentKeys.map(k => <Badge key={k} variant="secondary" className="text-[10px]">{k}</Badge>)}
                   </div>
                 </div>
+                <div>
+                  <p className="text-muted-foreground mb-1">Document Exploration</p>
+                  <div className="flex items-center gap-1.5">
+                    <Link2 className={`h-3.5 w-3.5 ${exploreDriveLinks ? "text-primary" : "text-muted-foreground"}`} />
+                    <span className={`text-sm font-medium ${exploreDriveLinks ? "text-primary" : "text-muted-foreground"}`}>
+                      {exploreDriveLinks ? "Enabled — will read linked Drive files" : "Disabled — text only"}
+                    </span>
+                  </div>
+                </div>
               </div>
             </div>
           </CardContent>
@@ -344,9 +417,9 @@ export function ExtractionWizard() {
             <Button 
               onClick={handleStart} 
               disabled={startMutation.isPending}
-              className="bg-indigo-600 hover:bg-indigo-700 text-white"
+              className="gap-1.5 bg-gradient-to-r from-cyan-600 to-blue-600 text-white hover:from-cyan-700 hover:to-blue-700 shadow-sm"
             >
-              {startMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Play className="mr-2 h-4 w-4" />}
+              {startMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Bot className="h-4 w-4" />}
               {startMutation.isPending ? "Starting..." : "Start Extraction"}
             </Button>
           </CardFooter>

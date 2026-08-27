@@ -10,6 +10,7 @@ import type {
   DatasetDTO,
   DatasetRecordDTO,
   DatasetValueDTO,
+  DatasetColumnDefDTO,
   RecordStatus,
   FieldType,
   SchemaDTO,
@@ -124,10 +125,23 @@ import {
   Redo,
   ArrowLeftToLine,
   ArrowRightToLine,
+  Copy,
+  ExternalLink,
+  Bot,
 } from "lucide-react";
 import { NewShareRequestDialog } from "@/components/sharing/new-share-request-dialog";
 import { AssignSchemaDialog } from "@/components/datasets/assign-schema-dialog";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 
 // ── Helpers ──────────────────────────────────────────────────────────────
@@ -227,6 +241,107 @@ function valueByFieldId(
 
 // ── Component ────────────────────────────────────────────────────────────
 
+// URL detection helper
+function isUrl(text: string): boolean {
+  if (!text || typeof text !== "string") return false;
+  try {
+    const url = new URL(text.trim());
+    return url.protocol === "http:" || url.protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
+// Normalize escaped newline sequences in text (e.g. from JSON/API strings)
+function normalizeNewlines(text: string): string {
+  return text
+    .replace(/\\r\\n/g, "\n")
+    .replace(/\\n/g, "\n")
+    .replace(/\\r/g, "\n");
+}
+
+// ── LinkChip — an attractive clickable pill for URLs ─────────────────────
+
+function LinkChip({ url, compact = false }: { url: string; compact?: boolean }) {
+  let label = url;
+  try {
+    const parsed = new URL(url);
+    label = parsed.hostname.replace(/^www\./, "");
+  } catch {
+    // keep raw url as label
+  }
+  return (
+    <a
+      href={url}
+      target="_blank"
+      rel="noopener noreferrer"
+      onClick={(e) => e.stopPropagation()}
+      title={url}
+      className={`inline-flex items-center gap-1.5 rounded-full border border-blue-500/40 bg-blue-500/10 
+                  text-blue-400 hover:bg-blue-500/20 hover:text-blue-300 transition-colors 
+                  font-medium truncate ${compact ? "px-2 py-0.5 text-xs max-w-[180px]" : "px-3 py-1 text-sm max-w-[260px]"}`}
+    >
+      <ExternalLink className={compact ? "h-2.5 w-2.5 shrink-0" : "h-3.5 w-3.5 shrink-0"} />
+      <span className="truncate">{label}</span>
+    </a>
+  );
+}
+
+// ── FormattedFieldValue — richly renders field values in the evidence drawer ─
+
+function FormattedFieldValue({
+  value,
+  fieldType,
+}: {
+  value: unknown;
+  fieldType: string;
+}) {
+  if (value == null || value === "") {
+    return <span className="text-muted-foreground">—</span>;
+  }
+
+  // Array / multiselect: render each item as a chip
+  if (Array.isArray(value)) {
+    if (value.length === 0) return <span className="text-muted-foreground">—</span>;
+    return (
+      <div className="flex flex-wrap gap-1.5 mt-1">
+        {value.map((item, i) => {
+          const str = String(item);
+          return (
+            <span
+              key={i}
+              className="inline-flex items-center rounded-md bg-muted px-2.5 py-1 text-sm text-foreground"
+            >
+              {str}
+            </span>
+          );
+        })}
+      </div>
+    );
+  }
+
+  const text = String(value);
+
+  // Single URL → link chip
+  if (isUrl(text.trim())) {
+    return <LinkChip url={text.trim()} />;
+  }
+
+  // Long text or text with newlines → preserve formatting
+  const normalized = normalizeNewlines(text);
+  if (normalized.includes("\n") || normalized.length > 200) {
+    return (
+      <pre className="whitespace-pre-wrap font-sans text-sm leading-relaxed break-words text-foreground">
+        {normalized}
+      </pre>
+    );
+  }
+
+  return <span className="text-sm leading-relaxed break-words">{text}</span>;
+}
+
+
+
 export function DatasetDetailView() {
   const queryClient = useQueryClient();
   const datasetId = useAppStore((s) => s.selectedDatasetId);
@@ -245,6 +360,27 @@ export function DatasetDetailView() {
   const [viewMode, setViewMode] = useState<"list" | "card">("list");
   const [inlineEditCell, setInlineEditCell] = useState<{ recordId: string; fieldId: string } | null>(null);
   const [selectedRecords, setSelectedRecords] = useState<Set<string>>(new Set());
+
+  type EditAction = {
+    recordId: string;
+    fieldId: string;
+    valueId: string;
+    oldVal: string;
+    newVal: string;
+  };
+  const [undoStack, setUndoStack] = useState<EditAction[]>([]);
+  const [redoStack, setRedoStack] = useState<EditAction[]>([]);
+  const [confirmDialog, setConfirmDialog] = useState<{
+    open: boolean;
+    title: string;
+    description: string;
+    onConfirm: () => void;
+  }>({
+    open: false,
+    title: "",
+    description: "",
+    onConfirm: () => {},
+  });
 
 
   const clickTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -519,9 +655,7 @@ export function DatasetDetailView() {
   // ── Record deletion mutation (Bulk) ───────────────────────────────────
   const deleteMutation = useMutation({
     mutationFn: (recordIds: string[]) =>
-      api.delete<{ deleted: number }>(`/api/datasets/${datasetId}/records/bulk`, {
-        data: { recordIds }
-      }),
+      api.delete<{ deleted: number }>(`/api/datasets/${datasetId}/records/bulk`, { recordIds }),
     onSuccess: (res) => {
       toast.success(`Deleted ${res.deleted} record(s)`);
       setSelectedRecords(new Set());
@@ -534,6 +668,75 @@ export function DatasetDetailView() {
       toast.error("Delete failed", { description: msg });
     },
   });
+
+  const applyEditMutation = useMutation({
+    mutationFn: async (action: EditAction & { revertTo: string }) => {
+      const field = dataset?.schema?.fields.find(f => f.id === action.fieldId);
+      let parsedValue: any = action.revertTo;
+      if (field?.type === "number") {
+        parsedValue = parseFloat(action.revertTo) || 0;
+      } else if (field?.type === "boolean") {
+        parsedValue = action.revertTo.toLowerCase() === "true" || action.revertTo.toLowerCase() === "yes" || action.revertTo === "1";
+      }
+
+      return api.patch(`/api/datasets/${datasetId}/records/${action.recordId}/values/${action.valueId}`, {
+        value: parsedValue,
+        confidence: 1,
+        evidence: "Undo/Redo operation",
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["dataset-records", datasetId] });
+      toast.success("Change applied");
+    },
+    onError: (err: any) => {
+      toast.error(err.message || "Failed to apply change");
+    },
+  });
+
+  const handleUndo = () => {
+    if (undoStack.length === 0) return;
+    setUndoStack(prev => {
+      const newStack = [...prev];
+      const action = newStack.pop()!;
+      setRedoStack(r => [...r, action]);
+      applyEditMutation.mutate({ ...action, revertTo: action.oldVal });
+      return newStack;
+    });
+  };
+
+  const handleRedo = () => {
+    if (redoStack.length === 0) return;
+    setRedoStack(prev => {
+      const newStack = [...prev];
+      const action = newStack.pop()!;
+      setUndoStack(u => [...u, action]);
+      applyEditMutation.mutate({ ...action, revertTo: action.newVal });
+      return newStack;
+    });
+  };
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const activeTag = document.activeElement?.tagName;
+      if (activeTag === "INPUT" || activeTag === "TEXTAREA") return;
+
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z") {
+        if (e.shiftKey) {
+          e.preventDefault();
+          handleRedo();
+        } else {
+          e.preventDefault();
+          handleUndo();
+        }
+      } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "y") {
+        e.preventDefault();
+        handleRedo();
+      }
+    };
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [undoStack, redoStack]);
 
   const createColumnMutation = useMutation({
     mutationFn: (vars: { name: string; type: string; position?: number }) =>
@@ -563,13 +766,17 @@ export function DatasetDetailView() {
 
 
   // ── Derived: visible fields ───────────────────────────────────────────
+  // Use stable derived arrays as deps so the React Compiler can preserve memoization.
+  const columnDefs = dataset?.columnDefs;
+  const schemaFields = dataset?.schema?.fields;
+
   const allFields = useMemo(() => {
     // DatasetColumnDef is the authoritative source once seeded.
-    if (dataset?.columnDefs && dataset.columnDefs.length > 0) {
+    if (columnDefs && columnDefs.length > 0) {
       const schemaFieldsMap = new Map(
-        dataset.schema?.fields?.map((f) => [f.id, f]) || []
+        schemaFields?.map((f) => [f.id, f]) || []
       );
-      return dataset.columnDefs
+      return columnDefs
         .filter((c: any) => !c.isDeleted)
         .map((c) => {
           const sf = schemaFieldsMap.get(c.columnId);
@@ -589,12 +796,12 @@ export function DatasetDetailView() {
     }
 
     // Fallback if not seeded yet
-    if (dataset?.schema?.fields && dataset.schema.fields.length > 0) {
-      return dataset.schema.fields;
+    if (schemaFields && schemaFields.length > 0) {
+      return schemaFields;
     }
-    
+
     return [];
-  }, [dataset]);
+  }, [columnDefs, schemaFields]);
 
   const visibleFields = useMemo(
     () => allFields.filter((f) => !hiddenFields.has(f.id)),
@@ -892,8 +1099,8 @@ export function DatasetDetailView() {
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <div>
-                          <Button size="sm" className="gap-1.5 bg-gradient-to-r from-violet-600/50 to-indigo-600/50 text-white/70 shadow-sm" disabled>
-                            <Zap className="h-3.5 w-3.5" />
+                          <Button size="sm" className="gap-1.5 bg-gradient-to-r from-cyan-600/50 to-blue-600/50 text-white/70 shadow-sm" disabled>
+                            <Bot className="h-3.5 w-3.5" />
                             Extract Custom Fields (AI)
                           </Button>
                         </div>
@@ -906,11 +1113,11 @@ export function DatasetDetailView() {
                 ) : (
                   <Button
                     size="sm"
-                    className="gap-1.5 bg-gradient-to-r from-violet-600 to-indigo-600 text-white hover:from-violet-700 hover:to-indigo-700 shadow-sm"
+                    className="gap-1.5 bg-gradient-to-r from-cyan-600 to-blue-600 text-white hover:from-cyan-700 hover:to-blue-700 shadow-sm"
                     onClick={() => setExtractDialog(true)}
                     title="Run AI extraction from this Default Dataset into a new Custom Dataset"
                   >
-                    <Zap className="h-3.5 w-3.5" />
+                    <Bot className="h-3.5 w-3.5" />
                     Extract Custom Fields (AI)
                   </Button>
                 )
@@ -1047,10 +1254,24 @@ export function DatasetDetailView() {
 
       {/* Secondary Spreadsheet Toolbar */}
       <div className="flex items-center gap-1 overflow-x-auto rounded-md border bg-card px-2 py-1.5 shadow-sm">
-        <Button variant="ghost" size="icon" className="h-7 w-7 rounded-sm text-muted-foreground" disabled title="Undo (Coming soon)">
+        <Button 
+          variant="ghost" 
+          size="icon" 
+          className="h-7 w-7 rounded-sm text-muted-foreground" 
+          disabled={undoStack.length === 0 || applyEditMutation.isPending} 
+          title="Undo (Ctrl+Z)"
+          onClick={handleUndo}
+        >
           <Undo className="h-3.5 w-3.5" />
         </Button>
-        <Button variant="ghost" size="icon" className="h-7 w-7 rounded-sm text-muted-foreground" disabled title="Redo (Coming soon)">
+        <Button 
+          variant="ghost" 
+          size="icon" 
+          className="h-7 w-7 rounded-sm text-muted-foreground" 
+          disabled={redoStack.length === 0 || applyEditMutation.isPending} 
+          title="Redo (Ctrl+Shift+Z)"
+          onClick={handleRedo}
+        >
           <Redo className="h-3.5 w-3.5" />
         </Button>
         
@@ -1118,7 +1339,7 @@ export function DatasetDetailView() {
             className="h-8 bg-background"
             disabled={statusMutation.isPending || cannotEdit}
             onClick={() => {
-              const promises = Array.from(selectedRecords).map(id => statusMutation.mutateAsync({ recordId: id, status: "approved" }).catch(() => {}));
+              const promises = [...selectedRecords].map(id => statusMutation.mutateAsync({ recordId: id, status: "approved" }).catch(() => {}));
               toast.promise(Promise.all(promises), {
                 loading: "Approving records...",
                 success: () => {
@@ -1138,7 +1359,7 @@ export function DatasetDetailView() {
             className="h-8 bg-background"
             disabled={statusMutation.isPending || cannotEdit}
             onClick={() => {
-              const promises = Array.from(selectedRecords).map(id => statusMutation.mutateAsync({ recordId: id, status: "rejected" }).catch(() => {}));
+              const promises = [...selectedRecords].map(id => statusMutation.mutateAsync({ recordId: id, status: "rejected" }).catch(() => {}));
               toast.promise(Promise.all(promises), {
                 loading: "Rejecting records...",
                 success: () => {
@@ -1161,9 +1382,14 @@ export function DatasetDetailView() {
             className="h-8 bg-destructive/10 text-destructive border-destructive/20 hover:bg-destructive/20 hover:text-destructive"
             disabled={deleteMutation.isPending || cannotEdit}
             onClick={() => {
-              if (confirm(`Are you sure you want to delete ${selectedRecords.size} records?`)) {
-                deleteMutation.mutate(Array.from(selectedRecords));
-              }
+              setConfirmDialog({
+                open: true,
+                title: "Delete Records",
+                description: `Are you sure you want to delete ${selectedRecords.size} records?`,
+                onConfirm: () => {
+                  deleteMutation.mutate(Array.from(selectedRecords));
+                }
+              });
             }}
           >
             <Trash2 className="mr-1.5 h-3.5 w-3.5" />
@@ -1270,9 +1496,14 @@ export function DatasetDetailView() {
                           className="text-destructive focus:text-destructive" 
                           disabled={cannotEdit}
                           onClick={() => {
-                            if (confirm(`Delete column "${f.name}"? This cannot be undone.`)) {
-                              deleteColumnMutation.mutate(f.id);
-                            }
+                            setConfirmDialog({
+                              open: true,
+                              title: "Delete Column",
+                              description: `Delete column "${f.name}"? This cannot be undone.`,
+                              onConfirm: () => {
+                                deleteColumnMutation.mutate(f.id);
+                              }
+                            });
                           }}
                         >
                           <Trash2 className="mr-2 h-4 w-4" /> Delete Column
@@ -1357,46 +1588,90 @@ export function DatasetDetailView() {
                       const fmt = v
                         ? formatValueCompact(v.value, f.type)
                         : { text: "" };
-                        const isEditing = inlineEditCell?.recordId === r.id && inlineEditCell?.fieldId === f.id;
-                        return (
-                          <TableCell
-                            key={f.id}
-                            className="border-r last:border-r-0 align-middle group/cell min-w-[150px] max-w-[300px] p-0"
-                            onClick={(e) => handleCellClick(r.id, e)}
-                            onDoubleClick={(e) => handleCellDoubleClick(r.id, f.id, e)}
-                          >
-                            {isEditing ? (
-                              <InlineEditCell
-                                datasetId={datasetId}
-                                recordId={r.id}
-                                fieldId={f.id}
-                                valueId={v?.id}
-                                initialValue={fmt.text}
-                                fieldType={f.type}
-                                onClose={() => setInlineEditCell(null)}
-                              />
-                            ) : (
-                              <div className="flex w-full h-12 items-center gap-2 cursor-pointer px-4">
-                                <span
-                                  className={`min-w-0 flex-1 truncate text-sm hover:underline-offset-2 ${
-                                    f.type === "number" ? "tabular-nums" : ""
-                                  }`}
-                                  title={fmt.text}
+                      const isEditing = inlineEditCell?.recordId === r.id && inlineEditCell?.fieldId === f.id;
+                      const cellIsUrl = isUrl(fmt.text);
+                      return (
+                        <TableCell
+                          key={f.id}
+                          className="border-r last:border-r-0 align-middle group/cell min-w-[150px] max-w-[300px] p-0"
+                          onClick={(e) => handleCellClick(r.id, e)}
+                          onDoubleClick={(e) => handleCellDoubleClick(r.id, f.id, e)}
+                        >
+                          {isEditing ? (
+                            <InlineEditCell
+                              datasetId={datasetId}
+                              recordId={r.id}
+                              fieldId={f.id}
+                              valueId={v?.id}
+                              initialValue={fmt.text}
+                              fieldType={f.type}
+                              onClose={() => setInlineEditCell(null)}
+                              onSaveSuccess={(oldVal, newVal, valueId) => {
+                                setUndoStack(prev => [...prev, { recordId: r.id, fieldId: f.id, valueId, oldVal, newVal }]);
+                                setRedoStack([]); // clear redo stack on new edit
+                              }}
+                            />
+                          ) : (
+                            <div className="relative flex w-full h-12 items-center gap-2 cursor-pointer px-4">
+                              {cellIsUrl ? (
+                                <LinkChip url={fmt.text} compact />
+                              ) : (
+                                <TooltipProvider delayDuration={400}>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <span
+                                        className={`min-w-0 flex-1 truncate text-sm ${
+                                          f.type === "number" ? "tabular-nums" : ""
+                                        }`}
+                                      >
+                                        {fmt.node ?? (
+                                          <span className={fmt.text ? "text-foreground" : "text-muted-foreground"}>
+                                            {fmt.text || "—"}
+                                          </span>
+                                        )}
+                                      </span>
+                                    </TooltipTrigger>
+                                    {fmt.text && (
+                                      <TooltipContent className="max-w-[400px] break-words">
+                                        {fmt.text}
+                                      </TooltipContent>
+                                    )}
+                                  </Tooltip>
+                                </TooltipProvider>
+                              )}
+                              {v && (
+                                <TooltipProvider delayDuration={400}>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <span
+                                        className={`inline-block h-1.5 w-1.5 shrink-0 rounded-full ${confidenceColor(v.confidence)}`}
+                                      />
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                      Confidence {Math.round(v.confidence * 100)}%
+                                    </TooltipContent>
+                                  </Tooltip>
+                                </TooltipProvider>
+                              )}
+                              {cellIsUrl && (
+                                <button
+                                  className="absolute top-1 right-1 opacity-0 group-hover/cell:opacity-100 transition-opacity p-0.5 rounded text-muted-foreground hover:text-foreground bg-background/80"
+                                  title="Copy link"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    navigator.clipboard.writeText(fmt.text).then(() => {
+                                      toast.success("Link copied to clipboard");
+                                    }).catch(() => {
+                                      toast.error("Failed to copy link");
+                                    });
+                                  }}
                                 >
-                                  {fmt.node ?? (
-                                    <span className={fmt.text ? "text-foreground" : "text-muted-foreground"}>
-                                      {fmt.text || "—"}
-                                    </span>
-                                  )}
-                                </span>
-                                {v && (
-                                  <span
-                                    className={`inline-block h-1.5 w-1.5 shrink-0 rounded-full ${confidenceColor(v.confidence)}`}
-                                    title={`Confidence ${Math.round(v.confidence * 100)}%`}
-                                  />
-                                )}
-                              </div>
-                            )}
+                                  <Copy className="h-3 w-3" />
+                                </button>
+                              )}
+                            </div>
+                          )}
+
                           </TableCell>
                         );
                     })}
@@ -1449,16 +1724,33 @@ export function DatasetDetailView() {
                     const fmt = v ? formatValueCompact(v.value, f.type) : { text: "" };
                     return (
                       <div key={f.id} className="grid grid-cols-[100px_1fr] items-start gap-2 text-sm">
-                        <span className="text-muted-foreground truncate" title={f.name}>{f.name}</span>
+                        <TooltipProvider delayDuration={400}>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span className="text-muted-foreground truncate">{f.name}</span>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              {f.name}
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
                         <div className="flex items-center gap-1.5 min-w-0">
                           <span className="truncate font-medium flex-1">
                             {fmt.text || "—"}
                           </span>
                           {v && (
-                            <span
-                              className={`inline-block h-1.5 w-1.5 shrink-0 rounded-full ${confidenceColor(v.confidence)}`}
-                              title={`Confidence ${Math.round(v.confidence * 100)}%`}
-                            />
+                            <TooltipProvider delayDuration={400}>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <span
+                                    className={`inline-block h-1.5 w-1.5 shrink-0 rounded-full ${confidenceColor(v.confidence)}`}
+                                  />
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  Confidence {Math.round(v.confidence * 100)}%
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
                           )}
                         </div>
                       </div>
@@ -1512,6 +1804,7 @@ export function DatasetDetailView() {
       <EvidenceDrawer
         open={!!selectedRecord}
         record={selectedRecord}
+        fields={visibleFields}
         onClose={() => setSelectedRecordId(null)}
         onEditClick={handleEditClick}
         onStatusChange={(status) => {
@@ -1579,6 +1872,26 @@ export function DatasetDetailView() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={confirmDialog.open} onOpenChange={(open) => setConfirmDialog(prev => ({ ...prev, open }))}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{confirmDialog.title}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {confirmDialog.description}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction className="bg-destructive text-destructive-foreground hover:bg-destructive/90" onClick={() => {
+              confirmDialog.onConfirm();
+              setConfirmDialog(prev => ({ ...prev, open: false }));
+            }}>
+              Continue
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Import dialog */}
       <Dialog open={importDialog} onOpenChange={setImportDialog}>
@@ -1857,6 +2170,7 @@ function DetailTopBar({
 function EvidenceDrawer({
   open,
   record,
+  fields,
   onClose,
   onStatusChange,
   statusPending,
@@ -1864,6 +2178,7 @@ function EvidenceDrawer({
 }: {
   open: boolean;
   record: DatasetRecordDTO | null;
+  fields: Array<{ id: string; name: string; dataType?: string; position?: number; [key: string]: unknown }>;
   onClose: () => void;
   onStatusChange: (status: RecordStatus) => void;
   statusPending: boolean;
@@ -1912,25 +2227,42 @@ function EvidenceDrawer({
                 </div>
               </SheetHeader>
 
-              <SheetBody className="space-y-4">
+              <SheetBody className="space-y-4 px-5">
                 <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                  {record.values.length} extracted field
-                  {record.values.length === 1 ? "" : "s"}
+                  {fields.length} field{fields.length === 1 ? "" : "s"}
                 </p>
-                {record.values.length === 0 ? (
+                {fields.length === 0 ? (
                   <EmptyState
                     icon={<Database className="h-5 w-5" />}
-                    title="No field values"
-                    description="This record has no extracted values yet."
+                    title="No fields"
+                    description="This dataset has no schema fields configured."
                   />
                 ) : (
-                  record.values.map((v) => (
-                    <FieldValueCard
-                      key={v.id}
-                      value={v}
-                      onEdit={() => onEditClick({ ...v, recordId: record.id })}
-                    />
-                  ))
+                  [...fields]
+                    .sort((a, b) => (a.position ?? 0) - (b.position ?? 0))
+                    .map((f) => {
+                    const v = record.values.find((val) => val.fieldId === f.id);
+                    const displayValue = v || {
+                      id: `empty-${f.id}`,
+                      fieldId: f.id,
+                      fieldName: f.name,
+                      fieldType: f.dataType,
+                      value: null,
+                      confidence: 0,
+                      evidence: "",
+                      modelUsed: "manual",
+                      promptVersion: "manual",
+                      extractedAt: new Date().toISOString(),
+                    } as unknown as DatasetValueDTO;
+                    
+                    return (
+                      <FieldValueCard
+                        key={displayValue.id}
+                        value={displayValue}
+                        onEdit={() => onEditClick({ ...displayValue, recordId: record.id, id: v ? v.id : undefined } as any)}
+                      />
+                    );
+                  })
                 )}
               </SheetBody>
 
@@ -1976,7 +2308,7 @@ function EvidenceDrawer({
   );
 }
 
-// ── Field value card (inside drawer) ────────────────────────────────────
+
 
 function FieldValueCard({
   value,
@@ -1985,28 +2317,23 @@ function FieldValueCard({
   value: DatasetValueDTO;
   onEdit: () => void;
 }) {
-  const fmt = formatValueCompact(value.value, value.fieldType ?? "text");
   return (
     <div className="rounded-lg border bg-card p-4">
-      {/* Header row */}
+      {/* Header row: field name + confidence badge */}
       <div className="flex items-start justify-between gap-2">
         <div className="flex items-center gap-2">
           {value.fieldType && <FieldTypeBadge type={value.fieldType} />}
-          <span className="text-sm font-medium">{value.fieldName ?? "Field"}</span>
+          <span className="text-sm font-semibold">{value.fieldName ?? "Field"}</span>
         </div>
         <ConfidenceBadge value={value.confidence} />
       </div>
 
-      {/* Large value */}
-      <div className="mt-3 min-h-[2rem] text-base font-medium leading-snug break-words">
-        {fmt.node ?? (
-          <span className={fmt.text ? "" : "text-muted-foreground"}>
-            {fmt.text || "—"}
-          </span>
-        )}
+      {/* Rich-formatted value */}
+      <div className="mt-3 min-h-[2rem] break-words">
+        <FormattedFieldValue value={value.value} fieldType={value.fieldType ?? "text"} />
       </div>
 
-      {/* Collapsible Extracted Details */}
+      {/* Collapsible Extracted Details (evidence snippet + human-correction record) */}
       {(value.evidence || (value.originalValue != null && value.correctedAt)) && (
         <Collapsible className="mt-4">
           <CollapsibleTrigger asChild>
@@ -2020,7 +2347,7 @@ function FieldValueCard({
             {value.evidence && (
               <blockquote className="border-l-2 border-primary/40 bg-muted/30 py-2 pl-3 pr-2">
                 <p className="font-mono text-xs leading-relaxed text-muted-foreground whitespace-pre-wrap">
-                  “{value.evidence}”
+                  "{value.evidence}"
                 </p>
               </blockquote>
             )}
@@ -2039,8 +2366,7 @@ function FieldValueCard({
                   )}
                 </div>
                 <p className="mt-1 text-sm text-amber-900 dark:text-amber-200 break-words">
-                  {formatValueCompact(value.originalValue, value.fieldType ?? "text").text ||
-                   "—"}
+                  {formatValueCompact(value.originalValue, value.fieldType ?? "text").text || "—"}
                 </p>
                 <p className="mt-1 text-[10px] text-amber-700/80 dark:text-amber-400/80">
                   Corrected {relativeTime(value.correctedAt)}
@@ -2051,50 +2377,6 @@ function FieldValueCard({
           </CollapsibleContent>
         </Collapsible>
       )}
-
-      {/* Collapsible Source & Model Info */}
-      <Collapsible className="mt-3">
-        <CollapsibleTrigger asChild>
-          <Button variant="ghost" size="sm" className="flex w-full items-center justify-between p-0 h-auto font-medium text-xs text-muted-foreground hover:bg-transparent hover:text-foreground">
-            <span>Source & Model Info</span>
-            <ChevronDown className="h-3 w-3 transition-transform duration-200" />
-          </Button>
-        </CollapsibleTrigger>
-        <CollapsibleContent className="pt-3">
-          <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground sm:grid-cols-3">
-            {value.sourceFile && (
-              <MetaItem
-                icon={<FileText className="h-3 w-3" />}
-                label="Source"
-                value={value.sourceFile}
-              />
-            )}
-            {value.pageNumber != null && (
-              <MetaItem
-                icon={<Hash className="h-3 w-3" />}
-                label="Page"
-                value={String(value.pageNumber)}
-              />
-            )}
-            <MetaItem
-              icon={<Cpu className="h-3 w-3" />}
-              label="Model"
-              value={value.modelUsed}
-            />
-            <MetaItem
-              icon={<FileText className="h-3 w-3" />}
-              label="Prompt"
-              value={value.promptVersion}
-            />
-            <MetaItem
-              icon={<Clock className="h-3 w-3" />}
-              label="Extracted"
-              value={relativeTime(value.extractedAt)}
-              title={formatDateTime(value.extractedAt)}
-            />
-          </div>
-        </CollapsibleContent>
-      </Collapsible>
 
       {/* Edit action */}
       <div className="mt-3 border-t pt-3">
@@ -2119,15 +2401,24 @@ function MetaItem({
   title?: string;
 }) {
   return (
-    <div className="min-w-0" title={title ?? value}>
-      <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground/80">
-        {label}
-      </p>
-      <p className="inline-flex items-center gap-1 truncate font-mono text-xs text-foreground">
-        {icon}
-        <span className="truncate">{value}</span>
-      </p>
-    </div>
+    <TooltipProvider delayDuration={400}>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <div className="min-w-0">
+            <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground/80">
+              {label}
+            </p>
+            <p className="inline-flex items-center gap-1 truncate font-mono text-xs text-foreground">
+              {icon}
+              <span className="truncate">{value}</span>
+            </p>
+          </div>
+        </TooltipTrigger>
+        <TooltipContent className="max-w-[400px] break-words">
+          {title ?? value}
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
   );
 }
 
@@ -2163,11 +2454,19 @@ function EditValueDialog({
       value: unknown;
       confidence: number;
       evidence: string;
-    }) =>
-      api.patch<DatasetValueDTO>(
-        `/api/datasets/${datasetId}/records/${recordId}/values/${value?.id}`,
-        payload
-      ),
+    }) => {
+      if (value?.id && !String(value.id).startsWith("empty-")) {
+        return api.patch<DatasetValueDTO>(
+          `/api/datasets/${datasetId}/records/${recordId}/values/${value.id}`,
+          payload
+        );
+      } else {
+        return api.post<DatasetValueDTO>(
+          `/api/datasets/${datasetId}/records/${recordId}/values`,
+          { ...payload, fieldId: value?.fieldId }
+        );
+      }
+    },
     onSuccess: () => {
       toast.success("Value updated", {
         description: "Human correction recorded in the audit log.",

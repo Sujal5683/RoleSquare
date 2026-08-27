@@ -6,7 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Zap, Mail, Lock, Eye, EyeOff, ArrowRight, Loader2, AlertCircle, ArrowLeft } from "lucide-react";
 import Link from "next/link";
 
-type Mode = "login" | "signup" | "forgot";
+type Mode = "login" | "signup" | "forgot" | "2fa";
 
 export default function LoginPage() {
   return (
@@ -19,11 +19,18 @@ export default function LoginPage() {
 function LoginPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const next = searchParams.get("next") || "/";
+  
+  let next = searchParams.get("next") || "/";
+  if (!next.startsWith("/") || next.startsWith("//")) {
+    next = "/";
+  }
 
-  const [mode, setMode] = useState<Mode>("login");
+  const initialMode = (searchParams.get("mode") as Mode) || "login";
+
+  const [mode, setMode] = useState<Mode>(initialMode);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [token2fa, setToken2fa] = useState("");
   const [showPass, setShowPass] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -31,12 +38,26 @@ function LoginPageContent() {
 
   const supabase = createClient();
 
-  // If already logged in, bounce to app
+  // If already logged in, check if 2FA is needed
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session) router.replace(next);
+      if (session) {
+        fetch("/api/session").then(async (res) => {
+          if (res.ok) {
+            router.replace(next);
+          } else if (res.status === 403) {
+            const data = await res.json();
+            if (data.error === "2FA_REQUIRED") {
+              setMode("2fa");
+            }
+          } else if (res.status === 401) {
+            // normal, not logged in according to our backend (maybe missing user row)
+            supabase.auth.signOut();
+          }
+        });
+      }
     });
-  }, []);
+  }, [next, router, supabase]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -45,6 +66,21 @@ function LoginPageContent() {
     setLoading(true);
 
     try {
+      if (mode === "2fa") {
+        const res = await fetch("/api/2fa/verify", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ token: token2fa }),
+        });
+        if (!res.ok) {
+          const data = await res.json();
+          throw new Error(data.error || "Invalid 2FA token");
+        }
+        router.push(next);
+        router.refresh();
+        return;
+      }
+
       if (mode === "forgot") {
         const { error } = await supabase.auth.resetPasswordForEmail(email, {
           redirectTo: `${window.location.origin}/api/auth/callback?next=/`,
@@ -70,8 +106,21 @@ function LoginPageContent() {
       }
 
       // Login
-      const { error } = await supabase.auth.signInWithPassword({ email, password });
-      if (error) throw error;
+      const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
+      if (signInError) throw signInError;
+
+      // Check if 2FA is required
+      const res = await fetch("/api/session");
+      if (!res.ok) {
+        if (res.status === 403) {
+          const data = await res.json();
+          if (data.error === "2FA_REQUIRED") {
+            setMode("2fa");
+            return;
+          }
+        }
+        throw new Error("Failed to initialize session");
+      }
 
       // Session is set — redirect to the app
       router.push(next);
@@ -87,12 +136,14 @@ function LoginPageContent() {
     login: "Sign in to your account",
     signup: "Create your account",
     forgot: "Reset your password",
+    "2fa": "Two-Factor Authentication",
   };
 
   const SUBTITLES: Record<Mode, string> = {
     login: "Turn Google Workspace into structured datasets",
     signup: "Start building AI-powered datasets from Gmail & Drive",
     forgot: "We'll send a reset link to your email",
+    "2fa": "Enter the code from your authenticator app",
   };
 
   return (
@@ -146,28 +197,55 @@ function LoginPageContent() {
               </div>
             )}
 
-            {/* Email */}
-            <div className="space-y-1.5">
-              <label htmlFor="email" className="text-sm font-medium text-foreground">
-                Email address
-              </label>
-              <div className="relative">
-                <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                <input
-                  id="email"
-                  type="email"
-                  required
-                  autoComplete="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="you@company.com"
-                  className="w-full rounded-lg border bg-background py-2.5 pl-9 pr-3 text-sm outline-none ring-offset-background placeholder:text-muted-foreground/60 focus:ring-2 focus:ring-ring focus:ring-offset-2 transition"
-                />
+            {/* 2FA Mode */}
+            {mode === "2fa" && (
+              <div className="space-y-1.5">
+                <label htmlFor="token2fa" className="text-sm font-medium text-foreground">
+                  Authentication Code
+                </label>
+                <div className="relative">
+                  <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <input
+                    id="token2fa"
+                    type="text"
+                    required
+                    autoComplete="one-time-code"
+                    value={token2fa}
+                    onChange={(e) => setToken2fa(e.target.value)}
+                    placeholder="6-digit code"
+                    className="w-full rounded-lg border bg-background py-2.5 pl-9 pr-3 text-sm outline-none ring-offset-background placeholder:text-muted-foreground/60 focus:ring-2 focus:ring-ring focus:ring-offset-2 transition"
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground mt-2">
+                  Enter the 6-digit code from your authenticator app.
+                </p>
               </div>
-            </div>
+            )}
 
-            {/* Password (not shown for forgot) */}
-            {mode !== "forgot" && (
+            {/* Email */}
+            {mode !== "2fa" && (
+              <div className="space-y-1.5">
+                <label htmlFor="email" className="text-sm font-medium text-foreground">
+                  Email address
+                </label>
+                <div className="relative">
+                  <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <input
+                    id="email"
+                    type="email"
+                    required
+                    autoComplete="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="you@company.com"
+                    className="w-full rounded-lg border bg-background py-2.5 pl-9 pr-3 text-sm outline-none ring-offset-background placeholder:text-muted-foreground/60 focus:ring-2 focus:ring-ring focus:ring-offset-2 transition"
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Password (not shown for forgot or 2fa) */}
+            {mode !== "forgot" && mode !== "2fa" && (
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between">
                   <label htmlFor="password" className="text-sm font-medium text-foreground">
@@ -222,6 +300,7 @@ function LoginPageContent() {
                   {mode === "login" && "Sign in"}
                   {mode === "signup" && "Create account"}
                   {mode === "forgot" && "Send reset link"}
+                  {mode === "2fa" && "Verify code"}
                   <ArrowRight className="h-4 w-4" />
                 </>
               )}
@@ -252,9 +331,18 @@ function LoginPageContent() {
                 </button>
               </>
             )}
-            {mode === "forgot" && (
+            {(mode === "2fa" || mode === "forgot") && (
               <button
-                onClick={() => { setMode("login"); setError(null); setSuccess(null); }}
+                type="button"
+                onClick={async () => { 
+                  if (mode === "2fa") {
+                    await fetch("/api/auth/logout", { method: "POST" });
+                  }
+                  setMode("login"); 
+                  setError(null); 
+                  setSuccess(null); 
+                  setToken2fa("");
+                }}
                 className="font-medium text-primary hover:underline"
               >
                 ← Back to sign in

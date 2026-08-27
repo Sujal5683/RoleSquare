@@ -22,6 +22,9 @@ model User {
   name        String?
   avatarUrl   String?
   role        String   @default("user") // global role: user | admin
+  notificationPrefs String @default("{}") // JSON
+  twoFactorSecret String?
+  twoFactorEnabled Boolean @default(false)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -46,6 +49,11 @@ model Organization {
   createdBy String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  
+  retentionEmails    String   @default("90")
+  retentionDocs      String   @default("365")
+  retentionAuditLogs String   @default("365")
+  exportFileExpiry   String   @default("7d")
 
   members            OrganizationMember[]
   connections        GoogleConnection[]
@@ -63,6 +71,7 @@ model Organization {
   invitations            Invitation[]
   ownedAccesses          DatasetAccess[]        @relation("OwnerOrgAccess")
   granteeOrgAccesses     DatasetAccess[]        @relation("GranteeOrgAccess")
+  invoices               Invoice[]
   // Google Sheets Integration
   googleSheetsAccounts   GoogleSheetsAccount[]
   spreadsheetConnections SpreadsheetConnection[]
@@ -925,3 +934,25 @@ model ImportMapping {
 
   @@index([importJobId])
 }
+
+// ----------------------------------------------------------------------------
+// Billing & Invoices (Simulated)
+// ----------------------------------------------------------------------------
+
+model Invoice {
+  id               String   @id @default(cuid())
+  organizationId   String
+  planId           String
+  amountUsd        Float
+  status           String   @default("paid") // paid | pending | failed
+  pdfUrl           String?
+  billingPeriodStart DateTime
+  billingPeriodEnd   DateTime
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+}
+

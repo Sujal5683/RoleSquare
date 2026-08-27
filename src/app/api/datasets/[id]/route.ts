@@ -101,8 +101,8 @@ export async function PATCH(
     const { id } = await params;
     const { user, organizationId } = await requireRole(req, "member");
 
-    // Requires edit access
-    const before = await requireDataset(id, organizationId, user.id, "edit");
+    // Requires owner access to change schema
+    const before = await requireDataset(id, organizationId, user.id, "owner");
     if (!before) {
       return NextResponse.json({ error: "Dataset not found" }, { status: 404 });
     }

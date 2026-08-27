@@ -149,8 +149,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   }, [activeOrgId, setActiveOrgId]);
 
   async function handleSignOut() {
-    await supabase.auth.signOut();
-    router.push("/login");
+    await fetch("/api/auth/logout", { method: "POST" });
+    router.push("/");
     router.refresh();
   }
 

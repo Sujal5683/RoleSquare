@@ -69,6 +69,8 @@ export function serializeUser(u: any): UserDTO {
     name: u.name ?? null,
     avatarUrl: u.avatarUrl ?? null,
     role: u.role,
+    notificationPrefs: parseJson<Record<string, boolean>>(u.notificationPrefs, {}),
+    twoFactorEnabled: !!u.twoFactorEnabled,
   };
 }
 
@@ -83,6 +85,10 @@ export function serializeOrganization(
     plan: o.plan,
     createdBy: o.createdBy,
     createdAt: o.createdAt instanceof Date ? o.createdAt.toISOString() : o.createdAt,
+    retentionEmails: o.retentionEmails,
+    retentionDocs: o.retentionDocs,
+    retentionAuditLogs: o.retentionAuditLogs,
+    exportFileExpiry: o.exportFileExpiry,
     ...(memberCount !== undefined ? { memberCount } : {}),
   };
 }
@@ -270,6 +276,7 @@ export function serializeDataset(d: any): DatasetDTO {
       dataType: c.dataType,
       required: c.required,
       position: c.position,
+      isDeleted: c.isDeleted,
     })) : undefined,
     name: d.name,
     description: d.description ?? null,

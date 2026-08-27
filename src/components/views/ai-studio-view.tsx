@@ -333,12 +333,12 @@ function TestSandboxTab() {
             disabled={
               runMutation.isPending || !schemaId || !sourceText.trim()
             }
-            className="w-full"
+            className="w-full gap-1.5 bg-gradient-to-r from-cyan-600 to-blue-600 text-white hover:from-cyan-700 hover:to-blue-700 shadow-sm"
           >
             {runMutation.isPending ? (
-              <RefreshCw className="mr-2 h-3.5 w-3.5 animate-spin" />
+              <RefreshCw className="h-3.5 w-3.5 animate-spin" />
             ) : (
-              <Play className="mr-2 h-3.5 w-3.5" />
+              <Bot className="h-3.5 w-3.5" />
             )}
             {runMutation.isPending ? "Extracting…" : "Run extraction"}
           </Button>

@@ -93,7 +93,6 @@ function buildAuth(accessToken: string) {
     process.env.GOOGLE_CLIENT_SECRET
   );
   auth.setCredentials({ access_token: accessToken });
-  google.options({ timeout: 30000, headers: { Connection: "close" } });
   return auth;
 }
 

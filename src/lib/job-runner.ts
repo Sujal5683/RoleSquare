@@ -22,6 +22,7 @@ import { getGmailClient, extractEmailBody, extractAttachments, extractDriveLinks
 import { parseEmailFields } from "@/lib/email-parser";
 import { ensureDefaultDataset, writeDefaultDatasetRecord } from "@/lib/dataset-provisioner";
 import { extractWithLLM } from "@/lib/extraction";
+import { exploreLinkedContent, extractAllUrls, filterDriveUrls } from "@/lib/drive-reader";
 import { agentInfo, agentWarn, agentError } from "@/lib/agent-logger";
 import { computeCost } from "@/lib/model-pricing";
 import crypto from "crypto";
@@ -788,8 +789,20 @@ async function processAiExtraction(
   const sourceDatasetId = payload.sourceDatasetId as string | undefined;
   const targetDatasetId = payload.targetDatasetId as string | undefined;
   const targetSchemaId  = payload.targetSchemaId  as string | undefined;
+  // New Drive exploration options (default exploreDriveLinks to true)
+  const exploreDriveLinks = payload.exploreDriveLinks !== false;
+  const driveConnectionId = payload.driveConnectionId as string | undefined;
+  const maxContentBytes   = typeof payload.maxContentBytes === "number" ? payload.maxContentBytes : undefined;
+
   if (sourceDatasetId && targetDatasetId && targetSchemaId) {
-    return processTwoStepExtraction(job, { sourceDatasetId, targetDatasetId, targetSchemaId });
+    return processTwoStepExtraction(job, {
+      sourceDatasetId,
+      targetDatasetId,
+      targetSchemaId,
+      exploreDriveLinks,
+      driveConnectionId,
+      maxContentBytes,
+    });
   }
 
   // Mode A — Legacy
@@ -951,10 +964,13 @@ async function processAiExtraction(
  */
 async function processTwoStepExtraction(
   job: { id: string; organizationId: string },
-  { sourceDatasetId, targetDatasetId, targetSchemaId }: {
+  { sourceDatasetId, targetDatasetId, targetSchemaId, exploreDriveLinks, driveConnectionId, maxContentBytes }: {
     sourceDatasetId: string;
     targetDatasetId: string;
     targetSchemaId: string;
+    exploreDriveLinks?: boolean;
+    driveConnectionId?: string;
+    maxContentBytes?: number;
   }
 ): Promise<Record<string, unknown>> {
   const schemaFields = await db.schemaField.findMany({
@@ -992,6 +1008,7 @@ async function processTwoStepExtraction(
 
   let recordsExtracted = 0;
   let totalTokens = 0;
+  let totalDriveFilesRead = 0;
 
   // FIX 3 (Mode B): Normalize field names so "Invoice Number" matches "invoice_number".
   const normFieldName = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
@@ -1022,18 +1039,84 @@ async function processTwoStepExtraction(
       "=== END ===",
     ].join("\n");
 
+    // ── Drive Link Exploration ──────────────────────────────────────────────
+    // When exploreDriveLinks is enabled, find all URLs in the record's field
+    // values and explore them (Drive folders/files + external links).
+    let driveContent: import("@/lib/drive-reader").DriveExplorationResult | undefined = undefined;
+
+    if (exploreDriveLinks) {
+      // Collect all raw text values from this record
+      const allValues = sourceRecord.values.map((v) => {
+        try { return String(JSON.parse(v.value) ?? ""); } catch { return v.value; }
+      }).join(" ");
+
+      // Extract all URLs and focus on Drive-type links
+      const allUrls = extractAllUrls(allValues + " " + sourceText);
+      const driveUrls = filterDriveUrls(allUrls);
+      const nonDriveUrls = allUrls.filter((u) => !driveUrls.includes(u)).slice(0, 3); // limit external to 3
+      const urlsToExplore = [...driveUrls, ...nonDriveUrls];
+
+      if (urlsToExplore.length > 0) {
+        try {
+          const result = await exploreLinkedContent(urlsToExplore, {
+            connectionId: driveConnectionId,
+            organizationId: job.organizationId,
+            maxBytes: maxContentBytes ?? 500_000,
+          });
+          driveContent = result;
+          totalDriveFilesRead += result.filesRead.length;
+
+          // Log exploration summary
+          await agentInfo(
+            job.id,
+            job.organizationId,
+            "extractor",
+            `Drive exploration: read ${result.filesRead.length} file(s) from ${urlsToExplore.length} link(s) for record ${sourceRecord.id}${result.truncated ? " (content truncated)" : ""}`,
+            {
+              filesRead: result.filesRead,
+              failedFiles: result.failedFiles,
+              totalChars: result.totalChars,
+              truncated: result.truncated,
+            }
+          );
+
+          if (result.failedFiles.length > 0) {
+            await agentInfo(
+              job.id,
+              job.organizationId,
+              "extractor",
+              `Drive exploration: ${result.failedFiles.length} file(s) could not be read`,
+              { failedFiles: result.failedFiles }
+            );
+          }
+        } catch (err) {
+          // Drive exploration failure is non-fatal — log and continue with text-only extraction
+          await agentInfo(
+            job.id,
+            job.organizationId,
+            "extractor",
+            `Drive exploration failed for record ${sourceRecord.id}, falling back to text-only: ${err instanceof Error ? err.message : String(err)}`,
+            {}
+          );
+        }
+      }
+    }
+    // ── End Drive Link Exploration ──────────────────────────────────────────
+
     let extractionResult;
     try {
       extractionResult = await extractWithLLM({
         fields: fieldInputs,
         sourceText,
         sourceFile: `dataset:${sourceDatasetId}:record:${sourceRecord.id}`,
+        driveContent,
       });
     } catch (err) {
       console.error(`[job-runner] Two-step extraction failed for record ${sourceRecord.id}:`, err);
       processed++;
       continue;
     }
+
 
     // FIX 3 (empty guard): Skip creating a record if LLM returned no fields.
     // Without this, empty DatasetRecord rows appear in the UI as blank rows.
@@ -1123,11 +1206,19 @@ async function processTwoStepExtraction(
         organizationId: job.organizationId,
         type: "AI_EXTRACTION",
         status: "queued",
-        payload: JSON.stringify({ sourceDatasetId, targetDatasetId, targetSchemaId }),
+        payload: JSON.stringify({
+          sourceDatasetId,
+          targetDatasetId,
+          targetSchemaId,
+          // Preserve Drive exploration options across batches
+          exploreDriveLinks,
+          driveConnectionId,
+          maxContentBytes,
+        }),
         progress: 0,
       },
     });
   }
 
-  return { recordsExtracted, totalTokens, sourceRecordsProcessed: unprocessed.length };
+  return { recordsExtracted, totalTokens, sourceRecordsProcessed: unprocessed.length, totalDriveFilesRead };
 }

@@ -62,6 +62,8 @@ export interface UserDTO {
   name: string | null;
   avatarUrl: string | null;
   role: string;
+  notificationPrefs: Record<string, boolean>;
+  twoFactorEnabled?: boolean;
 }
 
 export interface OrganizationDTO {
@@ -74,6 +76,10 @@ export interface OrganizationDTO {
   memberCount?: number;
   userStatus?: string;
   userRole?: string;
+  retentionEmails?: string;
+  retentionDocs?: string;
+  retentionAuditLogs?: string;
+  exportFileExpiry?: string;
 }
 
 export interface MemberDTO {

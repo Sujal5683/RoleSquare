@@ -14,13 +14,15 @@ export async function GET() {
         name: user.name,
         avatarUrl: user.avatarUrl,
         role: user.role,
+        notificationPrefs: user.notificationPrefs,
+        twoFactorEnabled: user.twoFactorEnabled,
       },
       organizations: user.organizations,
     });
-  } catch (err) {
+  } catch (err: any) {
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Failed to load session" },
-      { status: 500 }
+      { status: err.status || 500 }
     );
   }
 }
@@ -29,19 +31,27 @@ export async function PATCH(req: Request) {
   try {
     const user = await getCurrentUser();
     const body = await req.json().catch(() => ({}));
+    const dataToUpdate: any = {};
     if (typeof body.name === "string") {
+      dataToUpdate.name = body.name.trim();
+    }
+    if (body.notificationPrefs && typeof body.notificationPrefs === "object") {
+      dataToUpdate.notificationPrefs = JSON.stringify(body.notificationPrefs);
+    }
+    
+    if (Object.keys(dataToUpdate).length > 0) {
       const { db } = await import("@/lib/db");
       await db.user.update({
         where: { id: user.id },
-        data: { name: body.name.trim() },
+        data: dataToUpdate,
       });
       return NextResponse.json({ success: true });
     }
-    return NextResponse.json({ error: "Invalid name" }, { status: 400 });
-  } catch (err) {
+    return NextResponse.json({ error: "Invalid payload" }, { status: 400 });
+  } catch (err: any) {
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Failed to update profile" },
-      { status: 500 }
+      { status: err.status || 500 }
     );
   }
 }

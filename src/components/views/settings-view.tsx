@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { useActiveOrg } from "@/hooks/use-active-org";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { formatDistanceToNow } from "date-fns";
@@ -11,6 +11,7 @@ import type {
   UsageMetricDTO,
   UserDTO,
 } from "@/lib/types";
+import { PLANS } from "@/lib/plans";
 import {
   PageHeader,
   EmptyState,
@@ -215,6 +216,10 @@ interface SessionResponse {
     plan: string;
     role: string;
     status: string;
+    retentionEmails?: string;
+    retentionDocs?: string;
+    retentionAuditLogs?: string;
+    exportFileExpiry?: string;
   }>;
 }
 
@@ -657,31 +662,56 @@ function ConnectAccountDialog({
 // ── Security section ─────────────────────────────────────────────────────
 
 function SecuritySection() {
-  const [twoFactor, setTwoFactor] = useState(false);
-  const [currentPassword, setCurrentPassword] = useState("");
-  const [newPassword, setNewPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
+  const { data: session } = useSession();
+  const queryClient = useQueryClient();
+  const twoFactor = session?.user?.twoFactorEnabled ?? false;
+  const [setupOpen, setSetupOpen] = useState(false);
+  const [qrCodeDataUri, setQrCodeDataUri] = useState("");
+  const [secret, setSecret] = useState("");
+  const [token, setToken] = useState("");
+  
 
-  const handleChangePassword = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!currentPassword || !newPassword || !confirmPassword) {
-      toast.error("Please fill in all password fields");
-      return;
+  const setupMutation = useMutation({
+    mutationFn: () => api.post<{ secret: string; qrCodeDataUri: string }>("/api/2fa/setup"),
+    onSuccess: (data) => {
+      setSecret(data.secret);
+      setQrCodeDataUri(data.qrCodeDataUri);
+      setSetupOpen(true);
+    },
+    onError: () => toast.error("Failed to start 2FA setup"),
+  });
+
+  const verifyMutation = useMutation({
+    mutationFn: (token: string) => api.post("/api/2fa/verify", { token }),
+    onSuccess: () => {
+      toast.success("2FA enabled successfully");
+      setSetupOpen(false);
+      setToken("");
+      queryClient.invalidateQueries({ queryKey: ["session"] });
+    },
+    onError: (err) => {
+      const msg = err instanceof Error ? err.message : "Invalid token";
+      toast.error("Verification failed", { description: msg });
+    },
+  });
+
+  const disableMutation = useMutation({
+    mutationFn: () => api.post("/api/2fa/disable"),
+    onSuccess: () => {
+      toast.success("2FA disabled");
+      queryClient.invalidateQueries({ queryKey: ["session"] });
+    },
+    onError: () => toast.error("Failed to disable 2FA"),
+  });
+
+  const toggle2FA = (enabled: boolean) => {
+    if (enabled) {
+      setupMutation.mutate();
+    } else {
+      if (confirm("Are you sure you want to disable two-factor authentication?")) {
+        disableMutation.mutate();
+      }
     }
-    if (newPassword !== confirmPassword) {
-      toast.error("New passwords do not match");
-      return;
-    }
-    if (newPassword.length < 8) {
-      toast.error("New password must be at least 8 characters");
-      return;
-    }
-    toast.success("Password updated", {
-      description: "Your password has been changed successfully.",
-    });
-    setCurrentPassword("");
-    setNewPassword("");
-    setConfirmPassword("");
   };
 
   return (
@@ -725,61 +755,6 @@ function SecuritySection() {
         </CardContent>
       </Card>
 
-      {/* Password */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-base">
-            <Lock className="h-4 w-4 text-primary" />
-            Password
-          </CardTitle>
-          <CardDescription>
-            Change your password regularly to keep your account secure.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form
-            onSubmit={handleChangePassword}
-            className="grid gap-4 sm:grid-cols-3"
-          >
-            <div className="space-y-1.5">
-              <Label htmlFor="current-pw">Current password</Label>
-              <Input
-                id="current-pw"
-                type="password"
-                value={currentPassword}
-                onChange={(e) => setCurrentPassword(e.target.value)}
-                autoComplete="current-password"
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="new-pw">New password</Label>
-              <Input
-                id="new-pw"
-                type="password"
-                value={newPassword}
-                onChange={(e) => setNewPassword(e.target.value)}
-                autoComplete="new-password"
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="confirm-pw">Confirm new password</Label>
-              <Input
-                id="confirm-pw"
-                type="password"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                autoComplete="new-password"
-              />
-            </div>
-            <div className="sm:col-span-3 flex justify-end">
-              <Button type="submit" size="sm">
-                <Key className="mr-2 h-3.5 w-3.5" />
-                Update password
-              </Button>
-            </div>
-          </form>
-        </CardContent>
-      </Card>
 
       {/* 2FA */}
       <Card>
@@ -807,11 +782,9 @@ function SecuritySection() {
             </div>
             <Switch
               checked={twoFactor}
-              onCheckedChange={(v) => {
-                setTwoFactor(v);
-                toast.success(v ? "2FA enabled" : "2FA disabled");
-              }}
+              onCheckedChange={toggle2FA}
               className="shrink-0"
+              disabled={setupMutation.isPending || disableMutation.isPending}
             />
           </div>
         </CardContent>
@@ -872,6 +845,49 @@ function SecuritySection() {
           ))}
         </CardContent>
       </Card>
+
+      {/* 2FA Setup Dialog */}
+      <Dialog open={setupOpen} onOpenChange={(o) => {
+        if (!o) setSetupOpen(false);
+      }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Setup Two-Factor Authentication</DialogTitle>
+            <DialogDescription>
+              Scan the QR code below with your authenticator app (e.g. Google Authenticator, 1Password, Authy).
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-col items-center gap-4 py-4">
+            {qrCodeDataUri ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={qrCodeDataUri} alt="QR Code" className="w-48 h-48 border rounded" />
+            ) : (
+              <div className="w-48 h-48 bg-muted animate-pulse rounded" />
+            )}
+            <div className="text-center space-y-1">
+              <p className="text-sm font-medium">Or enter this code manually:</p>
+              <code className="text-sm font-mono bg-muted px-2 py-1 rounded">{secret}</code>
+            </div>
+            <div className="w-full mt-4 space-y-2">
+              <Label>Enter the 6-digit code from your app</Label>
+              <div className="flex gap-2">
+                <Input
+                  value={token}
+                  onChange={(e) => setToken(e.target.value)}
+                  placeholder="123456"
+                  maxLength={6}
+                />
+                <Button 
+                  onClick={() => verifyMutation.mutate(token)}
+                  disabled={verifyMutation.isPending || token.length < 6}
+                >
+                  Verify
+                </Button>
+              </div>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -919,15 +935,33 @@ const NOTIFICATION_PREFS: NotificationPref[] = [
 ];
 
 function NotificationsSection() {
-  // Mock — store toggles in local state only.
-  const [prefs, setPrefs] = useState<Record<string, boolean>>(() =>
-    Object.fromEntries(
-      NOTIFICATION_PREFS.map((p) => [p.key, p.defaultEnabled])
-    )
-  );
+  const { data: session } = useSession();
+  const queryClient = useQueryClient();
+  
+  // Merge defaults with saved preferences
+  const prefs = useMemo(() => {
+    const saved = session?.user?.notificationPrefs || {};
+    return Object.fromEntries(
+      NOTIFICATION_PREFS.map((p) => [
+        p.key,
+        saved[p.key] !== undefined ? saved[p.key] : p.defaultEnabled,
+      ])
+    );
+  }, [session?.user?.notificationPrefs]);
+
+  const updateMutation = useMutation({
+    mutationFn: (newPrefs: Record<string, boolean>) => 
+      api.patch("/api/session", { notificationPrefs: newPrefs }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["session"] });
+    },
+    onError: () => toast.error("Failed to save notification preferences"),
+  });
 
   const toggle = (key: string, value: boolean) => {
-    setPrefs((p) => ({ ...p, [key]: value }));
+    const newPrefs = { ...prefs, [key]: value };
+    // Optimistic update by mutating session data in query client if needed, or just let mutation invalidate.
+    updateMutation.mutate(newPrefs);
     toast.success(value ? "Notification enabled" : "Notification disabled", {
       description: NOTIFICATION_PREFS.find((p) => p.key === key)?.label,
     });
@@ -1000,6 +1034,11 @@ const USAGE_METRIC_META: Record<
 function BillingSection() {
   const { data: session } = useSession();
   const activeOrgId = useActiveOrg();
+  const queryClient = useQueryClient();
+
+  const [upgradeOpen, setUpgradeOpen] = useState(false);
+  const [invoicesOpen, setInvoicesOpen] = useState(false);
+  const [selectedPlan, setSelectedPlan] = useState<"free" | "team" | "enterprise">("free");
 
   const {
     data: usage,
@@ -1009,15 +1048,38 @@ function BillingSection() {
     isFetching,
   } = useQuery({
     queryKey: ["usage", activeOrgId],
-    queryFn: () => api.get<UsageMetricDTO[]>("/api/usage"),
+    queryFn: () => api.get<{ metrics: UsageMetricDTO[]; aiCost: any }>("/api/usage"),
     enabled: !!activeOrgId,
+  });
+
+  const { data: invoices = [] } = useQuery({
+    queryKey: ["invoices", activeOrgId],
+    queryFn: () => api.get<any[]>("/api/invoices"),
+    enabled: !!activeOrgId && invoicesOpen,
   });
 
   const activeOrg = session?.organizations?.[0];
   const plan = (activeOrg?.plan ?? "free") as "free" | "team" | "enterprise";
+  const currentPlanDef = PLANS[plan] || PLANS.free;
+
+  const upgradeMutation = useMutation({
+    mutationFn: (newPlan: string) => api.patch(`/api/organizations/${activeOrgId}`, { plan: newPlan }),
+    onSuccess: (_, newPlan) => {
+      toast.success(`Plan updated to ${PLANS[newPlan].name}`);
+      queryClient.invalidateQueries({ queryKey: ["session"] });
+      queryClient.invalidateQueries({ queryKey: ["invoices"] });
+      setUpgradeOpen(false);
+    },
+    onError: () => toast.error("Failed to update plan"),
+  });
+
+  const handleUpgradeClick = () => {
+    setSelectedPlan(plan);
+    setUpgradeOpen(true);
+  };
 
   const usageByType: Record<string, number> = {};
-  for (const m of usage ?? []) {
+  for (const m of usage?.metrics ?? []) {
     usageByType[m.metricType] = (usageByType[m.metricType] ?? 0) + m.value;
   }
 
@@ -1044,29 +1106,126 @@ function BillingSection() {
                 <div className="flex items-center gap-2">
                   <PlanBadge plan={plan} />
                   <span className="text-xs text-muted-foreground capitalize">
-                    {plan} plan
+                    {currentPlanDef.name} plan
                   </span>
                 </div>
                 <p className="text-sm text-muted-foreground mt-0.5">
-                  {plan === "free"
-                    ? "Limited to 1,000 records / month"
-                    : plan === "team"
-                      ? "10,000 records / month, priority support"
-                      : "Unlimited records, dedicated support, SSO"}
+                  {currentPlanDef.limits.maxRecordsPerMonth === -1 
+                    ? "Unlimited records" 
+                    : `${currentPlanDef.limits.maxRecordsPerMonth.toLocaleString()} records / month`}
+                  {", "}
+                  {currentPlanDef.limits.supportLevel}
+                  {currentPlanDef.limits.ssoEnabled ? ", SSO" : ""}
                 </p>
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <Button variant="outline" size="sm" onClick={() => toast.info("Invoices", { description: "Invoice history is not available in this demo." })}>
+              <Button variant="outline" size="sm" onClick={() => setInvoicesOpen(true)}>
                 View invoices
               </Button>
-              <Button size="sm" onClick={() => toast.info("Upgrade plan", { description: "Plan upgrades are not available in this demo." })}>
-                Upgrade plan
+              <Button size="sm" onClick={handleUpgradeClick}>
+                Change plan
               </Button>
             </div>
           </div>
         </CardContent>
       </Card>
+
+      <Dialog open={upgradeOpen} onOpenChange={setUpgradeOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Change your plan</DialogTitle>
+            <DialogDescription>
+              Select the plan that fits your organization's needs. Note: This is a demo payment gateway so you will not be charged.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4 py-4">
+            {Object.values(PLANS).map((p) => (
+              <div 
+                key={p.id}
+                className={`border p-4 rounded-lg cursor-pointer flex items-start gap-3 transition-colors ${selectedPlan === p.id ? "border-primary bg-primary/5" : "hover:border-primary/50"}`}
+                onClick={() => setSelectedPlan(p.id)}
+              >
+                <div className="mt-0.5">
+                  <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${selectedPlan === p.id ? "border-primary" : "border-muted-foreground"}`}>
+                    {selectedPlan === p.id && <div className="w-2.5 h-2.5 rounded-full bg-primary" />}
+                  </div>
+                </div>
+                <div>
+                  <h4 className="font-semibold text-sm">
+                    {p.name} {p.priceUsd > 0 ? `($${p.priceUsd}/mo)` : ""}
+                  </h4>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {p.description}
+                  </p>
+                  <p className="text-[10px] text-muted-foreground mt-1">
+                    {p.limits.maxRecordsPerMonth === -1 ? "Unlimited" : p.limits.maxRecordsPerMonth.toLocaleString()} records, {p.limits.supportLevel}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+          
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setUpgradeOpen(false)}>Cancel</Button>
+            <Button 
+              onClick={() => upgradeMutation.mutate(selectedPlan)} 
+              disabled={upgradeMutation.isPending || selectedPlan === plan}
+            >
+              {upgradeMutation.isPending ? "Updating..." : "Confirm changes"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={invoicesOpen} onOpenChange={setInvoicesOpen}>
+        <DialogContent className="max-w-xl">
+          <DialogHeader>
+            <DialogTitle>Invoice History</DialogTitle>
+            <DialogDescription>
+              Your past billing invoices.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="py-4">
+            {invoices.length === 0 ? (
+              <EmptyState 
+                icon={<FileText className="h-5 w-5" />} 
+                title="No invoices yet" 
+                description="When your plan is upgraded, simulated invoices will appear here." 
+              />
+            ) : (
+              <div className="rounded-md border">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b bg-muted/50 text-left">
+                      <th className="p-3 font-medium">Date</th>
+                      <th className="p-3 font-medium">Plan</th>
+                      <th className="p-3 font-medium">Amount</th>
+                      <th className="p-3 font-medium">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {invoices.map((inv) => (
+                      <tr key={inv.id} className="border-b last:border-0">
+                        <td className="p-3">{new Date(inv.createdAt).toLocaleDateString()}</td>
+                        <td className="p-3 capitalize">{PLANS[inv.planId]?.name || inv.planId}</td>
+                        <td className="p-3">${inv.amountUsd.toFixed(2)}</td>
+                        <td className="p-3">
+                          <Badge variant="outline" className="text-emerald-700 bg-emerald-50 border-emerald-200">
+                            {inv.status}
+                          </Badge>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Usage summary */}
       <Card>
@@ -1116,7 +1275,7 @@ function BillingSection() {
                   />
                 );
               })}
-              {usage && usage.length === 0 && (
+              {usage?.metrics && usage.metrics.length === 0 && (
                 <div className="sm:col-span-2 lg:col-span-3">
                   <EmptyState
                     icon={<CreditCard className="h-5 w-5" />}
@@ -1136,21 +1295,66 @@ function BillingSection() {
 // ── Data Retention section ───────────────────────────────────────────────
 
 function DataRetentionSection() {
-  const [emailRetention, setEmailRetention] = useState("90");
-  const [docRetention, setDocRetention] = useState("365");
-  const [auditRetention, setAuditRetention] = useState("365");
-  const [exportExpiry, setExportExpiry] = useState("7d");
+  const { data: session } = useSession();
+  const activeOrgId = useActiveOrg();
+  const queryClient = useQueryClient();
+
+  const org = session?.organizations?.find((o) => o.id === activeOrgId);
+
+  const [emailRetention, setEmailRetention] = useState(org?.retentionEmails || "90");
+  const [docRetention, setDocRetention] = useState(org?.retentionDocs || "365");
+  const [auditRetention, setAuditRetention] = useState(org?.retentionAuditLogs || "365");
+  const [exportExpiry, setExportExpiry] = useState(org?.exportFileExpiry || "7d");
+
+  // Sync state when org loads
+  useEffect(() => {
+    if (org) {
+      setEmailRetention(org.retentionEmails || "90");
+      setDocRetention(org.retentionDocs || "365");
+      setAuditRetention(org.retentionAuditLogs || "365");
+      setExportExpiry(org.exportFileExpiry || "7d");
+    }
+  }, [org]);
+
+  const updateMutation = useMutation({
+    mutationFn: (vars: Record<string, string>) =>
+      api.patch(`/api/organizations/${activeOrgId}`, vars),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["session"] });
+      toast.success("Retention policies updated");
+    },
+    onError: () => toast.error("Failed to update retention policies"),
+  });
+
+  const handleRetentionChange = (key: string, value: string, setter: (v: string) => void) => {
+    setter(value);
+    updateMutation.mutate({ [key]: value });
+  };
+
+  const jobMutation = useMutation({
+    mutationFn: (type: string) =>
+      api.post("/api/ai-jobs", { type, payload: {} }),
+    onSuccess: (data: any) => {
+      if (data.type === "DATA_DELETION") {
+        toast.info("Data deletion scheduled", {
+          description: "A deletion job has been queued. You will be notified by email before it runs.",
+        });
+      } else {
+        toast.info("GDPR export queued", {
+          description: "A complete export of your data has been queued. You will receive a download link by email.",
+        });
+      }
+    },
+    onError: () => toast.error("Failed to schedule job"),
+  });
 
   const handleScheduleDeletion = () => {
-    toast.info("Data deletion scheduled", {
-      description: "A deletion job has been queued. You will be notified by email before it runs.",
-    });
+    if (!confirm("Are you sure you want to schedule permanent data deletion?")) return;
+    jobMutation.mutate("DATA_DELETION");
   };
 
   const handleExportAll = () => {
-    toast.info("GDPR export queued", {
-      description: "A complete export of your data has been queued. You will receive a download link by email.",
-    });
+    jobMutation.mutate("GDPR_EXPORT");
   };
 
   const retentionSelect = (
@@ -1164,7 +1368,7 @@ function DataRetentionSection() {
         <CardTitle className="text-sm">{label}</CardTitle>
       </CardHeader>
       <CardContent>
-        <Select value={value} onValueChange={onChange}>
+        <Select value={value} onValueChange={onChange} disabled={!activeOrgId}>
           <SelectTrigger className="w-full">
             <SelectValue />
           </SelectTrigger>
@@ -1186,7 +1390,7 @@ function DataRetentionSection() {
         {retentionSelect(
           "Email retention",
           emailRetention,
-          setEmailRetention,
+          (v) => handleRetentionChange("retentionEmails", v, setEmailRetention),
           [
             { value: "30", label: "30 days" },
             { value: "90", label: "90 days" },
@@ -1196,7 +1400,7 @@ function DataRetentionSection() {
         {retentionSelect(
           "Document retention",
           docRetention,
-          setDocRetention,
+          (v) => handleRetentionChange("retentionDocs", v, setDocRetention),
           [
             { value: "30", label: "30 days" },
             { value: "90", label: "90 days" },
@@ -1206,7 +1410,7 @@ function DataRetentionSection() {
         {retentionSelect(
           "Audit log retention",
           auditRetention,
-          setAuditRetention,
+          (v) => handleRetentionChange("retentionAuditLogs", v, setAuditRetention),
           [
             { value: "90", label: "90 days" },
             { value: "365", label: "365 days" },
@@ -1216,7 +1420,7 @@ function DataRetentionSection() {
         {retentionSelect(
           "Export file expiry",
           exportExpiry,
-          setExportExpiry,
+          (v) => handleRetentionChange("exportFileExpiry", v, setExportExpiry),
           [
             { value: "24h", label: "24 hours" },
             { value: "7d", label: "7 days" },
@@ -1249,6 +1453,7 @@ function DataRetentionSection() {
               variant="outline"
               className="border-destructive/40 text-destructive hover:text-destructive shrink-0"
               onClick={handleScheduleDeletion}
+              disabled={jobMutation.isPending || !activeOrgId}
             >
               <Trash2 className="mr-2 h-3.5 w-3.5" />
               Schedule deletion
@@ -1262,7 +1467,7 @@ function DataRetentionSection() {
                 link by email when it&apos;s ready.
               </p>
             </div>
-            <Button variant="outline" onClick={handleExportAll} className="shrink-0">
+            <Button variant="outline" onClick={handleExportAll} className="shrink-0" disabled={jobMutation.isPending || !activeOrgId}>
               <FileDown className="mr-2 h-3.5 w-3.5" />
               Export all data
             </Button>

@@ -11,15 +11,20 @@ export async function DELETE(
 ) {
   try {
     const { id: datasetId } = await params;
-    const { organizationId } = await requireRole(req, "member");
+    const { user, organizationId } = await requireRole(req, "member");
 
-    // Verify dataset belongs to org
-    const dataset = await db.dataset.findFirst({
-      where: { id: datasetId, organizationId },
-      select: { id: true },
+    const dataset = await db.dataset.findUnique({
+      where: { id: datasetId },
+      select: { id: true, organizationId: true },
     });
+    
     if (!dataset) {
       return NextResponse.json({ error: "Dataset not found" }, { status: 404 });
+    }
+
+    const { verifyDatasetAccess } = await import("@/lib/auth");
+    if (!(await verifyDatasetAccess(dataset, organizationId, user.id, "edit"))) {
+      return NextResponse.json({ error: "Not authorized to edit this dataset" }, { status: 403 });
     }
 
     const body = await req.json().catch(() => ({}));

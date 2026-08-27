@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { parseJson } from "@/lib/serialize";
+import { requireRole, AuthError, authErrorResponse, verifyDatasetAccess } from "@/lib/auth";
 
 export async function POST(
   req: NextRequest,
@@ -8,6 +9,13 @@ export async function POST(
 ) {
   try {
     const { id } = await params;
+    const { user, organizationId } = await requireRole(req, "member");
+    
+    const dataset = await db.dataset.findUnique({ where: { id } });
+    if (!dataset || !(await verifyDatasetAccess(dataset, organizationId, user.id, "read"))) {
+      return NextResponse.json({ error: "Dataset not found or unauthorized" }, { status: 403 });
+    }
+
     const { format } = await req.json();
     
     if (format !== "csv" && format !== "json") {
@@ -22,6 +30,7 @@ export async function POST(
       recordCount: count
     });
   } catch (err: any) {
+    if (err instanceof AuthError) return authErrorResponse(err);
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
 }
@@ -32,6 +41,14 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
+    
+    // Auth check
+    const { user, organizationId } = await requireRole(req, "member");
+    const checkDataset = await db.dataset.findUnique({ where: { id } });
+    if (!checkDataset || !(await verifyDatasetAccess(checkDataset, organizationId, user.id, "read"))) {
+      return new NextResponse("Dataset not found or unauthorized", { status: 403 });
+    }
+
     const { searchParams } = new URL(req.url);
     const format = searchParams.get("format");
 
@@ -115,6 +132,9 @@ export async function GET(
 
     return new NextResponse("Invalid format", { status: 400 });
   } catch (err: any) {
+    if (err instanceof AuthError) {
+      return authErrorResponse(err);
+    }
     return new NextResponse(err.message, { status: 500 });
   }
 }

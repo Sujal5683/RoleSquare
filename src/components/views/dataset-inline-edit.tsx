@@ -12,6 +12,7 @@ export function InlineEditCell({
   initialValue,
   fieldType,
   onClose,
+  onSaveSuccess,
 }: {
   datasetId: string;
   recordId: string;
@@ -20,6 +21,7 @@ export function InlineEditCell({
   initialValue: string;
   fieldType: string;
   onClose: () => void;
+  onSaveSuccess?: (oldVal: string, newVal: string, valueId: string) => void;
 }) {
   const [val, setVal] = useState(initialValue);
   const ref = useRef<HTMLInputElement>(null);
@@ -47,12 +49,22 @@ export function InlineEditCell({
           evidence: "Manual inline edit",
         });
       } else {
-        throw new Error("Creating new cell values inline is not supported in this version. Use the detail drawer.");
+        return api.post(`/api/datasets/${datasetId}/records/${recordId}/values`, {
+          fieldId,
+          value: parsedValue,
+          confidence: 1,
+          evidence: "Manual inline edit",
+        });
       }
     },
-    onSuccess: () => {
+    onSuccess: (res: any) => {
       queryClient.invalidateQueries({ queryKey: ["dataset-records", datasetId] });
       toast.success("Saved");
+      if (onSaveSuccess) {
+        // If it was a POST, valueId was undefined, but we get the new value's ID from the response.
+        const savedValueId = valueId || res?.id;
+        onSaveSuccess(initialValue, val, savedValueId);
+      }
       onClose();
     },
     onError: (err: any) => {

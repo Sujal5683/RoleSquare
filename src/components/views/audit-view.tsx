@@ -159,31 +159,25 @@ import { useActiveOrg } from "@/hooks/use-active-org";
 function renderObjectDiff(data: any): React.ReactNode {
   if (data === null || data === undefined || data === "") return <span className="text-xs text-muted-foreground">—</span>;
   if (typeof data !== "object") {
-    return <span className="text-xs text-foreground break-words">{String(data)}</span>;
+    return <span className="text-xs text-muted-foreground">Updated</span>;
   }
   if (Array.isArray(data)) {
-    return <span className="text-xs text-foreground break-words">{data.length > 0 ? data.join(", ") : "—"}</span>;
+    return <span className="text-xs text-muted-foreground">{data.length} items modified</span>;
   }
 
-  const entries = Object.entries(data);
+  const entries = Object.keys(data);
   if (entries.length === 0) return <span className="text-xs text-muted-foreground">—</span>;
 
   return (
-    <ul className="space-y-2">
-      {entries.map(([key, value]) => {
+    <ul className="space-y-1 list-disc list-inside text-muted-foreground">
+      {entries.map((key) => {
         const formattedKey = key
           .replace(/([A-Z])/g, " $1")
           .replace(/^./, (str) => str.toUpperCase())
           .trim();
-
-        const isNestedObject = value !== null && typeof value === "object" && !Array.isArray(value);
-
         return (
-          <li key={key} className="text-xs flex flex-col gap-0.5">
-            <span className="font-medium text-muted-foreground">{formattedKey}</span>
-            <div className={isNestedObject ? "pl-2 ml-1 border-l border-border/50" : ""}>
-              {renderObjectDiff(value)}
-            </div>
+          <li key={key} className="text-xs">
+            {formattedKey}
           </li>
         );
       })}

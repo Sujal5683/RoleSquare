@@ -47,6 +47,28 @@ export async function POST(req: NextRequest) {
         { status: 400 }
       );
     }
+    try {
+      const parsedUrl = new URL(url);
+      const hostname = parsedUrl.hostname;
+      if (
+        hostname === "localhost" ||
+        hostname.startsWith("127.") ||
+        hostname === "::1" ||
+        hostname === "[::1]" ||
+        hostname === "0.0.0.0" ||
+        hostname.startsWith("169.254.") ||
+        hostname.match(/^10\./) ||
+        hostname.match(/^192\.168\./) ||
+        hostname.match(/^172\.(1[6-9]|2[0-9]|3[0-1])\./)
+      ) {
+        return NextResponse.json(
+          { error: "Internal or private URLs are not allowed" },
+          { status: 400 }
+        );
+      }
+    } catch {
+      return NextResponse.json({ error: "Invalid URL format" }, { status: 400 });
+    }
 
     const webhook = await db.webhook.create({
       data: {

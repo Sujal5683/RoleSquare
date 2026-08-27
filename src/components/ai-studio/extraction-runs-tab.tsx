@@ -196,8 +196,14 @@ export function ExtractionRunsTab() {
             <Card>
               <CardHeader >
                 <CardTitle className="text-sm flex items-center justify-between">
-                  <span className="font-mono text-xs text-muted-foreground">
-                    Job: {selectedJob.id}
+                  <span className="font-medium text-xs text-foreground">
+                    {(() => {
+                      const payload = selectedJob.payload as any;
+                      const targetDs = datasets?.find(d => d.id === payload?.targetDatasetId);
+                      const sourceDs = datasets?.find(d => d.id === payload?.sourceDatasetId);
+                      const targetName = String(payload?.targetDatasetName || targetDs?.name || (payload?.targetDatasetId ? String(payload.targetDatasetId).slice(0, 8) + "…" : "New"));
+                      return `Ext: ${sourceDs?.name?.slice(0, 10) ?? 'Src'} → ${targetName.slice(0, 10)}`;
+                    })()}
                   </span>
                   <div className="flex items-center gap-2">
                     {(selectedJob.status === "running" || selectedJob.status === "queued") && (
@@ -265,9 +271,7 @@ export function ExtractionRunsTab() {
                         <ChevronRight className="h-3 w-3 transition-transform" />
                         Source Dataset: {datasets?.find(d => d.id === (selectedJob.payload as any).sourceDatasetId)?.name || "Unknown"}
                       </CollapsibleTrigger>
-                      <CollapsibleContent className="pl-4 pt-1 text-muted-foreground font-mono">
-                        ID: {(selectedJob.payload as any).sourceDatasetId}
-                      </CollapsibleContent>
+                      
                     </Collapsible>
                     
                     {/* Target Dataset */}
@@ -276,21 +280,18 @@ export function ExtractionRunsTab() {
                         <ChevronRight className="h-3 w-3 transition-transform" />
                         Target Dataset: {(selectedJob.payload as any).targetDatasetName || datasets?.find(d => d.id === (selectedJob.payload as any).targetDatasetId)?.name || "New Dataset"}
                       </CollapsibleTrigger>
-                      <CollapsibleContent className="pl-4 pt-1 text-muted-foreground font-mono">
-                        ID: {(selectedJob.payload as any).targetDatasetId || "N/A"}
-                      </CollapsibleContent>
                     </Collapsible>
 
                     {/* Schema */}
                     <Collapsible>
                       <CollapsibleTrigger className="flex items-center gap-1 font-medium hover:underline [&[data-state=open]>svg]:rotate-90">
                         <ChevronRight className="h-3 w-3 transition-transform" />
-                        Schema: {schemas?.find(s => s.id === (selectedJob.payload as any).schemaId)?.name || "Unknown"}
+                        Schema: {schemas?.find(s => s.id === (selectedJob.payload as any).targetSchemaId)?.name || "Unknown"}
                       </CollapsibleTrigger>
                       <CollapsibleContent className="pl-4 pt-1 space-y-1">
-                        <p className="font-mono text-muted-foreground">ID: {(selectedJob.payload as any).schemaId}</p>
+                        
                         {(() => {
-                           const s = schemas?.find(s => s.id === (selectedJob.payload as any).schemaId);
+                           const s = schemas?.find(s => s.id === (selectedJob.payload as any).targetSchemaId);
                            if (!s) return null;
                            return (
                              <div className="mt-2 bg-background/50 p-2 rounded border border-border/50">
@@ -359,7 +360,7 @@ export function ExtractionRunsTab() {
                               {isExpanded ? <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" /> : <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />}
                               <div>
                                 <p className="text-[11px] font-medium">{output.modelUsed}</p>
-                                <p className="text-[10px] text-muted-foreground font-mono">{output.id.slice(0, 10)}…</p>
+                                <p className="text-[10px] text-muted-foreground">AI Generation</p>
                               </div>
                             </div>
                             <div className="flex items-center gap-4 text-right">
@@ -389,15 +390,7 @@ export function ExtractionRunsTab() {
                                   <p className="font-medium">{new Date(output.createdAt).toLocaleTimeString()}</p>
                                 </div>
                               </div>
-                              {rawParsed !== null && rawParsed !== undefined && (
-                                <div>
-                                  <p className="text-[10px] text-muted-foreground mb-1">Response (truncated)</p>
-                                  <pre className="text-[10px] font-mono bg-background rounded p-2 overflow-x-auto whitespace-pre-wrap max-h-32">
-                                    {JSON.stringify(sanitizeSensitiveIds(rawParsed as Record<string, unknown>), null, 1).slice(0, 800)}
-                                    {JSON.stringify(sanitizeSensitiveIds(rawParsed as Record<string, unknown>), null, 1).length > 800 ? "…" : ""}
-                                  </pre>
-                                </div>
-                              )}
+                              
                             </div>
                           )}
                         </div>

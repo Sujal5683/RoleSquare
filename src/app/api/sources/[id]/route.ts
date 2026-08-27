@@ -82,7 +82,18 @@ export async function PATCH(
     if (typeof body?.scheduleMode === "string") data.scheduleMode = body.scheduleMode;
     if (typeof body?.scheduleExpr === "string") data.scheduleExpr = body.scheduleExpr;
     if (typeof body?.description === "string") data.description = body.description || null;
-    if (body?.schemaId !== undefined) data.schemaId = body.schemaId || null;
+    if (body?.schemaId !== undefined) {
+      const schemaId = body.schemaId || null;
+      if (schemaId) {
+        const schema = await db.schema.findFirst({
+          where: { id: schemaId, organizationId },
+        });
+        if (!schema) {
+          return NextResponse.json({ error: "Schema not found" }, { status: 404 });
+        }
+      }
+      data.schemaId = schemaId;
+    }
     if (body?.datasetId !== undefined) data.datasetId = body.datasetId || null;
     if (typeof body?.maxEmailsPerScan === "number") {
       data.maxEmailsPerScan = Math.max(1, Math.min(2000, body.maxEmailsPerScan));

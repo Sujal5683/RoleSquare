@@ -28,6 +28,9 @@ export async function POST(req: NextRequest) {
     let targetDatasetId = String(body?.targetDatasetId ?? "").trim();
     const agentKeys: string[] = Array.isArray(body?.agentKeys) ? body.agentKeys : [];
     const extraInstructions = String(body?.extraInstructions ?? "").trim();
+    // Drive exploration options — default exploreDriveLinks to true
+    const exploreDriveLinks: boolean = body?.exploreDriveLinks !== false;
+    const driveConnectionId = body?.driveConnectionId ? String(body.driveConnectionId).trim() : undefined;
 
     if (!sourceDatasetId || !schemaId) {
       return NextResponse.json(
@@ -45,6 +48,12 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Source dataset not found" }, { status: 404 });
     }
 
+    const { verifyDatasetWriteAccess } = await import("@/lib/dataset-access");
+    const canEditSource = await verifyDatasetWriteAccess(sourceDatasetId, user.id, organizationId);
+    if (!canEditSource) {
+      return NextResponse.json({ error: "You do not have write access to the source dataset." }, { status: 403 });
+    }
+
     // Verify schema exists and belongs to org
     const schema = await db.schema.findUnique({
       where: { id: schemaId },
@@ -59,12 +68,10 @@ export async function POST(req: NextRequest) {
 
     // Resolve or create the target dataset
     if (targetDatasetId) {
-      const existing = await db.dataset.findUnique({
-        where: { id: targetDatasetId },
-        select: { id: true, organizationId: true },
-      });
-      if (!existing || existing.organizationId !== organizationId) {
-        return NextResponse.json({ error: "Target dataset not found" }, { status: 404 });
+      const { verifyDatasetWriteAccess } = await import("@/lib/dataset-access");
+      const canEdit = await verifyDatasetWriteAccess(targetDatasetId, user.id, organizationId);
+      if (!canEdit) {
+        return NextResponse.json({ error: "You do not have write access to the target dataset." }, { status: 403 });
       }
     } else {
       const name = targetDatasetName || `${schema.name} — Extracted ${new Date().toLocaleDateString()}`;
@@ -96,6 +103,9 @@ export async function POST(req: NextRequest) {
           targetSchemaId: schemaId,
           agentKeys,
           extraInstructions,
+          // Drive exploration options
+          exploreDriveLinks,
+          ...(driveConnectionId ? { driveConnectionId } : {}),
         }),
         progress: 0,
       },

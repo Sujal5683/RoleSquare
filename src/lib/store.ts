@@ -68,6 +68,11 @@ interface AppState {
   addRecent: (item: Omit<RecentItem, "timestamp">) => void;
   clearRecent: () => void;
   removeRecent: (id: string) => void;
+
+  // Notifications
+  dismissedNotifications: string[];
+  dismissNotification: (id: string) => void;
+  dismissAllNotifications: (ids: string[]) => void;
 }
 
 const MAX_RECENT = 10;
@@ -161,6 +166,16 @@ export const useAppStore = create<AppState>()(
       clearRecent: () => set({ recentItems: [] }),
       removeRecent: (id) =>
         set((s) => ({ recentItems: s.recentItems.filter((i) => i.id !== id) })),
+
+      dismissedNotifications: [],
+      dismissNotification: (id) =>
+        set((s) => ({
+          dismissedNotifications: [...new Set([...s.dismissedNotifications, id])],
+        })),
+      dismissAllNotifications: (ids) =>
+        set((s) => ({
+          dismissedNotifications: [...new Set([...s.dismissedNotifications, ...ids])],
+        })),
     }),
     {
       name: "wip-app-store",
@@ -170,6 +185,7 @@ export const useAppStore = create<AppState>()(
         theme: s.theme,
         recentItems: s.recentItems,
         desktopSidebarOpen: s.desktopSidebarOpen,
+        dismissedNotifications: s.dismissedNotifications,
       }),
     }
   )

@@ -1,6 +1,6 @@
 const fs = require('fs');
 const filePath = 'src/app/api/ai/extract-wizard/route.ts';
-let content = fs.readFileSync(filePath, 'utf8');
+let content = fs.readFileSync(filePath, 'utf8').replace(/\r\n/g, '\n');
 
 const oldBlock = `    // Resolve or create the target dataset
     if (targetDatasetId) {

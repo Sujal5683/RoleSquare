@@ -17,7 +17,10 @@ export async function POST(req: NextRequest) {
   try {
     const { user, organizationId } = await requireRole(req, "member");
     const body = await req.json().catch(() => ({}));
-    const returnTo = typeof body?.returnTo === "string" ? body.returnTo : "/";
+    let returnTo = typeof body?.returnTo === "string" ? body.returnTo : "/";
+    if (!returnTo.startsWith("/") || returnTo.startsWith("//")) {
+      returnTo = "/";
+    }
 
     const authorizeUrl = buildSheetsOAuthUrl({
       userId: user.id,

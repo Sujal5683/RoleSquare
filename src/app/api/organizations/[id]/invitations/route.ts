@@ -77,6 +77,17 @@ export async function POST(
       return NextResponse.json({ error: "Invalid email address" }, { status: 400 });
     }
 
+    const { membership } = await requireManagerAccess(organizationId);
+    const inviterLevel = ROLE_LEVEL[membership.role] ?? 0;
+    const requestedLevel = ROLE_LEVEL[role] ?? 0;
+
+    if (requestedLevel > inviterLevel) {
+      return NextResponse.json(
+        { error: `You cannot invite someone with a higher role than your own. You are a ${membership.role}.` },
+        { status: 403 }
+      );
+    }
+
     // Check if the user is already an active member
     const targetUser = await db.user.findUnique({ where: { email } });
     if (targetUser) {

@@ -179,7 +179,6 @@ export function ModelCostTab() {
                       <tr key={m.model} className="border-b last:border-0 hover:bg-muted/30 transition-colors">
                         <td className="py-2 pr-3">
                           <p className="font-medium">{m.displayName}</p>
-                          <p className="text-[10px] text-muted-foreground font-mono">{m.model}</p>
                         </td>
                         <td className="text-right py-2 pr-3 font-mono tabular-nums">
                           {formatTokens(m.promptTokens)}

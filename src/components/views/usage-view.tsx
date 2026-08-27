@@ -426,7 +426,6 @@ export function UsageView() {
                       <p className="text-sm font-medium truncate">
                         {modelDisplayName(m.model)}
                       </p>
-                      <p className="text-[10px] text-muted-foreground font-mono truncate">{m.model}</p>
                       <p className="text-xs text-muted-foreground">
                         {m.calls} calls ·{" "}
                         <span title="Total tokens">{fmt(m.tokens)} tokens</span>

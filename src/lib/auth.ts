@@ -16,6 +16,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { createClient } from "@/lib/supabase/server";
+import { cookies } from "next/headers";
 
 export type Role = "owner" | "admin" | "manager" | "member" | "viewer";
 
@@ -43,6 +44,8 @@ export interface SessionUser {
   name: string | null;
   avatarUrl: string | null;
   role: string; // global role: user | admin
+  notificationPrefs: Record<string, boolean>;
+  twoFactorEnabled: boolean;
   memberships: OrgMembership[];
   // Convenience: organizations the user is an ACTIVE member of.
   organizations: {
@@ -52,6 +55,10 @@ export interface SessionUser {
     plan: string;
     role: Role;
     status: string;
+    retentionEmails: string;
+    retentionDocs: string;
+    retentionAuditLogs: string;
+    exportFileExpiry: string;
   }[];
 }
 
@@ -60,7 +67,7 @@ export interface SessionUser {
  * memberships. Only memberships with status="active" are included in the
  * `organizations` convenience array.
  */
-export async function getCurrentUser(): Promise<SessionUser> {
+export async function getCurrentUser(skip2FA = false): Promise<SessionUser> {
   const supabase = await createClient();
   const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
 
@@ -69,6 +76,14 @@ export async function getCurrentUser(): Promise<SessionUser> {
   }
 
   const user = await getOrCreateUser(authUser.email, authUser.user_metadata);
+
+  if (user.twoFactorEnabled && !skip2FA) {
+    const cookieStore = await cookies();
+    const verified = cookieStore.get("2fa_verified_" + user.id)?.value === "true";
+    if (!verified) {
+      throw new AuthError("2FA_REQUIRED", 403);
+    }
+  }
 
   const memberships: OrgMembership[] = user.organizations.map((m) => ({
     id: m.id,
@@ -84,6 +99,8 @@ export async function getCurrentUser(): Promise<SessionUser> {
     name: user.name,
     avatarUrl: user.avatarUrl,
     role: user.role,
+    notificationPrefs: JSON.parse(user.notificationPrefs || "{}"),
+    twoFactorEnabled: !!user.twoFactorEnabled,
     memberships,
     organizations: memberships
       .filter((m) => m.status === "active")
@@ -95,6 +112,14 @@ export async function getCurrentUser(): Promise<SessionUser> {
           .organization.slug,
         plan: user.organizations.find((om) => om.organizationId === m.organizationId)!
           .organization.plan,
+        retentionEmails: user.organizations.find((om) => om.organizationId === m.organizationId)!
+          .organization.retentionEmails,
+        retentionDocs: user.organizations.find((om) => om.organizationId === m.organizationId)!
+          .organization.retentionDocs,
+        retentionAuditLogs: user.organizations.find((om) => om.organizationId === m.organizationId)!
+          .organization.retentionAuditLogs,
+        exportFileExpiry: user.organizations.find((om) => om.organizationId === m.organizationId)!
+          .organization.exportFileExpiry,
         role: m.role,
         status: m.status,
       })),

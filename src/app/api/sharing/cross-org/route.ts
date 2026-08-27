@@ -60,6 +60,7 @@ export async function POST(req: NextRequest) {
     if (datasetId) {
       const dataset = await db.dataset.findUnique({ where: { id: datasetId }, select: { id: true, organizationId: true } })
       if (!dataset) return NextResponse.json({ error: 'Dataset not found' }, { status: 404 })
+      if (dataset.organizationId !== organizationId) return NextResponse.json({ error: 'Dataset does not belong to your active organization' }, { status: 403 })
       
       if (shareType === 'grant') {
          const dsMembership = await db.organizationMember.findUnique({

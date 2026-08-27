@@ -72,12 +72,22 @@ export async function POST(req: NextRequest) {
     }
 
     const source = await db.$transaction(async (tx) => {
+      let schemaId = body?.schemaId || null;
+      if (schemaId) {
+        const schema = await tx.schema.findFirst({
+          where: { id: schemaId, organizationId },
+        });
+        if (!schema) {
+          throw new AuthError("Schema not found", 404);
+        }
+      }
+
       const created = await tx.source.create({
         data: {
           organizationId,
           ownerUserId: user.id,
           googleConnectionId,
-          schemaId: body?.schemaId || null,
+          schemaId,
           datasetId: body?.datasetId || null,
           name,
           description: body?.description ?? null,

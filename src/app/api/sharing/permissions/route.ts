@@ -233,6 +233,12 @@ export async function PATCH(req: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
     }
 
+    const { verifyDatasetWriteAccess } = await import("@/lib/dataset-access");
+    const canEdit = await verifyDatasetWriteAccess(existing.datasetId, user.id, organizationId);
+    if (!canEdit) {
+      return NextResponse.json({ error: "You do not have write access to this dataset to manage permissions" }, { status: 403 });
+    }
+
     const dataToUpdate: any = {};
     if (typeof isPaused === "boolean") dataToUpdate.isPaused = isPaused;
     if (level) dataToUpdate.level = level;

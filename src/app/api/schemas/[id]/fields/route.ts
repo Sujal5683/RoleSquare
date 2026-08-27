@@ -114,8 +114,8 @@ export async function PUT(
 
     await db.$transaction(
       fieldIds.map((fid, i) =>
-        db.schemaField.update({
-          where: { id: fid },
+        db.schemaField.updateMany({
+          where: { id: fid, schemaId: id },
           data: { position: i },
         })
       )

@@ -32,11 +32,11 @@ import {
   ArrowUpRight
 } from "lucide-react";
 
-export function LandingView() {
+export function LandingView({ hasSession = false }: { hasSession?: boolean }) {
   return (
     <div className="flex min-h-screen flex-col bg-background text-foreground selection:bg-primary/10">
       {/* Header */}
-      <PublicHeader />
+      <PublicHeader hasSession={hasSession} />
 
       <main className="flex-1">
         {/* Hero */}
@@ -57,8 +57,8 @@ export function LandingView() {
             </p>
             <div className="mt-10 flex flex-col items-center justify-center gap-3 sm:flex-row">
               <Button size="lg" asChild className="w-full sm:w-auto h-12 px-8">
-                <Link href="/workspace">
-                  Open Workspace
+                <Link href={hasSession ? "/workspace" : "/login?mode=signup"}>
+                  {hasSession ? "Open Workspace" : "Get Started Free"}
                   <ArrowRight className="ml-2 h-4 w-4" />
                 </Link>
               </Button>
@@ -271,8 +271,8 @@ export function LandingView() {
             </p>
             <div className="mt-10 flex justify-center">
               <Button size="lg" variant="secondary" asChild className="h-12 px-8">
-                <Link href="/workspace">
-                  Create your free account
+                <Link href={hasSession ? "/workspace" : "/login?mode=signup"}>
+                  {hasSession ? "Go to Dashboard" : "Create your free account"}
                   <ArrowRight className="ml-2 h-4 w-4" />
                 </Link>
               </Button>

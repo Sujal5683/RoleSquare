@@ -64,7 +64,7 @@ export async function POST(req: NextRequest) {
       data: {
         name,
         slug,
-        plan,
+        plan: "free",
         createdBy: user.id,
         members: {
           create: { userId: user.id, role: "owner", status: "active" },

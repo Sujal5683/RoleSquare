@@ -60,13 +60,9 @@ export async function ensureDefaultDataset(sourceId: string): Promise<string> {
   });
   if (!source) throw new Error(`Source ${sourceId} not found`);
 
-  // If source already has a default dataset, return it
+  // If source already has a dataset, return it. Do not overwrite custom datasets.
   if (source.datasetId) {
-    const ds = await db.dataset.findUnique({
-      where: { id: source.datasetId },
-      select: { id: true, isDefault: true },
-    });
-    if (ds?.isDefault) return ds.id;
+    return source.datasetId;
   }
 
   // Ensure the default schema exists

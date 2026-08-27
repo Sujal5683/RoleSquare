@@ -41,11 +41,14 @@ export function NotificationsDropdown() {
   const [open, setOpen] = useState(false);
   const setView = useAppStore((s) => s.setView);
   const openDataset = useAppStore((s) => s.openDataset);
-  const [dismissed, setDismissed] = useState<Set<string>>(new Set());
+  const dismissedNotifications = useAppStore((s) => s.dismissedNotifications);
+  const dismissNotification = useAppStore((s) => s.dismissNotification);
+  const dismissAllNotifications = useAppStore((s) => s.dismissAllNotifications);
 
+  const activeOrgId = useAppStore((s) => s.selectedOrganizationId);
   const { data, refetch, isFetching } = useQuery({
-    queryKey: ["dashboard"],
-    queryFn: () => api.get<DashboardData>("/api/dashboard"),
+    queryKey: ["dashboard", activeOrgId],
+    queryFn: () => api.get<DashboardData>(activeOrgId ? `/api/dashboard?organizationId=${activeOrgId}` : "/api/dashboard"),
     staleTime: 30_000,
   });
 
@@ -78,7 +81,7 @@ export function NotificationsDropdown() {
 
   // Review queue items
   if (data?.reviewQueue) {
-    for (const rec of data.reviewQueue.slice(0, 3)) {
+    for (const rec of data.reviewQueue) {
       notifications.push({
         id: `review-${rec.id}`,
         type: "review",
@@ -95,7 +98,7 @@ export function NotificationsDropdown() {
   // Failed jobs
   if (data?.kpis && data.kpis.aiJobsFailed > 0) {
     notifications.push({
-      id: "failed-jobs",
+      id: `failed-jobs-${data.kpis.aiJobsFailed}`,
       type: "job",
       icon: AlertTriangle,
       title: `${data.kpis.aiJobsFailed} failed job${data.kpis.aiJobsFailed === 1 ? "" : "s"}`,
@@ -109,7 +112,7 @@ export function NotificationsDropdown() {
   // Running jobs
   if (data?.kpis && data.kpis.aiJobsRunning > 0) {
     notifications.push({
-      id: "running-jobs",
+      id: `running-jobs-${data.kpis.aiJobsRunning}`,
       type: "job",
       icon: RefreshCw,
       title: `${data.kpis.aiJobsRunning} job${data.kpis.aiJobsRunning === 1 ? "" : "s"} running`,
@@ -175,7 +178,7 @@ export function NotificationsDropdown() {
     });
   }
 
-  const visibleNotifications = notifications.filter((n) => !dismissed.has(n.id));
+  const visibleNotifications = notifications.filter((n) => !dismissedNotifications.includes(n.id));
   const unreadCount = visibleNotifications.filter((n) => !n.read).length;
 
   const handleAction = (n: Notification) => {
@@ -191,7 +194,7 @@ export function NotificationsDropdown() {
 
   const dismiss = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    setDismissed((prev) => new Set([...prev, id]));
+    dismissNotification(id);
   };
 
   const typeColors: Record<string, string> = {
@@ -215,10 +218,10 @@ export function NotificationsDropdown() {
       </PopoverTrigger>
       <PopoverContent
         align="end"
-        className="w-[90vw] sm:w-96 p-0"
+        className="w-[90vw] sm:w-96 p-0 flex flex-col overflow-hidden max-h-[85vh]"
         sideOffset={8}
       >
-        <div className="flex items-center justify-between border-b px-4 py-3">
+        <div className="flex items-center justify-between border-b px-4 py-3 shrink-0">
           <div className="flex items-center gap-2">
             <h3 className="text-sm font-semibold">Notifications</h3>
             {unreadCount > 0 && (
@@ -238,7 +241,7 @@ export function NotificationsDropdown() {
             Refresh
           </Button>
         </div>
-        <ScrollArea className="max-h-[400px]">
+        <ScrollArea className="flex-1 min-h-0">
           <div className="divide-y">
             {visibleNotifications.length === 0 ? (
               <div className="flex flex-col items-center py-5 text-center">
@@ -297,13 +300,13 @@ export function NotificationsDropdown() {
           </div>
         </ScrollArea>
         {visibleNotifications.length > 0 && (
-          <div className="border-t px-4 py-2">
+          <div className="border-t px-4 py-2 shrink-0">
             <Button
               variant="ghost"
               size="sm"
               className="w-full text-xs"
               onClick={() => {
-                setDismissed(new Set(notifications.map((n) => n.id)));
+                dismissAllNotifications(notifications.map((n) => n.id));
               }}
             >
               Mark all as read

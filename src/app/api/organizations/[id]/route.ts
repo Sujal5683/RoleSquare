@@ -74,12 +74,17 @@ export async function PATCH(
     const { user } = access;
     
     const body = await req.json().catch(() => ({}));
-    const data: { name?: string; plan?: string; slug?: string } = {};
+    const data: { 
+      name?: string; 
+      plan?: string; 
+      slug?: string;
+      retentionEmails?: string;
+      retentionDocs?: string;
+      retentionAuditLogs?: string;
+      exportFileExpiry?: string;
+    } = {};
     if (typeof body?.name === "string" && body.name.trim()) {
       data.name = body.name.trim();
-    }
-    if (typeof body?.plan === "string" && body.plan.trim()) {
-      data.plan = body.plan.trim();
     }
     if (typeof body?.slug === "string" && body.slug.trim()) {
       const baseSlug = body.slug.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
@@ -93,6 +98,19 @@ export async function PATCH(
         slug = `${baseSlug}-${attempt}`;
       }
       data.slug = slug;
+    }
+    
+    if (typeof body?.retentionEmails === "string") {
+      data.retentionEmails = body.retentionEmails;
+    }
+    if (typeof body?.retentionDocs === "string") {
+      data.retentionDocs = body.retentionDocs;
+    }
+    if (typeof body?.retentionAuditLogs === "string") {
+      data.retentionAuditLogs = body.retentionAuditLogs;
+    }
+    if (typeof body?.exportFileExpiry === "string") {
+      data.exportFileExpiry = body.exportFileExpiry;
     }
 
     const before = await db.organization.findUnique({ where: { id } });
