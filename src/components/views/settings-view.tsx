@@ -1337,7 +1337,7 @@ function BillingSection() {
             </DialogDescription>
           </DialogHeader>
           
-          <div className="grid md:grid-cols-3 gap-6 py-6">
+          <div className="grid md:grid-cols-3 gap-4 py-4">
             {Object.values(PLANS).map((p) => {
               const isSelected = selectedPlan === p.id;
               const isCurrent = userPlan === p.id;
@@ -1345,7 +1345,7 @@ function BillingSection() {
               return (
                 <div 
                   key={p.id}
-                  className={`relative flex flex-col border rounded-xl p-6 cursor-pointer transition-all ${
+                  className={`relative flex flex-col border rounded-xl p-4 cursor-pointer transition-all ${
                     isSelected 
                       ? "border-primary ring-2 ring-primary/20 shadow-md scale-[1.02] bg-primary/[0.02]" 
                       : "hover:border-primary/50 hover:shadow-sm"
@@ -1353,54 +1353,54 @@ function BillingSection() {
                   onClick={() => setSelectedPlan(p.id)}
                 >
                   {isCurrent && (
-                    <Badge variant="secondary" className="absolute top-4 right-4 text-xs font-normal">
-                      Current Plan
+                    <Badge variant="secondary" className="absolute top-3 right-3 text-[10px] font-normal px-2 py-0">
+                      Current
                     </Badge>
                   )}
                   
-                  <div className="mb-4">
-                    <h3 className="text-xl font-bold">{p.name}</h3>
-                    <div className="mt-2 flex items-baseline text-3xl font-extrabold">
+                  <div className="mb-2">
+                    <h3 className="text-lg font-bold">{p.name}</h3>
+                    <div className="mt-1 flex items-baseline text-2xl font-extrabold">
                       ${p.priceUsd}
-                      <span className="ml-1 text-sm font-medium text-muted-foreground">/mo</span>
+                      <span className="ml-1 text-xs font-medium text-muted-foreground">/mo</span>
                     </div>
                   </div>
                   
-                  <p className="text-sm text-muted-foreground mb-6 min-h-[40px]">
+                  <p className="text-xs text-muted-foreground mb-4 min-h-[32px]">
                     {p.description}
                   </p>
                   
-                  <div className="flex-1 space-y-3 text-sm">
+                  <div className="flex-1 space-y-2 text-xs">
                     <div className="flex items-center">
-                      <Check className="h-4 w-4 text-emerald-500 mr-3 flex-shrink-0" />
+                      <Check className="h-3 w-3 text-emerald-500 mr-2 flex-shrink-0" />
                       <span>{p.limits.maxRecordsPerMonth === -1 ? "Unlimited" : p.limits.maxRecordsPerMonth.toLocaleString()} records/mo</span>
                     </div>
                     <div className="flex items-center">
-                      <Check className="h-4 w-4 text-emerald-500 mr-3 flex-shrink-0" />
+                      <Check className="h-3 w-3 text-emerald-500 mr-2 flex-shrink-0" />
                       <span>{p.limits.maxAiTokensPerMonth === -1 ? "Unlimited" : p.limits.maxAiTokensPerMonth.toLocaleString()} AI tokens/mo</span>
                     </div>
                     <div className="flex items-center">
-                      <Check className="h-4 w-4 text-emerald-500 mr-3 flex-shrink-0" />
+                      <Check className="h-3 w-3 text-emerald-500 mr-2 flex-shrink-0" />
                       <span>{p.limits.maxAiJobsPerMonth === -1 ? "Unlimited" : p.limits.maxAiJobsPerMonth.toLocaleString()} AI jobs/mo</span>
                     </div>
                     <div className="flex items-center">
-                      <Check className="h-4 w-4 text-emerald-500 mr-3 flex-shrink-0" />
+                      <Check className="h-3 w-3 text-emerald-500 mr-2 flex-shrink-0" />
                       <span>{p.limits.supportLevel}</span>
                     </div>
                     {p.limits.ssoEnabled && (
                       <div className="flex items-center">
-                        <Check className="h-4 w-4 text-emerald-500 mr-3 flex-shrink-0" />
+                        <Check className="h-3 w-3 text-emerald-500 mr-2 flex-shrink-0" />
                         <span>SSO Enabled</span>
                       </div>
                     )}
                   </div>
                   
-                  <div className="mt-8 pt-4 border-t border-border/50">
-                    <div className="flex items-center gap-3">
-                      <div className={`w-5 h-5 rounded-full border flex items-center justify-center ${isSelected ? "border-primary" : "border-muted-foreground"}`}>
-                        {isSelected && <div className="w-3 h-3 rounded-full bg-primary" />}
+                  <div className="mt-4 pt-3 border-t border-border/50">
+                    <div className="flex items-center gap-2">
+                      <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${isSelected ? "border-primary" : "border-muted-foreground"}`}>
+                        {isSelected && <div className="w-2 h-2 rounded-full bg-primary" />}
                       </div>
-                      <span className={`text-sm font-medium ${isSelected ? "text-primary" : "text-muted-foreground"}`}>
+                      <span className={`text-xs font-medium ${isSelected ? "text-primary" : "text-muted-foreground"}`}>
                         {isSelected ? "Selected" : "Select this plan"}
                       </span>
                     </div>
