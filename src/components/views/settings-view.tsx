@@ -1329,46 +1329,93 @@ function BillingSection() {
       </Card>
 
       <Dialog open={upgradeOpen} onOpenChange={setUpgradeOpen}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Change your plan</DialogTitle>
-            <DialogDescription>
-              Select the plan that fits your organization's needs. Note: This is a demo payment gateway so you will not be charged.
+            <DialogTitle className="text-2xl font-bold text-center">Change your plan</DialogTitle>
+            <DialogDescription className="text-center">
+              Select the plan that fits your needs. Note: This is a demo payment gateway so you will not be charged.
             </DialogDescription>
           </DialogHeader>
           
-          <div className="space-y-4 py-4">
-            {Object.values(PLANS).map((p) => (
-              <div 
-                key={p.id}
-                className={`border p-4 rounded-lg cursor-pointer flex items-start gap-3 transition-colors ${selectedPlan === p.id ? "border-primary bg-primary/5" : "hover:border-primary/50"}`}
-                onClick={() => setSelectedPlan(p.id)}
-              >
-                <div className="mt-0.5">
-                  <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${selectedPlan === p.id ? "border-primary" : "border-muted-foreground"}`}>
-                    {selectedPlan === p.id && <div className="w-2.5 h-2.5 rounded-full bg-primary" />}
+          <div className="grid md:grid-cols-3 gap-6 py-6">
+            {Object.values(PLANS).map((p) => {
+              const isSelected = selectedPlan === p.id;
+              const isCurrent = userPlan === p.id;
+              
+              return (
+                <div 
+                  key={p.id}
+                  className={`relative flex flex-col border rounded-xl p-6 cursor-pointer transition-all ${
+                    isSelected 
+                      ? "border-primary ring-2 ring-primary/20 shadow-md scale-[1.02] bg-primary/[0.02]" 
+                      : "hover:border-primary/50 hover:shadow-sm"
+                  }`}
+                  onClick={() => setSelectedPlan(p.id)}
+                >
+                  {isCurrent && (
+                    <Badge variant="secondary" className="absolute top-4 right-4 text-xs font-normal">
+                      Current Plan
+                    </Badge>
+                  )}
+                  
+                  <div className="mb-4">
+                    <h3 className="text-xl font-bold">{p.name}</h3>
+                    <div className="mt-2 flex items-baseline text-3xl font-extrabold">
+                      ${p.priceUsd}
+                      <span className="ml-1 text-sm font-medium text-muted-foreground">/mo</span>
+                    </div>
                   </div>
-                </div>
-                <div>
-                  <h4 className="font-semibold text-sm">
-                    {p.name} {p.priceUsd > 0 ? `($${p.priceUsd}/mo)` : ""}
-                  </h4>
-                  <p className="text-xs text-muted-foreground mt-1">
+                  
+                  <p className="text-sm text-muted-foreground mb-6 min-h-[40px]">
                     {p.description}
                   </p>
-                  <p className="text-[10px] text-muted-foreground mt-1">
-                    {p.limits.maxRecordsPerMonth === -1 ? "Unlimited" : p.limits.maxRecordsPerMonth.toLocaleString()} records, {p.limits.maxAiTokensPerMonth === -1 ? "Unlimited" : p.limits.maxAiTokensPerMonth.toLocaleString()} AI tokens, {p.limits.maxAiJobsPerMonth === -1 ? "Unlimited" : p.limits.maxAiJobsPerMonth.toLocaleString()} jobs
-                  </p>
+                  
+                  <div className="flex-1 space-y-3 text-sm">
+                    <div className="flex items-center">
+                      <Check className="h-4 w-4 text-emerald-500 mr-3 flex-shrink-0" />
+                      <span>{p.limits.maxRecordsPerMonth === -1 ? "Unlimited" : p.limits.maxRecordsPerMonth.toLocaleString()} records/mo</span>
+                    </div>
+                    <div className="flex items-center">
+                      <Check className="h-4 w-4 text-emerald-500 mr-3 flex-shrink-0" />
+                      <span>{p.limits.maxAiTokensPerMonth === -1 ? "Unlimited" : p.limits.maxAiTokensPerMonth.toLocaleString()} AI tokens/mo</span>
+                    </div>
+                    <div className="flex items-center">
+                      <Check className="h-4 w-4 text-emerald-500 mr-3 flex-shrink-0" />
+                      <span>{p.limits.maxAiJobsPerMonth === -1 ? "Unlimited" : p.limits.maxAiJobsPerMonth.toLocaleString()} AI jobs/mo</span>
+                    </div>
+                    <div className="flex items-center">
+                      <Check className="h-4 w-4 text-emerald-500 mr-3 flex-shrink-0" />
+                      <span>{p.limits.supportLevel}</span>
+                    </div>
+                    {p.limits.ssoEnabled && (
+                      <div className="flex items-center">
+                        <Check className="h-4 w-4 text-emerald-500 mr-3 flex-shrink-0" />
+                        <span>SSO Enabled</span>
+                      </div>
+                    )}
+                  </div>
+                  
+                  <div className="mt-8 pt-4 border-t border-border/50">
+                    <div className="flex items-center gap-3">
+                      <div className={`w-5 h-5 rounded-full border flex items-center justify-center ${isSelected ? "border-primary" : "border-muted-foreground"}`}>
+                        {isSelected && <div className="w-3 h-3 rounded-full bg-primary" />}
+                      </div>
+                      <span className={`text-sm font-medium ${isSelected ? "text-primary" : "text-muted-foreground"}`}>
+                        {isSelected ? "Selected" : "Select this plan"}
+                      </span>
+                    </div>
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
           
-          <DialogFooter>
+          <DialogFooter className="mt-2">
             <Button variant="outline" onClick={() => setUpgradeOpen(false)}>Cancel</Button>
             <Button 
               onClick={() => upgradeMutation.mutate(selectedPlan)} 
               disabled={upgradeMutation.isPending || selectedPlan === userPlan}
+              className="px-8"
             >
               {upgradeMutation.isPending ? "Updating..." : "Confirm changes"}
             </Button>
