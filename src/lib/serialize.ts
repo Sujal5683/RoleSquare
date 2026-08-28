@@ -69,6 +69,7 @@ export function serializeUser(u: any): UserDTO {
     name: u.name ?? null,
     avatarUrl: u.avatarUrl ?? null,
     role: u.role,
+    plan: u.plan ?? "free",
     notificationPrefs: parseJson<Record<string, boolean>>(u.notificationPrefs, {}),
     twoFactorEnabled: !!u.twoFactorEnabled,
   };
