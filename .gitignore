@@ -52,3 +52,23 @@ prompt
 server.log
 # Skills directory
 /skills/
+# AI Agent Scratch Files and Logs
+/*.py
+/patch*.js
+/fix*.js
+/test*.js
+/test*.ts
+/test*.mjs
+/add-*.js
+/*.tmp
+/*.txt
+/worklog.md
+graphify-out/
+tool-results/
+agent-ctx/
+upload/
+download/
+scratch/
+raw/
+.zscripts/
+.z-ai-config
