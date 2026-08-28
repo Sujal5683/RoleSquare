@@ -43,7 +43,7 @@ function LoginPageContent() {
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session) {
-        fetch("/api/session").then(async (res) => {
+        fetch("/api/session", { cache: "no-store" }).then(async (res) => {
           if (res.ok) {
             router.replace(next);
           } else if (res.status === 403) {
@@ -117,7 +117,7 @@ function LoginPageContent() {
       if (signInError) throw signInError;
 
       // Check if 2FA is required
-      const res = await fetch("/api/session");
+      const res = await fetch("/api/session", { cache: "no-store" });
       if (!res.ok) {
         if (res.status === 403) {
           const data = await res.json();

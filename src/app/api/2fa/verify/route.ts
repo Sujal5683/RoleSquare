@@ -40,7 +40,7 @@ export async function POST(req: NextRequest) {
     const cookieStore = await cookies();
     cookieStore.set("2fa_verified_" + user.id, "true", {
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
+      secure: req.nextUrl.protocol === "https:",
       sameSite: "lax",
       maxAge: 30 * 24 * 60 * 60, // 30 days
     });
