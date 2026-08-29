@@ -9,8 +9,14 @@ export class ApiError extends Error {
   details?: unknown;
   constructor(message: string, status: number, details?: unknown) {
     super(message);
+    this.name = "ApiError";
     this.status = status;
     this.details = details;
+    Object.setPrototypeOf(this, ApiError.prototype);
+  }
+
+  static [Symbol.hasInstance](instance: any) {
+    return instance?.name === "ApiError";
   }
 }
 

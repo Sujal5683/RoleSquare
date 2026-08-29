@@ -120,6 +120,11 @@ export class GoogleSheetsAuthError extends Error {
   constructor(message: string) {
     super(message);
     this.name = "GoogleSheetsAuthError";
+    Object.setPrototypeOf(this, GoogleSheetsAuthError.prototype);
+  }
+
+  static [Symbol.hasInstance](instance: any) {
+    return instance?.name === "GoogleSheetsAuthError";
   }
 }
 

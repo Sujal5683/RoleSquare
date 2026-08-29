@@ -23,6 +23,7 @@ const PUBLIC_PATHS = [
   "/api/google/callback",            // Google OAuth token exchange (Gmail/Drive)
   "/api/google-sheets/auth/callback", // Google OAuth token exchange (Sheets)
   "/api/health",                     // health check
+  "/api/debug-error",
 ];
 
 function isPublicPath(pathname: string): boolean {

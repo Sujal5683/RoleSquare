@@ -417,6 +417,11 @@ export class AuthError extends Error {
     super(message);
     this.name = "AuthError";
     this.status = status;
+    Object.setPrototypeOf(this, AuthError.prototype);
+  }
+
+  static [Symbol.hasInstance](instance: any) {
+    return instance?.name === "AuthError";
   }
 }
 
