@@ -40,46 +40,77 @@ export interface ToolDefinition {
   /** Whether this tool writes/mutates data. Write tools require confirmation. */
   isWrite: boolean;
   risk: ToolRisk;
+  /** A TypeScript-like description of the expected JSON args object. */
+  argsSchema: string;
 }
 
 /** Master list of all available assistant tools with metadata. */
 export const TOOL_DEFINITIONS: ToolDefinition[] = [
-  // ── READ tools ──────────────────────────────────────────────────────────
-  { name: "navigate",            description: "Navigate to a view in the app", isWrite: false, risk: "low" },
-  { name: "get_dashboard",       description: "KPI snapshot: sources, datasets, jobs, review queue", isWrite: false, risk: "low" },
-  { name: "list_sources",        description: "List sources with status and last-run info", isWrite: false, risk: "low" },
-  { name: "get_source_detail",   description: "Full source config and recent scan runs", isWrite: false, risk: "low" },
-  { name: "list_datasets",       description: "List all datasets for the org", isWrite: false, risk: "low" },
-  { name: "get_dataset_detail",  description: "Dataset metadata and column definitions", isWrite: false, risk: "low" },
-  { name: "get_dataset_records", description: "Fetch sample records from a dataset", isWrite: false, risk: "low" },
-  { name: "list_schemas",        description: "List all schemas", isWrite: false, risk: "low" },
-  { name: "get_schema_detail",   description: "Full schema with all field definitions", isWrite: false, risk: "low" },
-  { name: "list_ai_jobs",        description: "List AI jobs with optional type/status filter", isWrite: false, risk: "low" },
-  { name: "get_audit_log",       description: "Recent audit log entries for the org", isWrite: false, risk: "low" },
-  { name: "list_members",        description: "Org member list with roles", isWrite: false, risk: "low" },
-  { name: "get_usage",           description: "Token and cost usage metrics", isWrite: false, risk: "low" },
-  { name: "search",              description: "Full-text search across sources, datasets, and schemas", isWrite: false, risk: "low" },
-  { name: "get_model_status",      description: "Live Gemini model chain status", isWrite: false, risk: "low" },
-  { name: "suggest_schema_fields", description: "Generate AI-suggested schema fields from a description — does NOT create anything", isWrite: false, risk: "low" },
-  { name: "test_extraction",       description: "Run a test AI extraction against sample text", isWrite: false, risk: "low" },
-  { name: "get_record_detail",     description: "Fetch a single dataset record with all its field values", isWrite: false, risk: "low" },
+  // ── READ tools — safe to execute immediately ─────────────────────────────
+  { name: "get_dashboard_stats", description: "Fetch aggregate counts of sources, datasets, and running jobs", isWrite: false, risk: "low", argsSchema: "{}" },
+  { name: "list_sources",        description: "List sources with status and last-run info", isWrite: false, risk: "low", argsSchema: "{ limit?: number }" },
+  { name: "get_source_detail",   description: "Full source config and recent scan runs", isWrite: false, risk: "low", argsSchema: "{ sourceId: string }" },
+  { name: "list_datasets",       description: "List all datasets for the org", isWrite: false, risk: "low", argsSchema: "{ limit?: number }" },
+  { name: "get_dataset_detail",  description: "Dataset metadata and column definitions", isWrite: false, risk: "low", argsSchema: "{ datasetId: string }" },
+  { name: "get_dataset_records", description: "Fetch sample records from a dataset", isWrite: false, risk: "low", argsSchema: "{ datasetId: string, limit?: number }" },
+  { name: "list_schemas",        description: "List all schemas", isWrite: false, risk: "low", argsSchema: "{}" },
+  { name: "get_schema_detail",   description: "Full schema with all field definitions", isWrite: false, risk: "low", argsSchema: "{ schemaId: string }" },
+  { name: "list_ai_jobs",        description: "List AI jobs with optional type/status filter", isWrite: false, risk: "low", argsSchema: "{ type?: string, status?: string, limit?: number }" },
+  { name: "get_audit_log",       description: "Recent audit log entries for the org", isWrite: false, risk: "low", argsSchema: "{ limit?: number, entity?: string }" },
+  { name: "list_members",        description: "Org member list with roles", isWrite: false, risk: "low", argsSchema: "{}" },
+  { name: "get_usage",           description: "Token and cost usage metrics", isWrite: false, risk: "low", argsSchema: "{}" },
+  { name: "search",              description: "Full-text search across sources, datasets, and schemas", isWrite: false, risk: "low", argsSchema: "{ q: string }" },
+  { name: "get_model_status",      description: "Live Gemini model chain status", isWrite: false, risk: "low", argsSchema: "{}" },
+  { name: "suggest_schema_fields", description: "Generate AI-suggested schema fields from a description — does NOT create anything", isWrite: false, risk: "low", argsSchema: "{ description: string }" },
+  { name: "test_extraction",       description: "Run a test AI extraction against sample text", isWrite: false, risk: "low", argsSchema: "{ text: string, schemaId: string }" },
+  { name: "get_record_detail",     description: "Fetch a single dataset record with all its field values", isWrite: false, risk: "low", argsSchema: "{ recordId: string }" },
 
   // ── WRITE tools — require confirmation before execution ──────────────────
-  { name: "trigger_scan",          description: "Trigger a Gmail/Drive scan for a source", isWrite: true, risk: "low" },
-  { name: "pause_source",          description: "Pause an active source (stops scheduled scans)", isWrite: true, risk: "low" },
-  { name: "resume_source",         description: "Resume a paused source", isWrite: true, risk: "low" },
-  { name: "retry_job",             description: "Retry a failed AI job", isWrite: true, risk: "low" },
-  { name: "cancel_job",            description: "Cancel a queued AI job", isWrite: true, risk: "medium" },
-  { name: "create_schema",         description: "Create a new schema with field definitions", isWrite: true, risk: "medium" },
-  { name: "update_schema",         description: "Update schema name, description, or prompt template", isWrite: true, risk: "medium" },
-  { name: "add_schema_field",      description: "Add a new field to an existing schema", isWrite: true, risk: "medium" },
-  { name: "update_schema_field",   description: "Update an existing field's properties (e.g. required, name, description)", isWrite: true, risk: "medium" },
-  { name: "delete_schema_field",   description: "Delete an existing field from a schema", isWrite: true, risk: "medium" },
-  { name: "delete_schema",         description: "Permanently delete a schema (unlinks datasets)", isWrite: true, risk: "high" },
-  { name: "create_dataset",        description: "Create a new dataset", isWrite: true, risk: "medium" },
-  { name: "update_dataset",        description: "Update dataset name or schema assignment", isWrite: true, risk: "medium" },
-  { name: "delete_dataset",        description: "Permanently delete a dataset and all its records", isWrite: true, risk: "high" },
-  { name: "update_member_role",    description: "Change a member's role in the organization", isWrite: true, risk: "high" },
+  { name: "trigger_scan",          description: "Trigger a Gmail/Drive scan for a source", isWrite: true, risk: "low", argsSchema: "{ sourceId: string, mode?: 'historical' | 'incremental' }" },
+  { name: "pause_source",          description: "Pause an active source (stops scheduled scans)", isWrite: true, risk: "low", argsSchema: "{ sourceId: string }" },
+  { name: "resume_source",         description: "Resume a paused source", isWrite: true, risk: "low", argsSchema: "{ sourceId: string }" },
+  { name: "retry_job",             description: "Retry a failed AI job", isWrite: true, risk: "low", argsSchema: "{ jobId: string }" },
+  { name: "cancel_job",            description: "Cancel a queued AI job", isWrite: true, risk: "medium", argsSchema: "{ jobId: string }" },
+  { name: "create_schema",         description: "Create a new schema with field definitions", isWrite: true, risk: "medium", argsSchema: "{ name: string, description?: string, fields: Array<{name:string, type:string, required:boolean, description?:string}> }" },
+  { name: "update_schema",         description: "Update schema name, description, or prompt template", isWrite: true, risk: "medium", argsSchema: "{ schemaId: string, name?: string, description?: string, extractionPrompt?: string }" },
+  { name: "add_schema_field",      description: "Add a new field to an existing schema", isWrite: true, risk: "medium", argsSchema: "{ schemaId: string, name: string, type: string, required: boolean, description?: string }" },
+  { name: "update_schema_field",   description: "Update an existing field's properties (e.g. required, name, description)", isWrite: true, risk: "medium", argsSchema: "{ fieldId: string, name?: string, type?: string, required?: boolean, description?: string }" },
+  { name: "delete_schema_field",   description: "Delete an existing field from a schema", isWrite: true, risk: "medium", argsSchema: "{ fieldId: string }" },
+  { name: "delete_schema",         description: "Permanently delete a schema (unlinks datasets)", isWrite: true, risk: "high", argsSchema: "{ schemaId: string }" },
+  { name: "create_dataset",        description: "Create a new dataset", isWrite: true, risk: "medium", argsSchema: "{ name: string, description?: string, schemaId?: string }" },
+  { name: "update_dataset",        description: "Update dataset name or schema assignment", isWrite: true, risk: "medium", argsSchema: "{ datasetId: string, name?: string, schemaId?: string }" },
+  { name: "delete_dataset",        description: "Permanently delete a dataset and all its records", isWrite: true, risk: "high", argsSchema: "{ datasetId: string }" },
+  { name: "update_member_role",    description: "Change a member's role in the organization", isWrite: true, risk: "high", argsSchema: "{ memberId: string, role: string }" },
+
+  // ── Missing Features (Source & Rules) ────────────────────────────────────
+  { name: "create_source",         description: "Connect a new Gmail or Drive source", isWrite: true, risk: "medium", argsSchema: "{ name: string, googleConnectionId: string, sourceType?: string, description?: string, schemaId?: string, datasetId?: string }" },
+  { name: "delete_source",         description: "Delete an entire source and its rules", isWrite: true, risk: "high", argsSchema: "{ sourceId: string }" },
+  { name: "add_source_rule",       description: "Add a filtering rule to a source (e.g. sender, subject)", isWrite: true, risk: "medium", argsSchema: "{ sourceId: string, filterType: string, operator: string, value: any, position?: number }" },
+  { name: "update_source_rule",    description: "Update an existing source filtering rule", isWrite: true, risk: "medium", argsSchema: "{ ruleId: string, filterType?: string, operator?: string, value?: any, position?: number }" },
+  { name: "delete_source_rule",    description: "Delete an existing source filtering rule", isWrite: true, risk: "medium", argsSchema: "{ ruleId: string }" },
+
+  // ── Missing Features (Dataset Curation) ──────────────────────────────────
+  { name: "update_record_status",  description: "Approve or reject a dataset record", isWrite: true, risk: "medium", argsSchema: "{ recordId: string, status: 'approved'|'rejected'|'needs_review' }" },
+  { name: "correct_extracted_value",description: "Human-in-the-loop correction of an extracted value", isWrite: true, risk: "medium", argsSchema: "{ valueId: string, newValue: string }" },
+  { name: "delete_dataset_record", description: "Delete a specific dataset record", isWrite: true, risk: "medium", argsSchema: "{ recordId: string }" },
+
+  // ── Missing Features (Team Governance & Sharing) ─────────────────────────
+  { name: "invite_member",         description: "Invite a new user to the organization", isWrite: true, risk: "high", argsSchema: "{ email: string, role?: string }" },
+  { name: "remove_member",         description: "Remove a member from the organization", isWrite: true, risk: "high", argsSchema: "{ memberId: string }" },
+  { name: "list_sharing_requests", description: "List pending incoming sharing requests", isWrite: false, risk: "low", argsSchema: "{}" },
+  { name: "approve_sharing_request",description: "Approve a dataset sharing request", isWrite: true, risk: "high", argsSchema: "{ requestId: string }" },
+  { name: "reject_sharing_request",description: "Reject a dataset sharing request", isWrite: true, risk: "medium", argsSchema: "{ requestId: string }" },
+  { name: "grant_dataset_access",  description: "Grant dataset access to an external org or user", isWrite: true, risk: "high", argsSchema: "{ datasetId: string, granteeOrgId?: string, granteeUserId?: string, level?: string }" },
+
+  // ── Missing Features (Google Integrations) ───────────────────────────────
+  { name: "list_google_connections",description: "List linked Google accounts and their status", isWrite: false, risk: "low", argsSchema: "{}" },
+  { name: "revoke_google_connection",description: "Revoke access to a connected Google account", isWrite: true, risk: "high", argsSchema: "{ connectionId: string }" },
+  { name: "export_dataset_to_sheets",description: "Export a dataset to a connected Google Sheet", isWrite: true, risk: "medium", argsSchema: "{ datasetId: string }" },
+  { name: "sync_dataset_to_sheets",description: "Force sync rows to an existing Google Sheet export", isWrite: true, risk: "low", argsSchema: "{ datasetId: string }" },
+
+  // ── Missing Features (Debugging) ─────────────────────────────────────────
+  { name: "get_job_logs",          description: "Get raw execution agent logs for an AI Job", isWrite: false, risk: "low", argsSchema: "{ jobId: string }" },
+  { name: "analyze_job_failure",   description: "Analyze a failed job's logs and explain the error", isWrite: false, risk: "low", argsSchema: "{ jobId: string }" },
 ];
 
 /** Look up tool metadata by name. */
@@ -178,6 +209,81 @@ export async function executeTool(
       return { runId: run.id, sourceId, mode, status: "queued" };
     }
 
+    case "create_source": {
+      const name = requireString(args.name, "name");
+      const googleConnectionId = requireString(args.googleConnectionId, "googleConnectionId");
+      const sourceType = typeof args.sourceType === "string" ? args.sourceType : "gmail";
+      const connection = await db.googleConnection.findUnique({ where: { id: googleConnectionId } });
+      if (!connection || connection.organizationId !== organizationId) throw new Error(`Google connection ${googleConnectionId} not found`);
+      const source = await db.source.create({
+        data: {
+          organizationId,
+          ownerUserId: userId,
+          googleConnectionId,
+          name,
+          sourceType,
+          description: typeof args.description === "string" ? args.description : null,
+          schemaId: typeof args.schemaId === "string" ? args.schemaId : null,
+          datasetId: typeof args.datasetId === "string" ? args.datasetId : null,
+        }
+      });
+      await logAudit({ organizationId, actorId: userId, actorType: "ai", action: "create", entity: "source", entityId: source.id, after: { name, sourceType } });
+      return { id: source.id, name: source.name };
+    }
+
+    case "delete_source": {
+      const sourceId = requireString(args.sourceId, "sourceId");
+      const source = await db.source.findUnique({ where: { id: sourceId } });
+      if (!source || source.organizationId !== organizationId) throw new Error(`Source ${sourceId} not found`);
+      await db.source.delete({ where: { id: sourceId } });
+      await logAudit({ organizationId, actorId: userId, actorType: "ai", action: "delete", entity: "source", entityId: sourceId, before: { name: source.name } });
+      return { ok: true, deletedId: sourceId };
+    }
+
+    case "add_source_rule": {
+      const sourceId = requireString(args.sourceId, "sourceId");
+      const filterType = requireString(args.filterType, "filterType");
+      const operator = requireString(args.operator, "operator");
+      const value = typeof args.value !== "undefined" ? JSON.stringify(args.value) : "\"\"";
+      const source = await db.source.findUnique({ where: { id: sourceId } });
+      if (!source || source.organizationId !== organizationId) throw new Error(`Source ${sourceId} not found`);
+      const rule = await db.sourceRule.create({
+        data: {
+          sourceId,
+          filterType,
+          operator,
+          value,
+          position: typeof args.position === "number" ? args.position : 999,
+        }
+      });
+      await logAudit({ organizationId, actorId: userId, actorType: "ai", action: "add_rule", entity: "source", entityId: sourceId, after: { filterType, operator, value } });
+      return { ok: true, ruleId: rule.id };
+    }
+
+    case "update_source_rule": {
+      const ruleId = requireString(args.ruleId, "ruleId");
+      const rule = await db.sourceRule.findUnique({ where: { id: ruleId }, include: { source: true } });
+      if (!rule || rule.source.organizationId !== organizationId) throw new Error(`Source rule ${ruleId} not found`);
+      const data: any = {};
+      if (typeof args.filterType === "string") data.filterType = args.filterType;
+      if (typeof args.operator === "string") data.operator = args.operator;
+      if (typeof args.value !== "undefined") data.value = JSON.stringify(args.value);
+      if (typeof args.position === "number") data.position = args.position;
+      await db.sourceRule.update({ where: { id: ruleId }, data });
+      await logAudit({ organizationId, actorId: userId, actorType: "ai", action: "update_rule", entity: "source", entityId: rule.sourceId, before: rule, after: data });
+      return { ok: true, ruleId };
+    }
+
+    case "delete_source_rule": {
+      const ruleId = requireString(args.ruleId, "ruleId");
+      const rule = await db.sourceRule.findUnique({ where: { id: ruleId }, include: { source: true } });
+      if (!rule || rule.source.organizationId !== organizationId) throw new Error(`Source rule ${ruleId} not found`);
+      await db.sourceRule.delete({ where: { id: ruleId } });
+      await logAudit({ organizationId, actorId: userId, actorType: "ai", action: "delete_rule", entity: "source", entityId: rule.sourceId, before: rule });
+      return { ok: true, deletedRuleId: ruleId };
+    }
+
+
     // ── Datasets ───────────────────────────────────────────────────────────
 
     case "list_datasets": {
@@ -251,6 +357,59 @@ export async function executeTool(
       await logAudit({ organizationId, actorId: userId, actorType: "ai", action: "delete", entity: "dataset", entityId: datasetId, before: { name: dataset.name } });
       // Dataset deletes are NOT undoable — records cascade-deleted permanently
       return { ok: true, deletedId: datasetId, name: dataset.name };
+    }
+
+    case "update_record_status": {
+      const recordId = requireString(args.recordId, "recordId");
+      const status = requireString(args.status, "status"); // "approved" | "rejected" | "needs_review"
+      const record = await db.datasetRecord.findUnique({ where: { id: recordId }, include: { dataset: true } });
+      if (!record || record.dataset.organizationId !== organizationId) throw new Error(`Record ${recordId} not found`);
+      await db.datasetRecord.update({ where: { id: recordId }, data: { status } });
+      await logAudit({ organizationId, actorId: userId, actorType: "ai", action: "update_status", entity: "record", entityId: recordId, before: { status: record.status }, after: { status } });
+      return { ok: true, recordId, status };
+    }
+
+    case "correct_extracted_value": {
+      const valueId = requireString(args.valueId, "valueId");
+      const newValue = requireString(args.newValue, "newValue");
+      // Find the value, ensuring the parent record and dataset belong to the user's org
+      const datasetValue = await db.datasetValue.findUnique({ 
+        where: { id: valueId }, 
+        include: { record: { include: { dataset: true } } } 
+      });
+      if (!datasetValue || datasetValue.record.dataset.organizationId !== organizationId) throw new Error(`Value ${valueId} not found`);
+      
+      // Keep the original value if it's the first correction, else keep existing originalValue
+      const originalValue = datasetValue.originalValue ?? datasetValue.value;
+      const originalConfidence = datasetValue.originalConfidence ?? datasetValue.confidence;
+      
+      await db.datasetValue.update({ 
+        where: { id: valueId }, 
+        data: { 
+          value: newValue, 
+          originalValue, 
+          originalConfidence,
+          correctedBy: userId, 
+          correctedAt: new Date(),
+          confidence: 1.0 // Manual correction implies 100% confidence
+        } 
+      });
+      // Mark record as updated
+      await db.datasetRecord.update({ where: { id: datasetValue.recordId }, data: { status: "updated" } });
+      await logAudit({ organizationId, actorId: userId, actorType: "ai", action: "correct_value", entity: "record", entityId: datasetValue.recordId, before: { value: datasetValue.value }, after: { value: newValue } });
+      return { ok: true, valueId, recordId: datasetValue.recordId };
+    }
+
+    case "delete_dataset_record": {
+      const recordId = requireString(args.recordId, "recordId");
+      const record = await db.datasetRecord.findUnique({ where: { id: recordId }, include: { dataset: true } });
+      if (!record || record.dataset.organizationId !== organizationId) throw new Error(`Record ${recordId} not found`);
+      await db.datasetRecord.delete({ where: { id: recordId } });
+      // Update the dataset record count properly in a transaction, or rely on a DB trigger if it exists.
+      // Assuming naive count for now, since this is a manual AI action.
+      await db.dataset.update({ where: { id: record.datasetId }, data: { recordCount: { decrement: 1 } } });
+      await logAudit({ organizationId, actorId: userId, actorType: "ai", action: "delete", entity: "record", entityId: recordId });
+      return { ok: true, deletedRecordId: recordId };
     }
 
     // ── Schemas ────────────────────────────────────────────────────────────
@@ -442,6 +601,166 @@ export async function executeTool(
         take: 50,
       });
       return members.map((m) => ({ id: m.id, role: m.role, status: m.status, email: m.user.email, name: m.user.name }));
+    }
+
+    case "invite_member": {
+      const email = requireString(args.email, "email").toLowerCase();
+      const role = typeof args.role === "string" ? args.role : "member";
+      const invite = await db.invitation.create({
+        data: {
+          organizationId,
+          email,
+          role,
+          token: Math.random().toString(36).slice(2),
+          expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+          invitedBy: userId
+        }
+      });
+      await logAudit({ organizationId, actorId: userId, actorType: "ai", action: "invite", entity: "member", entityId: invite.id, after: { email, role } });
+      return { ok: true, inviteId: invite.id, email, status: "sent" };
+    }
+
+    case "remove_member": {
+      const memberId = requireString(args.memberId, "memberId");
+      const member = await db.organizationMember.findUnique({ where: { id: memberId } });
+      if (!member || member.organizationId !== organizationId) throw new Error(`Member ${memberId} not found`);
+      if (member.role === "admin") {
+        const adminCount = await db.organizationMember.count({ where: { organizationId, role: "admin" } });
+        if (adminCount <= 1) throw new Error("Cannot remove the last admin");
+      }
+      await db.organizationMember.delete({ where: { id: memberId } });
+      await logAudit({ organizationId, actorId: userId, actorType: "ai", action: "remove", entity: "member", entityId: memberId });
+      return { ok: true, removedMemberId: memberId };
+    }
+
+    // ── Sharing & Governance ────────────────────────────────────────────────
+
+    case "list_sharing_requests": {
+      const requests = await db.sharingRequest.findMany({
+        where: { targetOrganizationId: organizationId, status: "pending" },
+        include: { requester: { select: { name: true, email: true } }, dataset: { select: { name: true } } },
+        take: 20
+      });
+      return requests.map(r => ({ id: r.id, datasetName: r.dataset?.name, requester: r.requester.email, level: r.level, reason: r.reason }));
+    }
+
+    case "approve_sharing_request": {
+      const requestId = requireString(args.requestId, "requestId");
+      const request = await db.sharingRequest.findUnique({ where: { id: requestId } });
+      if (!request || request.targetOrganizationId !== organizationId) throw new Error(`Request ${requestId} not found`);
+      
+      const [updated] = await db.$transaction([
+        db.sharingRequest.update({ where: { id: requestId }, data: { status: "approved", decidedBy: userId, decidedAt: new Date() } }),
+        db.datasetAccess.create({
+          data: {
+            datasetId: request.datasetId!,
+            ownerOrgId: request.organizationId,
+            granteeOrgId: organizationId,
+            granteeUserId: request.targetUserId,
+            level: request.level
+          }
+        })
+      ]);
+      await logAudit({ organizationId, actorId: userId, actorType: "ai", action: "approve_share", entity: "sharing_request", entityId: requestId });
+      return { ok: true, requestId, status: updated.status };
+    }
+
+    case "reject_sharing_request": {
+      const requestId = requireString(args.requestId, "requestId");
+      const request = await db.sharingRequest.findUnique({ where: { id: requestId } });
+      if (!request || request.targetOrganizationId !== organizationId) throw new Error(`Request ${requestId} not found`);
+      await db.sharingRequest.update({ where: { id: requestId }, data: { status: "rejected", decidedBy: userId, decidedAt: new Date() } });
+      await logAudit({ organizationId, actorId: userId, actorType: "ai", action: "reject_share", entity: "sharing_request", entityId: requestId });
+      return { ok: true, requestId, status: "rejected" };
+    }
+
+    case "grant_dataset_access": {
+      const datasetId = requireString(args.datasetId, "datasetId");
+      const granteeOrgId = args.granteeOrgId as string | undefined;
+      const granteeUserId = args.granteeUserId as string | undefined;
+      const level = typeof args.level === "string" ? args.level : "read";
+      
+      const dataset = await db.dataset.findUnique({ where: { id: datasetId } });
+      if (!dataset || dataset.organizationId !== organizationId) throw new Error(`Dataset ${datasetId} not found`);
+      if (!granteeOrgId && !granteeUserId) throw new Error("Must specify granteeOrgId or granteeUserId");
+
+      const access = await db.datasetAccess.create({
+        data: {
+          datasetId,
+          ownerOrgId: organizationId,
+          granteeOrgId,
+          granteeUserId,
+          level
+        }
+      });
+      await logAudit({ organizationId, actorId: userId, actorType: "ai", action: "grant_access", entity: "dataset", entityId: datasetId });
+      return { ok: true, accessId: access.id };
+    }
+
+    // ── Google Integrations ────────────────────────────────────────────────
+
+    case "list_google_connections": {
+      const connections = await db.googleConnection.findMany({
+        where: { organizationId },
+        select: { id: true, googleEmail: true, status: true, scopes: true, tokenExpiresAt: true }
+      });
+      return connections;
+    }
+
+    case "revoke_google_connection": {
+      const connectionId = requireString(args.connectionId, "connectionId");
+      const connection = await db.googleConnection.findUnique({ where: { id: connectionId } });
+      if (!connection || connection.organizationId !== organizationId) throw new Error(`Connection ${connectionId} not found`);
+      await db.googleConnection.update({ where: { id: connectionId }, data: { status: "revoked" } });
+      await logAudit({ organizationId, actorId: userId, actorType: "ai", action: "revoke", entity: "google_connection", entityId: connectionId });
+      return { ok: true, connectionId, status: "revoked" };
+    }
+
+    case "export_dataset_to_sheets":
+    case "sync_dataset_to_sheets": {
+      const datasetId = requireString(args.datasetId, "datasetId");
+      const dataset = await db.dataset.findUnique({ where: { id: datasetId } });
+      if (!dataset || dataset.organizationId !== organizationId) throw new Error(`Dataset ${datasetId} not found`);
+      
+      const job = await db.aiJob.create({
+        data: {
+          organizationId,
+          type: "EXPORT",
+          status: "queued",
+          payload: JSON.stringify({ datasetId, target: "google_sheets", mode: toolName === "export_dataset_to_sheets" ? "full" : "sync" }),
+          progress: 0
+        }
+      });
+      fetch(new URL("/api/jobs/process", appOrigin).toString(), { method: "POST" }).catch(() => {});
+      await logAudit({ organizationId, actorId: userId, actorType: "ai", action: toolName, entity: "dataset", entityId: datasetId });
+      return { ok: true, jobId: job.id, status: "queued" };
+    }
+
+    // ── Debugging ──────────────────────────────────────────────────────────
+
+    case "get_job_logs": {
+      const jobId = requireString(args.jobId, "jobId");
+      const job = await db.aiJob.findUnique({ where: { id: jobId } });
+      if (!job || job.organizationId !== organizationId) throw new Error(`Job ${jobId} not found`);
+      const logs = await db.agentLog.findMany({ where: { jobId }, orderBy: { createdAt: "asc" } });
+      return logs;
+    }
+
+    case "analyze_job_failure": {
+      const jobId = requireString(args.jobId, "jobId");
+      const job = await db.aiJob.findUnique({ where: { id: jobId } });
+      if (!job || job.organizationId !== organizationId) throw new Error(`Job ${jobId} not found`);
+      const logs = await db.agentLog.findMany({ where: { jobId }, orderBy: { createdAt: "desc" }, take: 50 });
+      
+      // Inline Gemini call to analyze logs
+      const prompt = `Analyze this failed AI Job and explain exactly what went wrong in plain English.\n\nError Message:\n${job.errorMessage}\n\nRecent Agent Logs:\n${JSON.stringify(logs, null, 2)}`;
+      const { callGeminiWithFallback } = await import("@/lib/gemini"); // Dynamic import to prevent circular deps if any
+      const analysisResult = await callGeminiWithFallback([{ role: "user", content: prompt }], {
+        system: "You are an expert platform debugger. Explain the error concisely.",
+        temperature: 0.1,
+        maxOutputTokens: 500
+      });
+      return { jobId, analysis: analysisResult.text };
     }
 
     // ── Usage ──────────────────────────────────────────────────────────────

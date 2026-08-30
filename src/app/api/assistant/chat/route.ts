@@ -172,8 +172,8 @@ function buildSystemPrompt(
   userName: string,
   mode: "chat" | "suggest"
 ): string {
-  const writeToolNames = TOOL_DEFINITIONS.filter(t => t.isWrite).map(t => `- ${t.name} [WRITE|${t.risk}]: ${t.description}`).join("\n");
-  const readToolNames = TOOL_DEFINITIONS.filter(t => !t.isWrite).map(t => `- ${t.name}: ${t.description}`).join("\n");
+  const writeToolNames = TOOL_DEFINITIONS.filter(t => t.isWrite).map(t => `- ${t.name}(args: ${t.argsSchema}) [WRITE|${t.risk}]: ${t.description}`).join("\n");
+  const readToolNames = TOOL_DEFINITIONS.filter(t => !t.isWrite).map(t => `- ${t.name}(args: ${t.argsSchema}): ${t.description}`).join("\n");
 
   return `You are the AI Assistant for the Workspace Intelligence Platform. You are embedded in the app and help ${userName} manage their data pipelines, schemas, datasets, and AI extraction jobs.
 

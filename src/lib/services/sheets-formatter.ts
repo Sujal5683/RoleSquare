@@ -34,7 +34,8 @@ const ROW_ID_FG = { red: 0.75, green: 0.75, blue: 0.75, alpha: 1 };
 // ── URL detection ─────────────────────────────────────────────────────────────
 
 interface ParsedLink {
-  url: string;
+  originalUrl: string;
+  validUri: string;
   label: string;
   isDrive: boolean;
   isForm: boolean;
@@ -43,13 +44,23 @@ interface ParsedLink {
 /** Extracts all HTTP(S) URLs from a string. */
 export function extractUrls(text: string): string[] {
   const re = /https?:\/\/[^\s"'<>)\],;]+/g;
-  const found = text.match(re) ?? [];
+  const matches = text.match(re) ?? [];
+  // Strip trailing punctuation that often gets caught if a URL is at the end of a sentence
+  const found = matches.map(url => url.replace(/[.,;:!?]+$/, ""));
   // Deduplicate
   return [...new Set(found)];
 }
 
-/** Classifies a URL and produces a human-readable short label. */
-function classifyUrl(url: string): ParsedLink {
+/** Classifies a URL, validates it, and produces a human-readable short label. */
+export function classifyUrl(url: string): ParsedLink | null {
+  let u: URL;
+  try {
+    u = new URL(url);
+  } catch {
+    return null; // Ignore malformed URLs that cannot be parsed
+  }
+  const validUri = u.href;
+
   const isDrive =
     url.includes("drive.google.com") ||
     url.includes("docs.google.com/spreadsheets") ||
@@ -59,35 +70,31 @@ function classifyUrl(url: string): ParsedLink {
     url.includes("docs.google.com/forms") || url.includes("forms.gle");
 
   let label: string;
-  try {
-    const u = new URL(url);
-    if (isDrive) {
-      // Attempt to extract the file name from the URL path
-      const parts = u.pathname.split("/").filter(Boolean);
-      const d = parts.indexOf("d");
-      if (d !== -1 && d + 1 < parts.length) {
-        // Path like /spreadsheets/d/<id>/edit → label = "Drive file"
-        const type = parts[0] || "file";
-        label =
-          type === "spreadsheets"
-            ? "📊 Sheet"
-            : type === "document"
-            ? "📄 Doc"
-            : type === "presentation"
-            ? "📑 Slides"
-            : "📁 Drive";
-      } else {
-        label = "📁 Drive";
-      }
-    } else if (isForm) {
-      label = "📋 Form";
+  if (isDrive) {
+    // Attempt to extract the file name from the URL path
+    const parts = u.pathname.split("/").filter(Boolean);
+    const d = parts.indexOf("d");
+    if (d !== -1 && d + 1 < parts.length) {
+      // Path like /spreadsheets/d/<id>/edit → label = "Drive file"
+      const type = parts[0] || "file";
+      label =
+        type === "spreadsheets"
+          ? "📊 Sheet"
+          : type === "document"
+          ? "📄 Doc"
+          : type === "presentation"
+          ? "📑 Slides"
+          : "📁 Drive";
     } else {
-      label = u.hostname.replace(/^www\./, "");
+      label = "📁 Drive";
     }
-  } catch {
-    label = url.length > 40 ? url.slice(0, 37) + "…" : url;
+  } else if (isForm) {
+    label = "📋 Form";
+  } else {
+    label = u.hostname.replace(/^www\./, "");
   }
-  return { url, label, isDrive, isForm };
+  
+  return { originalUrl: url, validUri, label, isDrive, isForm };
 }
 
 // ── Rich-text cell builders ───────────────────────────────────────────────────
@@ -133,6 +140,7 @@ export function buildRichTextCell(
   // Collect and replace URLs with labels
   for (const url of urls) {
     const info = classifyUrl(url);
+    if (!info) continue;
     linkInfos.push(info);
     composite = composite.replace(url, info.label);
   }
@@ -161,7 +169,7 @@ export function buildRichTextCell(
       startIndex: offset,
       format: {
         ...baseFormat,
-        link: { uri: info.url },
+        link: { uri: info.validUri },
         foregroundColor: { red: 0.15, green: 0.52, blue: 0.85, alpha: 1 },
         underline: true,
       },
