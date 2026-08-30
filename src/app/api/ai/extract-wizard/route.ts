@@ -15,7 +15,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { requireOrgContext, AuthError, authErrorResponse , requireRole} from "@/lib/auth";
 import { logAudit } from "@/lib/audit";
-import { ensureJobRunnerStarted } from "@/lib/job-runner";
+
 
 export async function POST(req: NextRequest) {
   try {
@@ -123,8 +123,7 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    // Ensure job runner is started
-    ensureJobRunnerStarted();
+    fetch(new URL("/api/jobs/process", req.url).toString(), { method: "POST" }).catch(() => {});
 
     await logAudit({
       organizationId,

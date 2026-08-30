@@ -59,22 +59,48 @@ export function InviteMemberDialog({
         `/api/organizations/${payload.orgId}/members`,
         { email: payload.email, role: payload.role }
       ),
+    onMutate: async (payload) => {
+      await queryClient.cancelQueries({ queryKey: ["organizations", payload.orgId, "members"] });
+      const previousMembers = queryClient.getQueryData(["organizations", payload.orgId, "members"]);
+      
+      // We don't have the full UserDTO, but we can make a dummy member for immediate display
+      queryClient.setQueryData(["organizations", payload.orgId, "members"], (old: any) => {
+        if (!old) return old;
+        const newMember = {
+          id: "temp-" + Date.now(),
+          role: payload.role,
+          user: {
+            id: "temp-user-" + Date.now(),
+            email: payload.email,
+          } as any,
+        } as unknown as MemberDTO;
+        return [...old, newMember];
+      });
+      
+      setEmail("");
+      setRole("member");
+      onClose();
+      
+      return { previousMembers, orgId: payload.orgId };
+    },
     onSuccess: (m) => {
       toast.success("Invitation sent", {
         description: `${m.user.email} has been invited as ${m.role}.`,
       });
-      queryClient.invalidateQueries({
-        queryKey: ["organizations", selectedOrg, "members"],
-      });
-      queryClient.invalidateQueries({ queryKey: ["organizations"] });
-      setEmail("");
-      setRole("member");
-      onClose();
     },
-    onError: (err: unknown) => {
+    onError: (err: unknown, variables, context: any) => {
+      if (context?.orgId) {
+        queryClient.setQueryData(["organizations", context.orgId, "members"], context.previousMembers);
+      }
       const msg = err instanceof Error ? err.message : "Failed to invite";
       toast.error("Invite failed", { description: msg });
     },
+    onSettled: (data, error, variables) => {
+      queryClient.invalidateQueries({
+        queryKey: ["organizations", variables.orgId, "members"],
+      });
+      queryClient.invalidateQueries({ queryKey: ["organizations"] });
+    }
   });
 
   const handleSubmit = () => {

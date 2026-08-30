@@ -6,6 +6,7 @@ import { api } from "@/lib/api-client";
 import { useAppStore } from "@/lib/store";
 import type { DashboardData, AuditLogDTO } from "@/lib/types";
 import { PageHeader, StatCard, LoadingState, EmptyState } from "@/components/ui/page-elements";
+import { DashboardSkeleton } from "@/components/ui/skeletons/dashboard-skeleton";
 import { StatusBadge, ConfidenceBadge } from "@/components/ui/status-badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -129,7 +130,7 @@ export function DashboardView() {
       />
 
       {isLoading ? (
-        <LoadingState rows={4} />
+        <DashboardSkeleton />
       ) : !data ? (
         <EmptyState title="No data" description="Dashboard data could not be loaded." />
       ) : (

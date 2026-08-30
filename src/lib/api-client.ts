@@ -60,8 +60,8 @@ async function request<T>(
       const loginUrl = new URL("/login", window.location.origin);
       loginUrl.searchParams.set("next", window.location.pathname);
       window.location.href = loginUrl.toString();
-      // Return a never-resolving promise so the component doesn't process stale state
-      return new Promise(() => {}) as Promise<T>;
+      // Reject the promise so the component doesn't process stale state and avoids a memory leak
+      return Promise.reject(new ApiError("Redirecting to login...", res.status));
     }
     throw new ApiError(
       data?.error || `Request failed (${res.status})`,

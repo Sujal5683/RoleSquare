@@ -7,11 +7,11 @@ import { toast } from "sonner";
 import { api } from "@/lib/api-client";
 import { useAppStore } from "@/lib/store";
 import type { SourceDTO, SourceRunDTO, SourceStatus } from "@/lib/types";
+import { TableSkeleton } from "@/components/ui/skeletons/table-skeleton";
 import {
   PageHeader,
   StatCard,
   EmptyState,
-  LoadingState,
   ErrorState,
 } from "@/components/ui/page-elements";
 import { StatusBadge } from "@/components/ui/status-badge";
@@ -195,27 +195,49 @@ export function SourcesView() {
   const pauseResumeMutation = useMutation({
     mutationFn: ({ id, status }: { id: string; status: SourceStatus }) =>
       api.patch<SourceDTO>(`/api/sources/${id}`, { status }),
+    onMutate: async ({ id, status }) => {
+      await queryClient.cancelQueries({ queryKey: ["sources", activeOrgId] });
+      const previousSources = queryClient.getQueryData(["sources", activeOrgId]);
+      queryClient.setQueryData(["sources", activeOrgId], (old: any) =>
+        (old || []).map((s: any) => (s.id === id ? { ...s, status } : s))
+      );
+      return { previousSources };
+    },
     onSuccess: () => {
       toast.success("Source updated");
-      queryClient.invalidateQueries({ queryKey: ["sources"] });
     },
-    onError: (err: unknown) => {
+    onError: (err: unknown, variables, context: any) => {
+      queryClient.setQueryData(["sources", activeOrgId], context?.previousSources);
       const msg = err instanceof Error ? err.message : "Failed to update source";
       toast.error("Update failed", { description: msg });
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ["sources", activeOrgId] });
     },
   });
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => api.delete(`/api/sources/${id}`),
+    onMutate: async (id: string) => {
+      await queryClient.cancelQueries({ queryKey: ["sources", activeOrgId] });
+      const previousSources = queryClient.getQueryData(["sources", activeOrgId]);
+      queryClient.setQueryData(["sources", activeOrgId], (old: any) =>
+        (old || []).filter((s: any) => s.id !== id)
+      );
+      setDeleteTarget(null);
+      return { previousSources };
+    },
     onSuccess: () => {
       toast.success("Source deleted");
-      queryClient.invalidateQueries({ queryKey: ["sources"] });
-      queryClient.invalidateQueries({ queryKey: ["dashboard"] });
-      setDeleteTarget(null);
     },
-    onError: (err: unknown) => {
+    onError: (err: unknown, variables, context: any) => {
+      queryClient.setQueryData(["sources", activeOrgId], context?.previousSources);
       const msg = err instanceof Error ? err.message : "Failed to delete source";
       toast.error("Delete failed", { description: msg });
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ["sources", activeOrgId] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard"] });
     },
   });
 
@@ -232,6 +254,14 @@ export function SourcesView() {
       }
       return { succeeded, failed };
     },
+    onMutate: async ({ ids, status }) => {
+      await queryClient.cancelQueries({ queryKey: ["sources", activeOrgId] });
+      const previousSources = queryClient.getQueryData(["sources", activeOrgId]);
+      queryClient.setQueryData(["sources", activeOrgId], (old: any) =>
+        (old || []).map((s: any) => (ids.includes(s.id) ? { ...s, status } : s))
+      );
+      return { previousSources };
+    },
     onSuccess: ({ succeeded, failed }) => {
       if (failed > 0) {
         toast.warning("Bulk update partial", {
@@ -240,13 +270,16 @@ export function SourcesView() {
       } else {
         toast.success(`${succeeded} sources updated`);
       }
-      queryClient.invalidateQueries({ queryKey: ["sources"] });
-      queryClient.invalidateQueries({ queryKey: ["dashboard"] });
       setSelectedIds(new Set());
     },
-    onError: (err: unknown) => {
+    onError: (err: unknown, variables, context: any) => {
+      queryClient.setQueryData(["sources", activeOrgId], context?.previousSources);
       const msg = err instanceof Error ? err.message : "Bulk update failed";
       toast.error("Bulk update failed", { description: msg });
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ["sources", activeOrgId] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard"] });
     },
   });
 
@@ -288,6 +321,15 @@ export function SourcesView() {
       if (succeeded === 0) throw new Error("All deletes failed");
       return { succeeded, failed };
     },
+    onMutate: async (ids) => {
+      await queryClient.cancelQueries({ queryKey: ["sources", activeOrgId] });
+      const previousSources = queryClient.getQueryData(["sources", activeOrgId]);
+      queryClient.setQueryData(["sources", activeOrgId], (old: any) =>
+        (old || []).filter((s: any) => !ids.includes(s.id))
+      );
+      setSelectedIds(new Set());
+      return { previousSources };
+    },
     onSuccess: ({ succeeded, failed }) => {
       if (failed > 0) {
         toast.warning("Bulk delete partial", {
@@ -296,14 +338,16 @@ export function SourcesView() {
       } else {
         toast.success(`${succeeded} sources deleted`);
       }
-      queryClient.invalidateQueries({ queryKey: ["sources"] });
-      queryClient.invalidateQueries({ queryKey: ["dashboard"] });
-      setSelectedIds(new Set());
     },
-    onError: (err: unknown) => {
+    onError: (err: unknown, variables, context: any) => {
+      queryClient.setQueryData(["sources", activeOrgId], context?.previousSources);
       const msg = err instanceof Error ? err.message : "Bulk delete failed";
       toast.error("Bulk delete failed", { description: msg });
     },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ["sources", activeOrgId] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+    }
   });
 
   // Selection helpers — defined after `filtered` to avoid referencing
@@ -602,7 +646,7 @@ export function SourcesView() {
         <CardContent className="p-0">
           {isLoading ? (
             <div className="p-4">
-              <LoadingState rows={4} />
+              <TableSkeleton />
             </div>
           ) : isError ? (
             <div className="p-4">
@@ -983,7 +1027,7 @@ export function SourcesView() {
           </DialogHeader>
           <div className="p-0 flex-1 overflow-y-auto">
             {runsLoading ? (
-              <LoadingState rows={3} />
+              <div className="p-4"><TableSkeleton /></div>
             ) : !runs || runs.length === 0 ? (
               <EmptyState
                 icon={<History className="h-5 w-5" />}

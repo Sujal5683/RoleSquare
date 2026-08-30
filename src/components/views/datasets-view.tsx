@@ -10,9 +10,9 @@ import type { DatasetDTO, SchemaDTO } from "@/lib/types";
 import {
   PageHeader,
   EmptyState,
-  LoadingState,
   ErrorState,
 } from "@/components/ui/page-elements";
+import { DashboardSkeleton } from "@/components/ui/skeletons/dashboard-skeleton";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Card, CardContent } from "@/components/ui/card";
@@ -174,15 +174,26 @@ export function DatasetsView() {
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => api.delete(`/api/datasets/${id}`),
+    onMutate: async (id: string) => {
+      await queryClient.cancelQueries({ queryKey: ["datasets", activeOrgId] });
+      const previousDatasets = queryClient.getQueryData(["datasets", activeOrgId]);
+      queryClient.setQueryData(["datasets", activeOrgId], (old: any) =>
+        (old || []).filter((d: any) => d.id !== id)
+      );
+      setDeleteTarget(null);
+      return { previousDatasets };
+    },
     onSuccess: () => {
       toast.success("Dataset deleted");
-      queryClient.invalidateQueries({ queryKey: ["datasets"] });
-      queryClient.invalidateQueries({ queryKey: ["dashboard"] });
-      setDeleteTarget(null);
     },
-    onError: (err: unknown) => {
+    onError: (err: unknown, variables, context: any) => {
+      queryClient.setQueryData(["datasets", activeOrgId], context?.previousDatasets);
       const msg = err instanceof Error ? err.message : "Failed to delete dataset";
       toast.error("Delete failed", { description: msg });
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ["datasets", activeOrgId] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard"] });
     },
   });
 
@@ -378,9 +389,7 @@ export function DatasetsView() {
 
       {/* Grid of dataset cards */}
       {isLoading ? (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          <LoadingState rows={3} />
-        </div>
+        <div className="py-4"><DashboardSkeleton /></div>
       ) : isError ? (
         <ErrorState
           message="Failed to load datasets"
@@ -791,6 +800,7 @@ function CreateDatasetDialog({
   schemas: SchemaDTO[];
 }) {
   const queryClient = useQueryClient();
+  const activeOrgId = useActiveOrg();
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [schemaId, setSchemaId] = useState<string>("");
@@ -801,19 +811,30 @@ function CreateDatasetDialog({
       description?: string;
       schemaId?: string;
     }) => api.post<DatasetDTO>("/api/datasets", payload),
-    onSuccess: (d) => {
-      toast.success("Dataset created", { description: d.name });
-      queryClient.invalidateQueries({ queryKey: ["datasets"] });
-      queryClient.invalidateQueries({ queryKey: ["dashboard"] });
-      // Reset form
+    onMutate: async (payload) => {
+      await queryClient.cancelQueries({ queryKey: ["datasets", activeOrgId] });
+      const previousDatasets = queryClient.getQueryData(["datasets", activeOrgId]);
+      queryClient.setQueryData(["datasets", activeOrgId], (old: any) => {
+        const newDataset = { id: "temp-" + Date.now(), ...payload, isShared: false, recordCount: 0, createdAt: new Date().toISOString() };
+        return [newDataset, ...(old || [])];
+      });
       setName("");
       setDescription("");
       setSchemaId("");
       onClose();
+      return { previousDatasets };
     },
-    onError: (err: unknown) => {
+    onSuccess: (d) => {
+      toast.success("Dataset created", { description: d.name });
+    },
+    onError: (err: unknown, variables, context: any) => {
+      queryClient.setQueryData(["datasets", activeOrgId], context?.previousDatasets);
       const msg = err instanceof Error ? err.message : "Failed to create dataset";
       toast.error("Create failed", { description: msg });
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ["datasets", activeOrgId] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard"] });
     },
   });
 

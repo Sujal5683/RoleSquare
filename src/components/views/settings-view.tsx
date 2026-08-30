@@ -17,10 +17,10 @@ import { formatCompactNumber } from "@/lib/utils";
 import {
   PageHeader,
   EmptyState,
-  LoadingState,
   ErrorState,
   StatCard,
 } from "@/components/ui/page-elements";
+import { ProfileSkeleton, ConnectionsSkeleton, BillingSkeleton } from "@/components/ui/skeletons/settings-skeleton";
 import {
   StatusBadge,
   PlanBadge,
@@ -279,7 +279,7 @@ function ProfileSection() {
     updateProfileMutation.mutate(trimmed);
   };
 
-  if (isLoading) return <LoadingState rows={3} />;
+  if (isLoading) return <ProfileSkeleton />;
   if (!session) {
     return (
       <ErrorState message="Failed to load profile" />
@@ -400,19 +400,30 @@ function ConnectedAccountsSection() {
   const disconnectMutation = useMutation({
     mutationFn: (id: string) =>
       api.delete<GoogleConnectionDTO>(`/api/google-connections/${id}`),
+    onMutate: async (id: string) => {
+      await queryClient.cancelQueries({ queryKey: ["google-connections", activeOrgId] });
+      const previousConnections = queryClient.getQueryData(["google-connections", activeOrgId]);
+      queryClient.setQueryData(["google-connections", activeOrgId], (old: any) =>
+        (old || []).filter((c: any) => c.id !== id)
+      );
+      setDisconnectTarget(null);
+      return { previousConnections };
+    },
     onSuccess: (c) => {
       toast.success("Connection disconnected", {
         description: `${c.googleEmail} has been revoked.`,
       });
-      queryClient.invalidateQueries({ queryKey: ["google-connections"] });
-      queryClient.invalidateQueries({ queryKey: ["dashboard"] });
-      setDisconnectTarget(null);
     },
-    onError: (err: unknown) => {
+    onError: (err: unknown, variables, context: any) => {
+      queryClient.setQueryData(["google-connections", activeOrgId], context?.previousConnections);
       const msg =
         err instanceof Error ? err.message : "Failed to disconnect";
       toast.error("Disconnect failed", { description: msg });
     },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ["google-connections", activeOrgId] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+    }
   });
 
   return (
@@ -447,7 +458,7 @@ function ConnectedAccountsSection() {
       </CardHeader>
       <CardContent>
         {isLoading ? (
-          <LoadingState rows={3} />
+          <ConnectionsSkeleton />
         ) : isError ? (
           <ErrorState
             message="Failed to load connections"
@@ -1496,7 +1507,7 @@ function BillingSection() {
         </CardHeader>
         <CardContent>
           {isLoading ? (
-            <LoadingState rows={3} />
+            <BillingSkeleton />
           ) : isError ? (
             <ErrorState message="Failed to load usage" onRetry={() => refetch()} />
           ) : (
@@ -1952,24 +1963,51 @@ function WebhooksSection() {
   const createMutation = useMutation({
     mutationFn: (vars: { url: string; secret: string | null; events: string[] }) =>
       api.post<WebhookDTO>("/api/webhooks", vars),
-    onSuccess: () => {
-      toast.success("Webhook created");
-      queryClient.invalidateQueries({ queryKey: ["webhooks"] });
+    onMutate: async (vars) => {
+      await queryClient.cancelQueries({ queryKey: ["webhooks", activeOrgId] });
+      const previousWebhooks = queryClient.getQueryData(["webhooks", activeOrgId]);
+      queryClient.setQueryData(["webhooks", activeOrgId], (old: any) => {
+        const newWebhook = { id: "temp-" + Date.now(), ...vars, createdAt: new Date().toISOString() };
+        return [newWebhook, ...(old || [])];
+      });
       setCreateOpen(false);
       setNewUrl("");
       setNewSecret("");
+      return { previousWebhooks };
     },
-    onError: () => toast.error("Failed to create webhook"),
+    onSuccess: () => {
+      toast.success("Webhook created");
+    },
+    onError: (err: unknown, variables, context: any) => {
+      queryClient.setQueryData(["webhooks", activeOrgId], context?.previousWebhooks);
+      toast.error("Failed to create webhook");
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ["webhooks", activeOrgId] });
+    }
   });
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) =>
       api.delete<WebhookDTO>(`/api/webhooks/${id}`),
+    onMutate: async (id) => {
+      await queryClient.cancelQueries({ queryKey: ["webhooks", activeOrgId] });
+      const previousWebhooks = queryClient.getQueryData(["webhooks", activeOrgId]);
+      queryClient.setQueryData(["webhooks", activeOrgId], (old: any) =>
+        (old || []).filter((w: any) => w.id !== id)
+      );
+      return { previousWebhooks };
+    },
     onSuccess: () => {
       toast.success("Webhook deleted");
-      queryClient.invalidateQueries({ queryKey: ["webhooks"] });
     },
-    onError: () => toast.error("Failed to delete webhook"),
+    onError: (err: unknown, variables, context: any) => {
+      queryClient.setQueryData(["webhooks", activeOrgId], context?.previousWebhooks);
+      toast.error("Failed to delete webhook");
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ["webhooks", activeOrgId] });
+    }
   });
 
   const testMutation = useMutation({

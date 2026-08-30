@@ -10,7 +10,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { requireOrgContext, AuthError, authErrorResponse , requireRole} from "@/lib/auth";
 import { logAudit } from "@/lib/audit";
-import { ensureJobRunnerStarted } from "@/lib/job-runner";
+
 
 export async function POST(
   req: NextRequest,
@@ -130,7 +130,7 @@ export async function POST(
       after: { schemaId, targetDatasetId, jobId: job.id },
     });
 
-    ensureJobRunnerStarted();
+    fetch(new URL("/api/jobs/process", req.url).toString(), { method: "POST" }).catch(() => {});
 
     return NextResponse.json(
       { jobId: job.id, targetDatasetId, message: "AI extraction queued" },

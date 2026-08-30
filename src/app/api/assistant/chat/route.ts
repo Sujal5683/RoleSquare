@@ -89,7 +89,8 @@ Available tools:
 async function executeTool(
   toolName: string,
   args: Record<string, unknown>,
-  organizationId: string
+  organizationId: string,
+  appUrl: string
 ): Promise<unknown> {
   switch (toolName) {
     case "navigate":
@@ -146,8 +147,7 @@ async function executeTool(
         where: { id: sourceId },
         data: { lastRunAt: now, runState: "scanning" },
       });
-      const { ensureJobRunnerStarted } = await import("@/lib/job-runner");
-      ensureJobRunnerStarted();
+      fetch(new URL("/api/jobs/process", appUrl).toString(), { method: "POST" }).catch(() => {});
       return { runId: run.id, sourceId, mode, status: "queued" };
     }
 
@@ -217,8 +217,7 @@ async function executeTool(
         where: { id: jobId },
         data: { status: "queued", attempts: 0, errorMessage: null },
       });
-      const { ensureJobRunnerStarted } = await import("@/lib/job-runner");
-      ensureJobRunnerStarted();
+      fetch(new URL("/api/jobs/process", appUrl).toString(), { method: "POST" }).catch(() => {});
       return { jobId, status: "re-queued" };
     }
 
@@ -363,7 +362,7 @@ export async function POST(req: NextRequest) {
       let toolError: string | null = null;
 
       try {
-        toolResultData = await executeTool(toolCall.tool, toolCall.args, organizationId);
+        toolResultData = await executeTool(toolCall.tool, toolCall.args, organizationId, new URL(req.url).origin);
       } catch (err) {
         toolError = err instanceof Error ? err.message : String(err);
         toolResultData = { error: toolError };

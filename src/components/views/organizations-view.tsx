@@ -10,9 +10,9 @@ import type { OrganizationDTO, MemberDTO, Plan } from "@/lib/types";
 import {
   PageHeader,
   EmptyState,
-  LoadingState,
   ErrorState,
 } from "@/components/ui/page-elements";
+import { OrganizationsSkeleton } from "@/components/ui/skeletons/organizations-skeleton";
 import { PlanBadge } from "@/components/ui/status-badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -224,16 +224,27 @@ export function OrganizationsView() {
   // ── Delete mutation ────────────────────────────────────────────────────
   const deleteMutation = useMutation({
     mutationFn: (id: string) => api.delete(`/api/organizations/${id}`),
+    onMutate: async (id: string) => {
+      await queryClient.cancelQueries({ queryKey: ["organizations"] });
+      const previousOrganizations = queryClient.getQueryData(["organizations"]);
+      queryClient.setQueryData(["organizations"], (old: any) =>
+        (old || []).filter((o: any) => o.id !== id)
+      );
+      setDeleteTarget(null);
+      return { previousOrganizations };
+    },
     onSuccess: () => {
       toast.success("Organization deleted");
+    },
+    onError: (err: unknown, variables, context: any) => {
+      queryClient.setQueryData(["organizations"], context?.previousOrganizations);
+      const msg = err instanceof Error ? err.message : "Failed to delete org";
+      toast.error("Delete failed", { description: msg });
+    },
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ["organizations"] });
       queryClient.invalidateQueries({ queryKey: ["session"] });
       queryClient.invalidateQueries({ queryKey: ["dashboard"] });
-      setDeleteTarget(null);
-    },
-    onError: (err: unknown) => {
-      const msg = err instanceof Error ? err.message : "Failed to delete org";
-      toast.error("Delete failed", { description: msg });
     },
   });
 
@@ -375,9 +386,7 @@ export function OrganizationsView() {
 
       {/* Grid */}
       {isLoading ? (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          <LoadingState rows={3} />
-        </div>
+        <OrganizationsSkeleton />
       ) : isError ? (
         <ErrorState
           message="Failed to load organizations"
@@ -741,19 +750,31 @@ function CreateOrgDialog({
       slug: string;
       plan: string;
     }) => api.post<OrganizationDTO>("/api/organizations", payload),
-    onSuccess: (o) => {
-      toast.success("Organization created", { description: o.name });
-      queryClient.invalidateQueries({ queryKey: ["organizations"] });
-      queryClient.invalidateQueries({ queryKey: ["session"] });
-      queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+    onMutate: async (payload) => {
+      await queryClient.cancelQueries({ queryKey: ["organizations"] });
+      const previousOrganizations = queryClient.getQueryData(["organizations"]);
+      queryClient.setQueryData(["organizations"], (old: any) => {
+        const newOrg = { id: "temp-" + Date.now(), ...payload, role: "owner", status: "active", membersCount: 1, datasetsCount: 0, sourcesCount: 0, createdAt: new Date().toISOString() };
+        return [newOrg, ...(old || [])];
+      });
       setName("");
       setSlug("");
       setPlan("free");
       onClose();
+      return { previousOrganizations };
     },
-    onError: (err: unknown) => {
+    onSuccess: (o) => {
+      toast.success("Organization created", { description: o.name });
+    },
+    onError: (err: unknown, variables, context: any) => {
+      queryClient.setQueryData(["organizations"], context?.previousOrganizations);
       const msg = err instanceof Error ? err.message : "Failed to create org";
       toast.error("Create failed", { description: msg });
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ["organizations"] });
+      queryClient.invalidateQueries({ queryKey: ["session"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard"] });
     },
   });
 

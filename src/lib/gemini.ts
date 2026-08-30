@@ -224,7 +224,7 @@ export async function callGeminiWithFallback(
       const result = await Promise.race([
         chat.sendMessage(lastMessage.content),
         new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error("Timeout: model did not respond within 30s")), 30000)
+          setTimeout(() => reject(new Error("Timeout: model did not respond within 8s")), 8000)
         ),
       ]);
       const response = result.response;

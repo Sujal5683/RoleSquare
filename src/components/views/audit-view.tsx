@@ -9,9 +9,9 @@ import type { AuditLogDTO } from "@/lib/types";
 import {
   PageHeader,
   EmptyState,
-  LoadingState,
   ErrorState,
 } from "@/components/ui/page-elements";
+import { TableSkeleton } from "@/components/ui/skeletons/table-skeleton";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -418,7 +418,7 @@ export function AuditView() {
         </CardHeader>
         <CardContent>
           {isLoading ? (
-            <LoadingState rows={5} />
+            <TableSkeleton />
           ) : isError ? (
             <ErrorState
               message="Failed to load audit logs"

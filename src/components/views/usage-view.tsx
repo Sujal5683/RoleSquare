@@ -4,7 +4,8 @@ import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api-client";
 import { useAppStore } from "@/lib/store";
 import { formatCompactNumber } from "@/lib/utils";
-import { PageHeader, StatCard, LoadingState, EmptyState } from "@/components/ui/page-elements";
+import { PageHeader, StatCard, EmptyState } from "@/components/ui/page-elements";
+import { UsageSkeleton } from "@/components/ui/skeletons/usage-skeleton";
 import { JobTypeBadge, StatusBadge } from "@/components/ui/status-badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -98,8 +99,8 @@ export function UsageView() {
   if (isLoading) {
     return (
       <div className="space-y-4">
-        <PageHeader title="Usage & Billing" description="Token consumption, costs, and quota trends." icon={<TrendingUp className="h-5 w-5" />} />
-        <LoadingState rows={4} />
+        <PageHeader title="Usage & Billing" description="Track AI token consumption, extraction costs, and quota utilization across your organization." icon={<TrendingUp className="h-5 w-5" />} />
+        <UsageSkeleton />
       </div>
     );
   }

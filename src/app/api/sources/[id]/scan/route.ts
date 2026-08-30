@@ -8,7 +8,7 @@ import { requireOrgContext, AuthError, authErrorResponse , requireRole} from "@/
 import { logAudit } from "@/lib/audit";
 import { serializeSourceRun } from "@/lib/serialize";
 import { dispatchWebhookEvent } from "@/lib/webhook-dispatcher";
-import { ensureJobRunnerStarted } from "@/lib/job-runner";
+
 import { getJobTypeForSource } from "@/lib/types";
 
 export async function POST(
@@ -104,9 +104,7 @@ export async function POST(
       },
     });
 
-    // Wake the in-process job runner so the GMAIL_SCAN job is picked up
-    // immediately rather than waiting for the next API request to start it.
-    ensureJobRunnerStarted();
+    fetch(new URL("/api/jobs/process", req.url).toString(), { method: "POST" }).catch(() => {});
 
     return NextResponse.json(serializeSourceRun(created.run), {
       status: 201,

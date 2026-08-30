@@ -32,45 +32,24 @@ import { agentInfo, agentWarn, agentError } from "@/lib/agent-logger";
 import { computeCost } from "@/lib/model-pricing";
 import crypto from "crypto";
 
-const POLL_INTERVAL_MS = 5_000;
 const STALE_JOB_THRESHOLD_MS = 10 * 60 * 1000; // 10 minutes
 const MAX_ATTEMPTS = 5;
 
-const globalForRunner = globalThis as unknown as {
-  runnerStarted: boolean;
-  runnerPromise: Promise<void> | null;
-};
-
 /**
- * Starts the job runner if it hasn't been started yet. Safe to call
- * multiple times — subsequent calls are no-ops.
+ * Processes a single job from the queue and marks stale jobs.
+ * This is meant to be called by an isolated API route or cron job,
+ * rather than running in an infinite loop inside the Next.js process.
  */
-export function ensureJobRunnerStarted() {
-  if (globalForRunner.runnerStarted) return;
-  globalForRunner.runnerStarted = true;
-  globalForRunner.runnerPromise = runJobLoop().catch((err) => {
-    console.error("[job-runner] fatal error:", err);
-    globalForRunner.runnerStarted = false;
-  });
-}
-
-async function runJobLoop() {
-  while (true) {
-    try {
-      await processStaleJobs();
-      const job = await pickNextJob();
-      if (job) {
-        await processJob(job);
-      }
-    } catch (err) {
-      console.error("[job-runner] error in loop:", err);
+export async function processNextJobCycle() {
+  try {
+    await processStaleJobs();
+    const job = await pickNextJob();
+    if (job) {
+      await processJob(job);
     }
-    await sleep(POLL_INTERVAL_MS);
+  } catch (err) {
+    console.error("[job-runner] error in cycle:", err);
   }
-}
-
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 /**

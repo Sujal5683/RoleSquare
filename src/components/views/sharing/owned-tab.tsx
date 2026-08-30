@@ -6,9 +6,10 @@ import { toast } from "sonner";
 import { api } from "@/lib/api-client";
 import { useActiveOrg } from "@/hooks/use-active-org";
 import type { DatasetAccessDTO, DatasetDTO } from "@/lib/types";
-import { EmptyState, LoadingState, ErrorState } from "@/components/ui/page-elements";
+import { EmptyState, ErrorState } from "@/components/ui/page-elements";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { TableSkeleton } from "@/components/ui/skeletons/table-skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -45,17 +46,29 @@ export function OwnedTab({ onRowClick }: OwnedTabProps) {
   const revokeMutation = useMutation({
     mutationFn: (id: string) =>
       api.delete("/api/sharing/permissions", { id }),
+    onMutate: async (id) => {
+      await queryClient.cancelQueries({ queryKey: ["sharing-permissions", activeOrgId, "owned"] });
+      const previous = queryClient.getQueryData(["sharing-permissions", activeOrgId, "owned"]);
+      queryClient.setQueryData(["sharing-permissions", activeOrgId, "owned"], (old: any) => {
+        if (!old) return old;
+        return { ...old, owned: old.owned.filter((a: any) => a.id !== id) };
+      });
+      return { previous };
+    },
     onSuccess: () => {
       toast.success("Access revoked");
-      queryClient.invalidateQueries({ queryKey: ["sharing-permissions"] });
     },
-    onError: (err: unknown) => {
+    onError: (err: unknown, variables, context: any) => {
+      queryClient.setQueryData(["sharing-permissions", activeOrgId, "owned"], context?.previous);
       toast.error("Failed to revoke", { description: err instanceof Error ? err.message : undefined });
     },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ["sharing-permissions", activeOrgId, "owned"] });
+    }
   });
 
   if (!activeOrgId) return <EmptyState icon={<Building2 className="h-5 w-5" />} title="No organization selected" description="" />;
-  if (isLoading) return <LoadingState rows={4} />;
+  if (isLoading) return <div className="p-4"><TableSkeleton /></div>;
   if (isError) return <ErrorState message="Failed to load shared-out datasets" onRetry={() => refetch()} />;
 
   const owned = data?.owned ?? [];
@@ -155,9 +168,17 @@ export function OwnedTab({ onRowClick }: OwnedTabProps) {
                         <DropdownMenuItem
                           key={lvl}
                           onClick={() => {
+                            const old = queryClient.getQueryData(["sharing-permissions", activeOrgId, "owned"]) as any;
+                            queryClient.setQueryData(["sharing-permissions", activeOrgId, "owned"], {
+                              ...old,
+                              owned: old.owned.map((a: any) => a.id === access.id ? { ...a, level: lvl } : a)
+                            });
                             api.patch('/api/sharing/permissions', { id: access.id, level: lvl })
-                               .then(() => queryClient.invalidateQueries({ queryKey: ["sharing-permissions"] }))
-                               .catch(() => toast.error("Failed to change level"));
+                               .catch(() => {
+                                 queryClient.setQueryData(["sharing-permissions", activeOrgId, "owned"], old);
+                                 toast.error("Failed to change level");
+                               })
+                               .finally(() => queryClient.invalidateQueries({ queryKey: ["sharing-permissions", activeOrgId, "owned"] }));
                           }}
                         >
                           Change to {lvl === "read" ? "Viewer" : lvl === "comment" ? "Commenter" : "Editor"}
@@ -190,9 +211,17 @@ export function OwnedTab({ onRowClick }: OwnedTabProps) {
                   <DropdownMenuContent align="end">
                     <DropdownMenuItem
                       onClick={() => {
+                        const old = queryClient.getQueryData(["sharing-permissions", activeOrgId, "owned"]) as any;
+                        queryClient.setQueryData(["sharing-permissions", activeOrgId, "owned"], {
+                          ...old,
+                          owned: old.owned.map((a: any) => a.id === access.id ? { ...a, isPaused: !access.isPaused } : a)
+                        });
                         api.patch('/api/sharing/permissions', { id: access.id, isPaused: !access.isPaused })
-                           .then(() => queryClient.invalidateQueries({ queryKey: ["sharing-permissions"] }))
-                           .catch(() => toast.error("Failed to update status"));
+                           .catch(() => {
+                             queryClient.setQueryData(["sharing-permissions", activeOrgId, "owned"], old);
+                             toast.error("Failed to update status");
+                           })
+                           .finally(() => queryClient.invalidateQueries({ queryKey: ["sharing-permissions", activeOrgId, "owned"] }));
                       }}
                     >
                       {access.isPaused ? "Resume access" : "Pause access"}
@@ -201,9 +230,17 @@ export function OwnedTab({ onRowClick }: OwnedTabProps) {
                       <DropdownMenuItem
                         key={lvl}
                         onClick={() => {
+                          const old = queryClient.getQueryData(["sharing-permissions", activeOrgId, "owned"]) as any;
+                          queryClient.setQueryData(["sharing-permissions", activeOrgId, "owned"], {
+                            ...old,
+                            owned: old.owned.map((a: any) => a.id === access.id ? { ...a, level: lvl } : a)
+                          });
                           api.patch('/api/sharing/permissions', { id: access.id, level: lvl })
-                             .then(() => queryClient.invalidateQueries({ queryKey: ["sharing-permissions"] }))
-                             .catch(() => toast.error("Failed to change level"));
+                             .catch(() => {
+                               queryClient.setQueryData(["sharing-permissions", activeOrgId, "owned"], old);
+                               toast.error("Failed to change level");
+                             })
+                             .finally(() => queryClient.invalidateQueries({ queryKey: ["sharing-permissions", activeOrgId, "owned"] }));
                         }}
                       >
                         Change to {lvl === "read" ? "Viewer" : lvl === "comment" ? "Commenter" : "Editor"}

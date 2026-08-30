@@ -16,9 +16,9 @@ import type { InvitationDTO } from "@/lib/types";
 import {
   PageHeader,
   EmptyState,
-  LoadingState,
   ErrorState,
 } from "@/components/ui/page-elements";
+import { TableSkeleton } from "@/components/ui/skeletons/table-skeleton";
 import {
   Sheet,
   SheetContent,
@@ -238,7 +238,7 @@ function IncomingInvites({ onSelect, viewMode = "card" }: { onSelect: (inv: Invi
     queryFn: () => api.get<InvitationDTO[]>("/api/invitations"),
   });
 
-  if (isLoading) return <LoadingState rows={3} />;
+  if (isLoading) return <div className="p-4"><TableSkeleton /></div>;
   if (isError) return <ErrorState message="Failed to load incoming invitations" onRetry={() => refetch()} />;
 
   const pendingInvites = (invitations ?? []).filter((i) => i.status === "pending");
@@ -455,7 +455,7 @@ function OutgoingInvites({ onSelect, viewMode = "list" }: { onSelect: (inv: Invi
     );
   }
 
-  if (isLoading) return <LoadingState rows={3} />;
+  if (isLoading) return <div className="p-4"><TableSkeleton /></div>;
   if (isError) return <ErrorState message="Failed to load outgoing invitations" onRetry={() => refetch()} />;
 
   const pending = (invitations ?? []).filter((i) => i.status === "pending");

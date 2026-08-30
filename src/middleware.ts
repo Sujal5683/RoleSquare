@@ -61,13 +61,14 @@ export async function middleware(request: NextRequest) {
   );
 
   // Refresh the session — IMPORTANT: do not add code between createServerClient
-  // and getUser() as it may cause subtle cookie-refresh bugs.
+  // and getSession() as it may cause subtle cookie-refresh bugs.
+  // Using getSession() avoids making a network request to Supabase on every edge request.
   const {
-    data: { user },
-  } = await supabase.auth.getUser();
+    data: { session },
+  } = await supabase.auth.getSession();
 
   // If no session and the route is not public, redirect to /login
-  if (!user) {
+  if (!session) {
     const loginUrl = request.nextUrl.clone();
     loginUrl.pathname = "/login";
     // Preserve the original destination so we can redirect back after login

@@ -16,9 +16,9 @@ import type {
 import {
   PageHeader,
   EmptyState,
-  LoadingState,
   ErrorState,
 } from "@/components/ui/page-elements";
+import { TableSkeleton } from "@/components/ui/skeletons/table-skeleton";
 import {
   StatusBadge,
   RoleBadge,
@@ -320,44 +320,68 @@ export function MembersView() {
         `/api/organizations/${activeOrgId}/members/${memberId}`,
         { role }
       ),
+    onMutate: async ({ memberId, role }) => {
+      await queryClient.cancelQueries({ queryKey: ["organizations", activeOrgId, "members"] });
+      const previousMembers = queryClient.getQueryData(["organizations", activeOrgId, "members"]);
+      queryClient.setQueryData(["organizations", activeOrgId, "members"], (old: any) => {
+        if (!old) return old;
+        return old.map((m: any) => m.id === memberId ? { ...m, role } : m);
+      });
+      return { previousMembers };
+    },
     onSuccess: (m, variables) => {
       toast.success("Role updated", {
         description: `${m.user.name ?? m.user.email} is now ${m.role}.`,
-      });
-      queryClient.invalidateQueries({
-        queryKey: ["organizations", activeOrgId, "members"],
       });
       if (variables.role === "owner") {
          queryClient.invalidateQueries({ queryKey: ["session"] });
       }
     },
-    onError: (err: unknown) => {
+    onError: (err: unknown, variables, context: any) => {
+      queryClient.setQueryData(["organizations", activeOrgId, "members"], context?.previousMembers);
       toast.error("Failed to change role", {
         description: err instanceof Error ? err.message : undefined,
       });
     },
+    onSettled: () => {
+      queryClient.invalidateQueries({
+        queryKey: ["organizations", activeOrgId, "members"],
+      });
+    }
   });
 
   const removeMemberMutation = useMutation({
     mutationFn: (memberId: string) =>
       api.delete(`/api/organizations/${activeOrgId}/members/${memberId}`),
+    onMutate: async (memberId: string) => {
+      await queryClient.cancelQueries({ queryKey: ["organizations", activeOrgId, "members"] });
+      const previousMembers = queryClient.getQueryData(["organizations", activeOrgId, "members"]);
+      queryClient.setQueryData(["organizations", activeOrgId, "members"], (old: any) => {
+        if (!old) return old;
+        return old.filter((m: any) => m.id !== memberId);
+      });
+      setRemoveTarget(null);
+      return { previousMembers };
+    },
     onSuccess: (_, variables) => {
       const isSelf = removeTarget?.user.id === currentUserId;
       toast.success(isSelf ? "You left the organization" : "Member removed");
-      queryClient.invalidateQueries({
-        queryKey: ["organizations", activeOrgId, "members"],
-      });
       if (isSelf) {
         queryClient.invalidateQueries({ queryKey: ["session"] });
       }
-      setRemoveTarget(null);
     },
-    onError: (err: unknown) => {
+    onError: (err: unknown, variables, context: any) => {
+      queryClient.setQueryData(["organizations", activeOrgId, "members"], context?.previousMembers);
       const isSelf = removeTarget?.user.id === currentUserId;
       toast.error(isSelf ? "Failed to leave organization" : "Failed to remove member", {
         description: err instanceof Error ? err.message : undefined,
       });
     },
+    onSettled: () => {
+      queryClient.invalidateQueries({
+        queryKey: ["organizations", activeOrgId, "members"],
+      });
+    }
   });
 
   // ── State ──────────────────────────────────────────────────────────────
@@ -557,7 +581,7 @@ export function MembersView() {
             />
           ) : isLoading ? (
             <div className="px-4 pb-6">
-              <LoadingState rows={4} />
+              <TableSkeleton />
             </div>
           ) : isError ? (
             <div className="px-4 pb-6">

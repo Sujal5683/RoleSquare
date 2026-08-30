@@ -6,9 +6,10 @@ import { toast } from "sonner";
 import { api } from "@/lib/api-client";
 import { useActiveOrg } from "@/hooks/use-active-org";
 import type { SharingRequestDTO, DatasetDTO } from "@/lib/types";
-import { EmptyState, LoadingState, ErrorState } from "@/components/ui/page-elements";
+import { EmptyState, ErrorState } from "@/components/ui/page-elements";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { TableSkeleton } from "@/components/ui/skeletons/table-skeleton";
 import { Badge } from "@/components/ui/badge";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
@@ -105,26 +106,56 @@ export function RequestsTab({ onRowClick }: RequestsTabProps) {
   const approveMutation = useMutation({
     mutationFn: ({ id, datasetId }: { id: string; datasetId?: string }) =>
       api.post(`/api/sharing/requests/${id}/approve`, datasetId ? { datasetId } : {}),
+    onMutate: async ({ id }) => {
+      await queryClient.cancelQueries({ queryKey: ["cross-org-shares", activeOrgId] });
+      const previous = queryClient.getQueryData(["cross-org-shares", activeOrgId]);
+      queryClient.setQueryData(["cross-org-shares", activeOrgId], (old: any) => {
+        if (!old) return old;
+        return {
+          ...old,
+          incoming: old.incoming.map((r: any) => r.id === id ? { ...r, status: "approved" } : r)
+        };
+      });
+      return { previous };
+    },
     onSuccess: () => {
       toast.success("Request approved");
       setApprovingRequest(null);
-      queryClient.invalidateQueries({ queryKey: ["cross-org-shares"] });
-      queryClient.invalidateQueries({ queryKey: ["sharing-permissions"] });
     },
-    onError: (err: unknown) => {
+    onError: (err: unknown, variables, context: any) => {
+      queryClient.setQueryData(["cross-org-shares", activeOrgId], context?.previous);
       toast.error("Failed to approve", { description: err instanceof Error ? err.message : undefined });
     },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ["cross-org-shares"] });
+      queryClient.invalidateQueries({ queryKey: ["sharing-permissions"] });
+    }
   });
 
   const rejectMutation = useMutation({
     mutationFn: (id: string) => api.post(`/api/sharing/requests/${id}/reject`, {}),
+    onMutate: async (id) => {
+      await queryClient.cancelQueries({ queryKey: ["cross-org-shares", activeOrgId] });
+      const previous = queryClient.getQueryData(["cross-org-shares", activeOrgId]);
+      queryClient.setQueryData(["cross-org-shares", activeOrgId], (old: any) => {
+        if (!old) return old;
+        return {
+          ...old,
+          incoming: old.incoming.map((r: any) => r.id === id ? { ...r, status: "rejected" } : r)
+        };
+      });
+      return { previous };
+    },
     onSuccess: () => {
       toast.success("Request rejected");
-      queryClient.invalidateQueries({ queryKey: ["cross-org-shares"] });
     },
-    onError: (err: unknown) => {
+    onError: (err: unknown, variables, context: any) => {
+      queryClient.setQueryData(["cross-org-shares", activeOrgId], context?.previous);
       toast.error("Failed to reject", { description: err instanceof Error ? err.message : undefined });
     },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ["cross-org-shares"] });
+    }
   });
 
   const handleApprove = (e: React.MouseEvent, r: SharingRequestDTO) => {
@@ -142,7 +173,7 @@ export function RequestsTab({ onRowClick }: RequestsTabProps) {
   };
 
   if (!activeOrgId) return <EmptyState icon={<Building2 className="h-5 w-5" />} title="No organization selected" description="" />;
-  if (isLoading) return <LoadingState rows={3} />;
+  if (isLoading) return <div className="p-4"><TableSkeleton /></div>;
   if (isError) return <ErrorState message="Failed to load sharing requests" onRetry={() => refetch()} />;
 
   const outgoing = data?.outgoing ?? [];

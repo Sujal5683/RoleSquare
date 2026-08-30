@@ -129,6 +129,7 @@ import {
   Copy,
   ExternalLink,
   Bot,
+  Wand2,
 } from "lucide-react";
 import { NewShareRequestDialog } from "@/components/sharing/new-share-request-dialog";
 import { AssignSchemaDialog } from "@/components/datasets/assign-schema-dialog";

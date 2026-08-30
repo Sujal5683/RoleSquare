@@ -14,14 +14,13 @@ import { logAudit } from "@/lib/audit";
 import { bumpUsageMetric } from "@/lib/usage";
 import { extractWithLLM, flagFieldsForReview } from "@/lib/extraction";
 import { dispatchWebhookEvent } from "@/lib/webhook-dispatcher";
-import { ensureJobRunnerStarted } from "@/lib/job-runner";
+
 import type { ExtractionFieldResult } from "@/lib/types";
 
 export async function POST(req: NextRequest) {
   try {
     // Ensure the in-process job runner is alive so any queued AI jobs are
-    // processed alongside this synchronous extraction call.
-    ensureJobRunnerStarted();
+    fetch(new URL("/api/jobs/process", req.url).toString(), { method: "POST" }).catch(() => {});
     const { user, organizationId } = await requireRole(req, "member");
     const body = await req.json().catch(() => ({}));
     const schemaId = String(body?.schemaId ?? "").trim();

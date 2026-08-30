@@ -57,19 +57,50 @@ export function InlineEditCell({
         });
       }
     },
-    onSuccess: (res: any) => {
-      queryClient.invalidateQueries({ queryKey: ["dataset-records", datasetId] });
-      toast.success("Saved");
+    onMutate: async (newValue: string) => {
+      // Cancel any outgoing refetches (so they don't overwrite our optimistic update)
+      await queryClient.cancelQueries({ queryKey: ["dataset-records", datasetId] });
+
+      // Snapshot the previous value
+      const previousRecords = queryClient.getQueryData(["dataset-records", datasetId]);
+
+      // Optimistically update to the new value
+      queryClient.setQueryData(["dataset-records", datasetId], (old: any) => {
+        if (!old || !old.records) return old;
+        return {
+          ...old,
+          records: old.records.map((record: any) => {
+            if (record.id === recordId) {
+              const newValues = [...(record.values || [])];
+              const valIndex = newValues.findIndex((v) => v.fieldId === fieldId);
+              if (valIndex >= 0) {
+                newValues[valIndex] = { ...newValues[valIndex], value: newValue };
+              } else {
+                newValues.push({ id: "temp", fieldId, value: newValue, confidence: 1 });
+              }
+              return { ...record, values: newValues };
+            }
+            return record;
+          }),
+        };
+      });
+
+      // Instantly close the cell for a snappy UI
+      onClose();
+      
+      // Call save success immediately for undo stack (using temp id if new)
       if (onSaveSuccess) {
-        // If it was a POST, valueId was undefined, but we get the new value's ID from the response.
-        const savedValueId = valueId || res?.id;
-        onSaveSuccess(initialValue, val, savedValueId);
+        onSaveSuccess(initialValue, newValue, valueId || "temp");
       }
-      onClose();
+
+      return { previousRecords };
     },
-    onError: (err: any) => {
+    onError: (err: any, newValue, context) => {
+      queryClient.setQueryData(["dataset-records", datasetId], context?.previousRecords);
       toast.error(err.message || "Failed to save");
-      onClose();
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ["dataset-records", datasetId] });
     },
   });
 

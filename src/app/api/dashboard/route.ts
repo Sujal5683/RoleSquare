@@ -28,107 +28,108 @@ export async function GET(req: NextRequest) {
   try {
     const { user, organizationId } = await requireOrgContext(req);
 
-    const connectedAccounts = await db.googleConnection.count({ where: { organizationId } });
-    const activeSources = await db.source.count({ where: { organizationId, status: "active" } });
-    const reviewQueueCount = await db.datasetRecord.count({
-      where: { dataset: { organizationId }, status: "needs_review" },
-    });
-    const aiJobsRunning = await db.aiJob.count({
-      where: { organizationId, status: { in: ["queued", "running"] } },
-    });
-    const aiJobsFailed = await db.aiJob.count({
-      where: { organizationId, status: { in: ["failed", "dlq"] } },
-    });
-    const recentRunsRaw = await db.sourceRun.findMany({
-      take: 6,
-      orderBy: { startedAt: "desc" },
-      where: { source: { organizationId } },
-      include: { source: { select: { id: true, name: true } } },
-    });
-    const reviewQueueRaw = await db.datasetRecord.findMany({
-      take: 10,
-      orderBy: { updatedAt: "desc" },
-      where: { status: "needs_review", dataset: { organizationId } },
-      include: {
-        values: true,
-        dataset: { select: { id: true, name: true } },
-      },
-    });
-    const recentDatasetsRaw = await db.dataset.findMany({
-      take: 5,
-      orderBy: { createdAt: "desc" },
-      where: { organizationId },
-      include: { schema: { include: { fields: true } } },
-    });
-    const queueHealthRaw = await db.aiJob.groupBy({
-      by: ["type", "status"],
-      where: { organizationId },
-      _count: { _all: true },
-    });
-    const usageRaw = await currentMonthUsage(organizationId);
-    const connectionAlertsRaw = await db.googleConnection.findMany({
-      where: {
-        organizationId,
-        OR: [
-          { status: { not: "active" } },
-          { watchExpiresAt: { lte: new Date(Date.now() + 2 * 86400_000) } },
-        ],
-      },
-    });
-    const pendingRequestsRaw = await db.sharingRequest.findMany({
-      where: {
-        status: "pending",
-        OR: [
-          { targetOrganizationId: organizationId },
-          { targetUserId: user.id },
-          { targetEmail: user.email }
-        ]
-      },
-      include: { dataset: { select: { id: true, name: true } }, requester: { select: { id: true, name: true, email: true } } }
-    });
-    const roleChangeAlertsRaw = await db.auditLog.findMany({
-      where: {
-        entity: "member",
-        entityId: { in: user.memberships.map((m: any) => m.id) },
-        action: "update",
-        createdAt: { gte: new Date(Date.now() - 30 * 86400_000) }
-      },
-      orderBy: { createdAt: "desc" },
-      take: 20,
-      include: { actor: { select: { id: true, name: true, email: true } }, organization: { select: { id: true, name: true } } }
-    });
+    const url = new URL(req.url);
+    const dateRangeParam = url.searchParams.get("dateRange") || "30d";
+    const rangeDays = parseInt(dateRangeParam.replace("d", ""), 10) || 30;
+    const rangeAgo = new Date(Date.now() - rangeDays * 24 * 60 * 60 * 1000);
 
-    // recordsExtracted: total count of dataset records across the org.
-    const recordsExtracted = await db.datasetRecord.count({
-      where: { dataset: { organizationId } },
-    });
-
-    // Attach schema field metadata to each review-queue record's values.
-    // `DatasetValue` has no Prisma relation to `SchemaField`, so we fetch
-    // all schema fields for the org and join in JS.
-    const schemaFields = await db.schemaField.findMany({
-      where: { schema: { organizationId } },
-    });
+    const [
+      connectedAccounts,
+      activeSources,
+      reviewQueueCount,
+      aiJobsRunning,
+      aiJobsFailed,
+      recentRunsRaw,
+      reviewQueueRaw,
+      recentDatasetsRaw,
+      queueHealthRaw,
+      usageRaw,
+      connectionAlertsRaw,
+      pendingRequestsRaw,
+      roleChangeAlertsRaw,
+      recordsExtracted,
+      schemaFields,
+      recentRecords,
+      recentJobs
+    ] = await Promise.all([
+      db.googleConnection.count({ where: { organizationId } }),
+      db.source.count({ where: { organizationId, status: "active" } }),
+      db.datasetRecord.count({ where: { dataset: { organizationId }, status: "needs_review" } }),
+      db.aiJob.count({ where: { organizationId, status: { in: ["queued", "running"] } } }),
+      db.aiJob.count({ where: { organizationId, status: { in: ["failed", "dlq"] } } }),
+      db.sourceRun.findMany({
+        take: 6,
+        orderBy: { startedAt: "desc" },
+        where: { source: { organizationId } },
+        include: { source: { select: { id: true, name: true } } },
+      }),
+      db.datasetRecord.findMany({
+        take: 10,
+        orderBy: { updatedAt: "desc" },
+        where: { status: "needs_review", dataset: { organizationId } },
+        include: {
+          values: true,
+          dataset: { select: { id: true, name: true } },
+        },
+      }),
+      db.dataset.findMany({
+        take: 5,
+        orderBy: { createdAt: "desc" },
+        where: { organizationId },
+        include: { schema: { include: { fields: true } } },
+      }),
+      db.aiJob.groupBy({
+        by: ["type", "status"],
+        where: { organizationId },
+        _count: { _all: true },
+      }),
+      currentMonthUsage(organizationId),
+      db.googleConnection.findMany({
+        where: {
+          organizationId,
+          OR: [
+            { status: { not: "active" } },
+            { watchExpiresAt: { lte: new Date(Date.now() + 2 * 86400_000) } },
+          ],
+        },
+      }),
+      db.sharingRequest.findMany({
+        where: {
+          status: "pending",
+          OR: [
+            { targetOrganizationId: organizationId },
+            { targetUserId: user.id },
+            { targetEmail: user.email }
+          ]
+        },
+        include: { dataset: { select: { id: true, name: true } }, requester: { select: { id: true, name: true, email: true } } }
+      }),
+      db.auditLog.findMany({
+        where: {
+          entity: "member",
+          entityId: { in: user.memberships.map((m: any) => m.id) },
+          action: "update",
+          createdAt: { gte: new Date(Date.now() - 30 * 86400_000) }
+        },
+        orderBy: { createdAt: "desc" },
+        take: 20,
+        include: { actor: { select: { id: true, name: true, email: true } }, organization: { select: { id: true, name: true } } }
+      }),
+      db.datasetRecord.count({ where: { dataset: { organizationId } } }),
+      db.schemaField.findMany({ where: { schema: { organizationId } } }),
+      db.datasetRecord.findMany({
+        where: { dataset: { organizationId }, createdAt: { gte: rangeAgo } },
+        select: { createdAt: true },
+      }),
+      db.aiJob.findMany({
+        where: { organizationId, createdAt: { gte: rangeAgo } },
+        select: { createdAt: true },
+      })
+    ]);
     const fieldsMap = fieldsByIdMap(schemaFields);
     const reviewQueueEnriched = attachFieldsToRecords(reviewQueueRaw, fieldsMap);
 
     const { serializeSharingRequest } = await import("@/lib/serialize");
-
-    const url = new URL(req.url);
-    const dateRangeParam = url.searchParams.get("dateRange") || "30d";
-    const rangeDays = parseInt(dateRangeParam.replace("d", ""), 10) || 30;
-
-    // Fetch time-series data for the requested range
-    const rangeAgo = new Date(Date.now() - rangeDays * 24 * 60 * 60 * 1000);
-    const recentRecords = await db.datasetRecord.findMany({
-      where: { dataset: { organizationId }, createdAt: { gte: rangeAgo } },
-      select: { createdAt: true },
-    });
-
-    const recentJobs = await db.aiJob.findMany({
-      where: { organizationId, createdAt: { gte: rangeAgo } },
-      select: { createdAt: true },
-    });
 
     // Group by date string (YYYY-MM-DD)
     const chartDataMap = new Map<string, { date: string, records: number, jobs: number }>();

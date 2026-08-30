@@ -6,9 +6,10 @@ import { toast } from "sonner";
 import { api } from "@/lib/api-client";
 import { useActiveOrg } from "@/hooks/use-active-org";
 import type { DatasetAccessDTO } from "@/lib/types";
-import { EmptyState, LoadingState, ErrorState } from "@/components/ui/page-elements";
+import { EmptyState, ErrorState } from "@/components/ui/page-elements";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { TableSkeleton } from "@/components/ui/skeletons/table-skeleton";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -45,17 +46,29 @@ export function ReceivedTab({ onRowClick }: ReceivedTabProps) {
   const revokeMutation = useMutation({
     mutationFn: (id: string) =>
       api.delete("/api/sharing/permissions", { id }),
+    onMutate: async (id) => {
+      await queryClient.cancelQueries({ queryKey: ["sharing-permissions", activeOrgId, "received"] });
+      const previous = queryClient.getQueryData(["sharing-permissions", activeOrgId, "received"]);
+      queryClient.setQueryData(["sharing-permissions", activeOrgId, "received"], (old: any) => {
+        if (!old) return old;
+        return { ...old, received: old.received.filter((a: any) => a.id !== id) };
+      });
+      return { previous };
+    },
     onSuccess: () => {
       toast.success("Dataset access revoked");
-      queryClient.invalidateQueries({ queryKey: ["sharing-permissions"] });
     },
-    onError: (err: unknown) => {
+    onError: (err: unknown, variables, context: any) => {
+      queryClient.setQueryData(["sharing-permissions", activeOrgId, "received"], context?.previous);
       toast.error("Failed to revoke", { description: err instanceof Error ? err.message : undefined });
     },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ["sharing-permissions", activeOrgId, "received"] });
+    }
   });
 
   if (!activeOrgId) return <EmptyState icon={<Building2 className="h-5 w-5" />} title="No organization selected" description="" />;
-  if (isLoading) return <LoadingState rows={4} />;
+  if (isLoading) return <div className="p-4"><TableSkeleton /></div>;
   if (isError) return <ErrorState message="Failed to load shared datasets" onRetry={() => refetch()} />;
 
   const received = data?.received ?? [];
@@ -97,13 +110,21 @@ export function ReceivedTab({ onRowClick }: ReceivedTabProps) {
             size="sm"
             onClick={() => {
               if (window.confirm(`Revoke ${selectedIds.size} datasets?`)) {
+                const old = queryClient.getQueryData(["sharing-permissions", activeOrgId, "received"]) as any;
+                queryClient.setQueryData(["sharing-permissions", activeOrgId, "received"], {
+                  ...old,
+                  received: old.received.filter((a: any) => !selectedIds.has(a.id))
+                });
                 Promise.all(Array.from(selectedIds).map(id => api.delete("/api/sharing/permissions", { id })))
                   .then(() => {
                     toast.success("Datasets revoked");
-                    queryClient.invalidateQueries({ queryKey: ["sharing-permissions"] });
                     setSelectedIds(new Set());
                   })
-                  .catch(() => toast.error("Failed to revoke some datasets"));
+                  .catch(() => {
+                    queryClient.setQueryData(["sharing-permissions", activeOrgId, "received"], old);
+                    toast.error("Failed to revoke some datasets");
+                  })
+                  .finally(() => queryClient.invalidateQueries({ queryKey: ["sharing-permissions", activeOrgId, "received"] }));
               }
             }}
           >
@@ -188,9 +209,17 @@ export function ReceivedTab({ onRowClick }: ReceivedTabProps) {
                       <>
                         <DropdownMenuItem
                           onClick={() => {
+                            const old = queryClient.getQueryData(["sharing-permissions", activeOrgId, "received"]) as any;
+                            queryClient.setQueryData(["sharing-permissions", activeOrgId, "received"], {
+                              ...old,
+                              received: old.received.map((a: any) => a.id === access.id ? { ...a, status: 'active' } : a)
+                            });
                             api.patch('/api/sharing/permissions', { id: access.id, status: 'active' })
-                               .then(() => queryClient.invalidateQueries({ queryKey: ["sharing-permissions"] }))
-                               .catch(() => toast.error("Failed to accept share"));
+                               .catch(() => {
+                                 queryClient.setQueryData(["sharing-permissions", activeOrgId, "received"], old);
+                                 toast.error("Failed to accept share");
+                               })
+                               .finally(() => queryClient.invalidateQueries({ queryKey: ["sharing-permissions", activeOrgId, "received"] }));
                           }}
                         >
                           Accept

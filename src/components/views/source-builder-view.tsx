@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { Stepper } from "@/components/ui/stepper";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useActiveOrg } from "@/hooks/use-active-org";
 import { toast } from "sonner";
 import { api } from "@/lib/api-client";
 import { useAppStore } from "@/lib/store";
@@ -221,6 +222,7 @@ const PRESETS_LABEL_MAP = {
 
 export function SourceBuilderView() {
   const queryClient = useQueryClient();
+  const activeOrgId = useActiveOrg();
   const selectedSourceId = useAppStore((s) => s.selectedSourceId);
   const openSource = useAppStore((s) => s.openSource);
   const openSchema = useAppStore((s) => s.openSchema);
@@ -330,36 +332,60 @@ export function SourceBuilderView() {
   const createMutation = useMutation({
     mutationFn: (payload: unknown) =>
       api.post<SourceDTO>("/api/sources", payload),
+    onMutate: async (payload: any) => {
+      await queryClient.cancelQueries({ queryKey: ["sources", activeOrgId] });
+      const previousSources = queryClient.getQueryData(["sources", activeOrgId]);
+      queryClient.setQueryData(["sources", activeOrgId], (old: any) => {
+        const newSource = { id: "temp-" + Date.now(), ...payload, status: "idle", lastRun: null };
+        return [...(old || []), newSource];
+      });
+      openSource(null);
+      setView("sources");
+      return { previousSources };
+    },
     onSuccess: () => {
       toast.success("Source created", {
         description: "Your new source is now active.",
       });
-      queryClient.invalidateQueries({ queryKey: ["sources"] });
-      queryClient.invalidateQueries({ queryKey: ["dashboard"] });
-      openSource(null);
-      setView("sources");
     },
-    onError: (err: unknown) => {
+    onError: (err: unknown, variables, context: any) => {
+      queryClient.setQueryData(["sources", activeOrgId], context?.previousSources);
       const msg = err instanceof Error ? err.message : "Failed to create source";
       toast.error("Create failed", { description: msg });
     },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ["sources", activeOrgId] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+    }
   });
 
   const updateMutation = useMutation({
     mutationFn: (payload: unknown) =>
       api.patch<SourceDTO>(`/api/sources/${selectedSourceId}`, payload),
-    onSuccess: () => {
-      toast.success("Source updated");
-      queryClient.invalidateQueries({ queryKey: ["sources"] });
-      queryClient.invalidateQueries({ queryKey: ["source", selectedSourceId] });
-      queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+    onMutate: async (payload: any) => {
+      await queryClient.cancelQueries({ queryKey: ["sources", activeOrgId] });
+      const previousSources = queryClient.getQueryData(["sources", activeOrgId]);
+      queryClient.setQueryData(["sources", activeOrgId], (old: any) => {
+        if (!old) return old;
+        return old.map((s: any) => s.id === selectedSourceId ? { ...s, ...payload } : s);
+      });
       openSource(null);
       setView("sources");
+      return { previousSources };
     },
-    onError: (err: unknown) => {
+    onSuccess: () => {
+      toast.success("Source updated");
+    },
+    onError: (err: unknown, variables, context: any) => {
+      queryClient.setQueryData(["sources", activeOrgId], context?.previousSources);
       const msg = err instanceof Error ? err.message : "Failed to update source";
       toast.error("Update failed", { description: msg });
     },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ["sources", activeOrgId] });
+      queryClient.invalidateQueries({ queryKey: ["source", selectedSourceId] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+    }
   });
 
   const [connectingAccount, setConnectingAccount] = useState(false);

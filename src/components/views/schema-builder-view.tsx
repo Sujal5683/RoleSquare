@@ -31,9 +31,9 @@ import type {
 import {
   PageHeader,
   EmptyState,
-  LoadingState,
   ErrorState,
 } from "@/components/ui/page-elements";
+import { SchemaBuilderSkeleton } from "@/components/ui/skeletons/schema-builder-skeleton";
 import { FieldTypeBadge, ConfidenceBadge } from "@/components/ui/status-badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -421,65 +421,126 @@ export function SchemaBuilderView() {
   const createSchemaMutation = useMutation({
     mutationFn: (payload: { name: string; description?: string }) =>
       api.post<SchemaDTO>("/api/schemas", payload),
+    onMutate: async (payload) => {
+      await queryClient.cancelQueries({ queryKey: ["schemas", activeOrgId] });
+      const previousSchemas = queryClient.getQueryData(["schemas", activeOrgId]);
+      queryClient.setQueryData(["schemas", activeOrgId], (old: any) => {
+        const newSchema = { id: "temp-" + Date.now(), ...payload, fields: [], _count: { datasets: 0 }, createdAt: new Date().toISOString() };
+        return [...(old || []), newSchema];
+      });
+      setCreateOpen(false);
+      setNewName("");
+      setNewDescription("");
+      return { previousSchemas };
+    },
     onSuccess: (schema) => {
       toast.success("Schema created", {
         description: schema.name,
       });
-      queryClient.invalidateQueries({ queryKey: ["schemas"] });
-      setCreateOpen(false);
-      setNewName("");
-      setNewDescription("");
       // Navigate to the new schema via the store so other views stay in sync.
       openSchema(schema.id, schema.name);
       setActiveSchemaId(schema.id);
     },
-    onError: (err: unknown) => {
+    onError: (err: unknown, newSchema, context: any) => {
+      queryClient.setQueryData(["schemas", activeOrgId], context?.previousSchemas);
       const msg = err instanceof Error ? err.message : "Failed to create schema";
       toast.error("Create failed", { description: msg });
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ["schemas", activeOrgId] });
     },
   });
 
   const deleteSchemaMutation = useMutation({
     mutationFn: () => api.delete(`/api/schemas/${activeSchemaId}`),
-    onSuccess: () => {
-      toast.success("Schema deleted");
-      queryClient.invalidateQueries({ queryKey: ["schemas"] });
+    onMutate: async () => {
+      await queryClient.cancelQueries({ queryKey: ["schemas", activeOrgId] });
+      const previousSchemas = queryClient.getQueryData(["schemas", activeOrgId]);
+      queryClient.setQueryData(["schemas", activeOrgId], (old: any) => 
+        (old || []).filter((s: any) => s.id !== activeSchemaId)
+      );
       setDeleteOpen(false);
+      const currentActive = activeSchemaId;
       setActiveSchemaId(null);
       openSchema(null);
+      return { previousSchemas, currentActive };
     },
-    onError: (err: unknown) => {
+    onSuccess: () => {
+      toast.success("Schema deleted");
+    },
+    onError: (err: unknown, variables, context: any) => {
+      queryClient.setQueryData(["schemas", activeOrgId], context?.previousSchemas);
+      setActiveSchemaId(context?.currentActive);
+      openSchema(context?.currentActive, "Restored Schema");
       const msg = err instanceof Error ? err.message : "Failed to delete schema";
       toast.error("Delete failed", { description: msg });
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ["schemas", activeOrgId] });
     },
   });
 
   const updateSchemaMutation = useMutation({
     mutationFn: (payload: unknown) =>
       api.patch<SchemaDTO>(`/api/schemas/${activeSchemaId}`, payload),
+    onMutate: async (payload: any) => {
+      await queryClient.cancelQueries({ queryKey: ["schemas", activeOrgId] });
+      await queryClient.cancelQueries({ queryKey: ["schema", activeSchemaId] });
+      const previousSchemas = queryClient.getQueryData(["schemas", activeOrgId]);
+      const previousSchema = queryClient.getQueryData(["schema", activeSchemaId]);
+      
+      queryClient.setQueryData(["schemas", activeOrgId], (old: any) => {
+        if (!old) return old;
+        return old.map((s: any) => s.id === activeSchemaId ? { ...s, ...payload } : s);
+      });
+      queryClient.setQueryData(["schema", activeSchemaId], (old: any) => {
+        if (!old) return old;
+        return { ...old, ...payload };
+      });
+      return { previousSchemas, previousSchema };
+    },
     onSuccess: () => {
       toast.success("Schema updated");
-      queryClient.invalidateQueries({ queryKey: ["schemas"] });
-      queryClient.invalidateQueries({ queryKey: ["schema", activeSchemaId] });
     },
-    onError: (err: unknown) => {
+    onError: (err: unknown, variables, context: any) => {
+      queryClient.setQueryData(["schemas", activeOrgId], context?.previousSchemas);
+      queryClient.setQueryData(["schema", activeSchemaId], context?.previousSchema);
       const msg = err instanceof Error ? err.message : "Failed to update schema";
       toast.error("Update failed", { description: msg });
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ["schemas", activeOrgId] });
+      queryClient.invalidateQueries({ queryKey: ["schema", activeSchemaId] });
     },
   });
 
   const createFieldMutation = useMutation({
     mutationFn: (payload: unknown) =>
       api.post<SchemaFieldDTO>(`/api/schemas/${activeSchemaId}/fields`, payload),
+    onMutate: async (payload: any) => {
+      await queryClient.cancelQueries({ queryKey: ["schema", activeSchemaId] });
+      const previousSchema = queryClient.getQueryData(["schema", activeSchemaId]);
+      queryClient.setQueryData(["schema", activeSchemaId], (old: any) => {
+        if (!old) return old;
+        return {
+          ...old,
+          fields: [...old.fields, { id: "temp-" + Date.now(), ...payload }],
+        };
+      });
+      setFieldDialog({ open: false, field: null });
+      return { previousSchema };
+    },
     onSuccess: () => {
       toast.success("Field added");
-      queryClient.invalidateQueries({ queryKey: ["schema", activeSchemaId] });
-      queryClient.invalidateQueries({ queryKey: ["schemas"] });
-      setFieldDialog({ open: false, field: null });
     },
-    onError: (err: unknown) => {
+    onError: (err: unknown, variables, context: any) => {
+      queryClient.setQueryData(["schema", activeSchemaId], context?.previousSchema);
       const msg = err instanceof Error ? err.message : "Failed to add field";
       toast.error("Add field failed", { description: msg });
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ["schema", activeSchemaId] });
+      queryClient.invalidateQueries({ queryKey: ["schemas", activeOrgId] });
     },
   });
 
@@ -498,7 +559,7 @@ export function SchemaBuilderView() {
     onSuccess: () => {
       toast.success("Field updated");
       queryClient.invalidateQueries({ queryKey: ["schema", activeSchemaId] });
-      queryClient.invalidateQueries({ queryKey: ["schemas"] });
+      queryClient.invalidateQueries({ queryKey: ["schemas", activeOrgId] });
       setFieldDialog({ open: false, field: null });
     },
     onError: (err: unknown) => {
@@ -510,16 +571,31 @@ export function SchemaBuilderView() {
   const deleteFieldMutation = useMutation({
     mutationFn: (fieldId: string) =>
       api.delete(`/api/schemas/${activeSchemaId}/fields/${fieldId}`),
+    onMutate: async (fieldId: string) => {
+      await queryClient.cancelQueries({ queryKey: ["schema", activeSchemaId] });
+      const previousSchema = queryClient.getQueryData(["schema", activeSchemaId]);
+      queryClient.setQueryData(["schema", activeSchemaId], (old: any) => {
+        if (!old) return old;
+        return {
+          ...old,
+          fields: old.fields.filter((f: any) => f.id !== fieldId),
+        };
+      });
+      setDeleteFieldTarget(null);
+      return { previousSchema };
+    },
     onSuccess: () => {
       toast.success("Field deleted");
-      queryClient.invalidateQueries({ queryKey: ["schema", activeSchemaId] });
-      queryClient.invalidateQueries({ queryKey: ["schemas"] });
-      setDeleteFieldTarget(null);
     },
-    onError: (err: unknown) => {
+    onError: (err: unknown, variables, context: any) => {
+      queryClient.setQueryData(["schema", activeSchemaId], context?.previousSchema);
       const msg = err instanceof Error ? err.message : "Failed to delete field";
       toast.error("Delete field failed", { description: msg });
     },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ["schema", activeSchemaId] });
+      queryClient.invalidateQueries({ queryKey: ["schemas", activeOrgId] });
+    }
   });
 
   const testExtractionMutation = useMutation({
@@ -733,7 +809,7 @@ export function SchemaBuilderView() {
       </Card>
 
       {listLoading ? (
-        <LoadingState rows={3} />
+        <SchemaBuilderSkeleton />
       ) : !activeSchemaId ? (
         <Card>
           <CardContent className="p-4">
@@ -751,7 +827,7 @@ export function SchemaBuilderView() {
           </CardContent>
         </Card>
       ) : schemaLoading ? (
-        <LoadingState rows={4} />
+        <SchemaBuilderSkeleton />
       ) : !activeSchema ? (
         <ErrorState message="Schema not found" />
       ) : (
