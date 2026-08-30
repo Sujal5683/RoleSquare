@@ -61,6 +61,13 @@ export function classifyUrl(url: string): ParsedLink | null {
   }
   const validUri = u.href;
 
+  // Google Sheets API uses java.net.URI which is stricter than Node's URL.
+  // We must reject URIs that Java would consider malformed, otherwise the entire sync fails.
+  if (u.hostname.includes("_")) return null;
+  if (/[^A-Za-z0-9\-._~:/?#[\]@!$&'()*+,;=%]/.test(validUri)) return null;
+  if (/%(?![0-9A-Fa-f]{2})/.test(validUri)) return null;
+
+
   const isDrive =
     url.includes("drive.google.com") ||
     url.includes("docs.google.com/spreadsheets") ||

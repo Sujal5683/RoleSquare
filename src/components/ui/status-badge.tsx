@@ -46,13 +46,14 @@ export function StatusBadge({
   status,
   className,
 }: {
-  status: string;
+  status?: string | null;
   className?: string;
 }) {
-  const v = statusVariant[status] ?? "secondary";
+  const safeStatus = status ?? "unknown";
+  const v = statusVariant[safeStatus] ?? "secondary";
   return (
     <Badge variant={v} className={cn("capitalize font-medium", className)}>
-      {status.replace("_", " ")}
+      {safeStatus.replace("_", " ")}
     </Badge>
   );
 }

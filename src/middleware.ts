@@ -24,6 +24,8 @@ const PUBLIC_PATHS = [
   "/api/google-sheets/auth/callback", // Google OAuth token exchange (Sheets)
   "/api/health",                     // health check
   "/api/debug-error",
+  "/api/jobs/process",               // Internal/cron job processing trigger
+  "/api/cron",                       // Cron jobs
 ];
 
 function isPublicPath(pathname: string): boolean {

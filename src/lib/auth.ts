@@ -176,7 +176,7 @@ async function getOrCreateUser(
       data: { id: userId, email, name, avatarUrl, role: "user" },
     });
     const org = await tx.organization.create({
-      data: { id: orgId, name: orgName, slug, createdBy: userId },
+      data: { id: orgId, name: orgName, slug, createdBy: userId, billingUserId: userId },
     });
     await tx.organizationMember.create({
       data: {

@@ -184,3 +184,95 @@ export async function writeDefaultDatasetRecord(
     });
   });
 }
+
+/**
+ * Writes a batch of parsed emails as DatasetRecord + DatasetValues into the default dataset.
+ * Skips records that already exist for their respective sourceEmailId.
+ */
+export async function writeDefaultDatasetRecordsBulk(
+  emailBatch: { emailId: string; fields: ParsedEmailFields }[],
+  datasetId: string,
+  schemaId: string
+): Promise<{ recordsCreated: number }> {
+  if (emailBatch.length === 0) return { recordsCreated: 0 };
+
+  // Load schema fields to get types for column creation
+  const schemaFields = await db.schemaField.findMany({
+    where: { schemaId },
+    select: { id: true, name: true, type: true, required: true },
+  });
+
+  // Merge incoming fields with DatasetColumnDef (additive — never removes columns)
+  const incomingFieldSpecs = schemaFields.map((f) => ({
+    id: f.id,
+    name: f.name,
+    type: f.type,
+    required: f.required,
+  }));
+  const columnIdByName = await mergeAndGetColumnIds(datasetId, incomingFieldSpecs);
+
+  // Check which records already exist to avoid duplicates
+  const emailIds = emailBatch.map(e => e.emailId);
+  const existingRecords = await db.datasetRecord.findMany({
+    where: { datasetId, sourceEmailId: { in: emailIds } },
+    select: { sourceEmailId: true },
+  });
+  const existingEmailIds = new Set(existingRecords.map(r => r.sourceEmailId));
+
+  // Filter out existing emails
+  const newEmails = emailBatch.filter(e => !existingEmailIds.has(e.emailId));
+  if (newEmails.length === 0) {
+    return { recordsCreated: 0 };
+  }
+
+  // Create new records + values in a transaction
+  return await db.$transaction(async (tx) => {
+    // 1. Bulk insert records and return them to get their IDs
+    const records = await tx.datasetRecord.createManyAndReturn({
+      data: newEmails.map(e => ({
+        datasetId,
+        sourceEmailId: e.emailId,
+        status: "valid",
+        confidence: 1.0,
+      })),
+      select: { id: true, sourceEmailId: true },
+    });
+
+    const recordIdByEmailId = new Map(records.map(r => [r.sourceEmailId, r.id]));
+
+    // 2. Prepare values for all new records
+    const valuesToCreate = newEmails.flatMap(e => {
+      const recordId = recordIdByEmailId.get(e.emailId);
+      if (!recordId) return [];
+      
+      return Object.entries(e.fields)
+        .map(([name, value]) => {
+          const columnId = columnIdByName.get(name);
+          if (!columnId) return null;
+          return {
+            recordId: recordId,
+            fieldId: columnId,
+            value: JSON.stringify(value ?? ""),
+            confidence: 1.0,
+            evidence: "Deterministically extracted from Gmail API",
+            modelUsed: "deterministic",
+            promptVersion: "v1",
+          };
+        })
+        .filter((v): v is NonNullable<typeof v> => v !== null);
+    });
+
+    // 3. Bulk insert values
+    if (valuesToCreate.length > 0) {
+      await tx.datasetValue.createMany({ data: valuesToCreate });
+    }
+
+    // 4. Update dataset count
+    await tx.dataset.update({
+      where: { id: datasetId },
+      data: { recordCount: { increment: records.length } },
+    });
+
+    return { recordsCreated: records.length };
+  }, { maxWait: 10000, timeout: 30000 });
+}

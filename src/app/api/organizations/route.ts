@@ -66,6 +66,7 @@ export async function POST(req: NextRequest) {
         slug,
         plan: "free",
         createdBy: user.id,
+        billingUserId: user.id,
         members: {
           create: { userId: user.id, role: "owner", status: "active" },
         },

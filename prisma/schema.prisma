@@ -41,6 +41,7 @@ model User {
   sentInvitations    Invitation[]     @relation("SentInvitations")
   datasetAccessGrants DatasetAccess[] @relation("GranteeUserAccess")
   assistantSessions  AssistantSession[]
+  billedOrganizations Organization[] @relation("OrgBillingUser")
 }
 
 model Organization {
@@ -79,6 +80,8 @@ model Organization {
   spreadsheetConnections SpreadsheetConnection[]
   sheetMappings          SheetMapping[]
   assistantSessions      AssistantSession[]
+  billingUserId          String?
+  billingUser            User?            @relation("OrgBillingUser", fields: [billingUserId], references: [id])
 }
 
 model ApiKey {

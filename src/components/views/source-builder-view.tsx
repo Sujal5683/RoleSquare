@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { Stepper } from "@/components/ui/stepper";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useActiveOrg } from "@/hooks/use-active-org";
@@ -272,42 +272,42 @@ export function SourceBuilderView() {
   const [isSimulating, setIsSimulating] = useState(false);
   const [simulationResult, setSimulationResult] = useState<any>(null);
 
-  // Prefill form when editing — render-time state adjustment (React
-  // recommended pattern, avoids setState-in-effect). Re-prefills whenever the
-  // loaded source id changes (e.g. user opens a different source to edit).
-  if (isEdit && existingSource && existingSource.id !== prefilledSourceId) {
-    const rules: RuleDraft[] = (existingSource.rules ?? []).map(
-      (r: SourceRuleDTO) => ({
-        id: r.id ?? makeLocalId(),
-        filterType: r.filterType,
-        operator: r.operator,
-        value: ruleValueToString(r.value),
-        metadata: r.metadata ?? undefined,
-      })
-    );
-    let ruleOperator: "AND" | "OR" = "AND";
-    if (existingSource.config) {
-      try {
-        const config = JSON.parse(existingSource.config);
-        if (config.ruleOperator === "OR") ruleOperator = "OR";
-      } catch (e) { /* ignore */ }
-    }
+  // Prefill form when editing
+  useEffect(() => {
+    if (isEdit && existingSource && existingSource.id !== prefilledSourceId) {
+      const rules: RuleDraft[] = (existingSource.rules ?? []).map(
+        (r: SourceRuleDTO) => ({
+          id: r.id ?? makeLocalId(),
+          filterType: r.filterType,
+          operator: r.operator,
+          value: ruleValueToString(r.value),
+          metadata: r.metadata ?? undefined,
+        })
+      );
+      let ruleOperator: "AND" | "OR" = "AND";
+      if (existingSource.config) {
+        try {
+          const config = JSON.parse(existingSource.config);
+          if (config.ruleOperator === "OR") ruleOperator = "OR";
+        } catch (e) { /* ignore */ }
+      }
 
-    setForm({
-      name: existingSource.name,
-      description: existingSource.description ?? "",
-      sourceType: existingSource.sourceType,
-      googleConnectionId: existingSource.googleConnectionId,
-      rules,
-      ruleOperator,
-      scheduleMode: existingSource.scheduleMode,
-      scheduleExpr: existingSource.scheduleExpr,
-      maxEmailsPerScan: existingSource.maxEmailsPerScan ?? 100,
-      schemaId: existingSource.schemaId ?? "",
-      datasetId: existingSource.datasetId ?? "",
-    });
-    setPrefilledSourceId(existingSource.id);
-  }
+      setDraft({
+        name: existingSource.name,
+        description: existingSource.description ?? "",
+        sourceType: existingSource.sourceType,
+        googleConnectionId: existingSource.googleConnectionId,
+        rules,
+        ruleOperator,
+        scheduleMode: existingSource.scheduleMode,
+        scheduleExpr: existingSource.scheduleExpr,
+        maxEmailsPerScan: existingSource.maxEmailsPerScan ?? 100,
+        schemaId: existingSource.schemaId ?? "",
+        datasetId: existingSource.datasetId ?? "",
+      });
+      setPrefilledSourceId(existingSource.id);
+    }
+  }, [isEdit, existingSource, prefilledSourceId, setDraft]);
 
   const handleTestSimulation = async () => {
     if (!form.googleConnectionId) return;

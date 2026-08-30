@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api-client";
 import { useAppStore } from "@/lib/store";
@@ -42,6 +42,39 @@ export function SidebarJobsWidget() {
   });
 
   const activeJobs = data?.data?.filter((j) => j.status === "running" || j.status === "queued") || [];
+  const hasActiveJobs = activeJobs.length > 0;
+  const processingRef = useRef(false);
+
+  useEffect(() => {
+    if (!hasActiveJobs) return;
+    
+    let isMounted = true;
+    const pokeProcessor = async () => {
+      if (!isMounted || !hasActiveJobs) return;
+      if (processingRef.current) {
+        setTimeout(pokeProcessor, 5000);
+        return;
+      }
+      
+      processingRef.current = true;
+      try {
+        await api.post("/api/jobs/process");
+      } catch (err) {
+        // ignore
+      } finally {
+        processingRef.current = false;
+        if (isMounted) {
+          setTimeout(pokeProcessor, 2000);
+        }
+      }
+    };
+
+    pokeProcessor();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [hasActiveJobs]);
 
   // Ensure index is within bounds if jobs complete
   const index = Math.min(currentIndex, Math.max(0, activeJobs.length - 1));

@@ -42,7 +42,7 @@ import {
 }                                       from "@/lib/google-client";
 import { parseEmailFields }             from "@/lib/email-parser";
 import type { ParsedEmailFields }       from "@/lib/email-parser";
-import { ensureDefaultDataset, writeDefaultDatasetRecord } from "@/lib/dataset-provisioner";
+import { ensureDefaultDataset, writeDefaultDatasetRecord, writeDefaultDatasetRecordsBulk } from "@/lib/dataset-provisioner";
 import { extractWithLLM }               from "@/lib/extraction";
 import { exploreLinkedContent, extractAllUrls, filterDriveUrls } from "@/lib/drive-reader";
 import { agentInfo, agentWarn, agentError } from "@/lib/agent-logger";
@@ -693,14 +693,16 @@ async function processDeterministicSync(
   const source = await db.source.findUnique({ where: { id: sourceId }, select: { schemaId: true } });
   if (!source?.schemaId) return { note: "Source has no schemaId" };
 
+  // Fetch up to 501 to check if there are more
   const emails = await db.email.findMany({
     where: { sourceId, processingStatus: "matched" },
-    take: 51,
+    take: 501,
     orderBy: { receivedAt: "asc" },
   });
-  const hasMore   = emails.length === 51;
-  const batchEmails = emails.slice(0, 50);
-  let recordsSynced = 0;
+  const hasMore   = emails.length === 501;
+  const batchEmails = emails.slice(0, 500);
+
+  const emailBatchToInsert: { emailId: string, fields: ParsedEmailFields }[] = [];
 
   for (const email of batchEmails) {
     const parsedFields: ParsedEmailFields = {
@@ -764,9 +766,17 @@ async function processDeterministicSync(
         }).join("; ");
     }
 
-    await writeDefaultDatasetRecord(email.id, datasetId, parsedFields, source.schemaId);
-    await db.email.update({ where: { id: email.id }, data: { processingStatus: "extracted" } });
-    recordsSynced++;
+    emailBatchToInsert.push({ emailId: email.id, fields: parsedFields });
+  }
+
+  const { recordsCreated } = await writeDefaultDatasetRecordsBulk(emailBatchToInsert, datasetId, source.schemaId);
+  
+  if (batchEmails.length > 0) {
+    const emailIds = batchEmails.map(e => e.id);
+    await db.email.updateMany({
+      where: { id: { in: emailIds } },
+      data: { processingStatus: "extracted" },
+    });
   }
 
   if (hasMore) {
@@ -775,7 +785,7 @@ async function processDeterministicSync(
     });
   }
 
-  return { recordsSynced, emailsProcessed: batchEmails.length };
+  return { recordsSynced: recordsCreated, emailsProcessed: batchEmails.length };
 }
 
 // ── EXPORT ────────────────────────────────────────────────────────────────────
