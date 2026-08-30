@@ -40,6 +40,7 @@ model User {
   jobs               AiJob[]
   sentInvitations    Invitation[]     @relation("SentInvitations")
   datasetAccessGrants DatasetAccess[] @relation("GranteeUserAccess")
+  assistantSessions  AssistantSession[]
 }
 
 model Organization {
@@ -77,6 +78,7 @@ model Organization {
   googleSheetsAccounts   GoogleSheetsAccount[]
   spreadsheetConnections SpreadsheetConnection[]
   sheetMappings          SheetMapping[]
+  assistantSessions      AssistantSession[]
 }
 
 model ApiKey {
@@ -959,3 +961,71 @@ model Invoice {
   @@index([organizationId])
 }
 
+// ────────────────────────────────────────────────────────────────────────────
+// AI Assistant — Chat Sessions & Messages
+//
+// Each user gets their own per-session history, scoped to both the user AND
+// the organization (multi-tenant). Content is AES-256-GCM encrypted at the
+// API layer before being written here — the DB never sees plaintext messages.
+//
+// Retention: sessions older than 7 days are soft-deleted via expiresAt.
+// Lazy-deletion happens in the list route (sessions past expiresAt are excluded).
+// ────────────────────────────────────────────────────────────────────────────
+
+/// One conversation thread between a user and the AI assistant.
+/// Scoped to a specific user + organization pair. Only the owning user
+/// can read or write this session — enforced in every API route.
+model AssistantSession {
+  id             String    @id @default(cuid())
+  /// The user who owns this session
+  userId         String
+  /// The organization context the session was started in
+  organizationId String
+  /// Display title auto-generated from the first user message (truncated, not encrypted)
+  title          String    @default("New conversation")
+  updatedAt      DateTime  @updatedAt
+  createdAt      DateTime  @default(now())
+  /// Hard expiry: sessions are excluded from lists after this point (7 days from creation)
+  expiresAt      DateTime
+  /// Soft-delete — set on explicit user delete, also set during pruning
+  deletedAt      DateTime?
+  /// Whether suggestion mode was active for this session
+  suggestionMode Boolean   @default(false)
+
+  user         User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  messages     AssistantMessage[]
+
+  @@index([userId])
+  @@index([organizationId])
+  @@index([userId, organizationId])
+  @@index([expiresAt])
+}
+
+/// A single message turn in an AssistantSession.
+/// The `content` and `toolResult` fields hold AES-256-GCM ciphertext
+/// (format: "<base64-ciphertext>:<base64-iv>") — never stored in plaintext.
+model AssistantMessage {
+  id          String   @id @default(cuid())
+  sessionId   String
+  /// "user" | "assistant"
+  role        String
+  /// AES-256-GCM encrypted message content (format: ciphertext:iv, both base64)
+  content     String
+  /// Tool name that was called for this turn (if any); stored unencrypted for audit
+  toolName    String?
+  /// AES-256-GCM encrypted JSON tool result blob (if any)
+  toolResult  String?
+  /// Gemini model display name used for this assistant turn
+  modelUsed   String?
+  /// Undo token for reversing a completed write action (base64-JSON, time-limited)
+  undoToken   String?
+  /// Sequential position within the session — used for stable ordering
+  position    Int
+  createdAt   DateTime @default(now())
+
+  session AssistantSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId])
+  @@index([sessionId, position])
+}

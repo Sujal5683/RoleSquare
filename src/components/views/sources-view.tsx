@@ -151,7 +151,10 @@ export function SourcesView() {
     queryKey: ["sources", activeOrgId],
     queryFn: () => api.get<SourceDTO[]>("/api/sources"),
     enabled: !!activeOrgId,
-    refetchInterval: 3000,
+    refetchInterval: (query) => {
+      const activeScans = query.state.data?.filter((s: any) => s.runState !== "idle") || [];
+      return activeScans.length > 0 ? 3000 : false;
+    },
   });
 
   // Runs query — only enabled when a source is opened in the dialog
@@ -160,7 +163,10 @@ export function SourcesView() {
     queryFn: () =>
       api.get<SourceRunDTO[]>(`/api/sources/${runsDialogSource!.id}/runs`),
     enabled: !!runsDialogSource,
-    refetchInterval: 2000,
+    refetchInterval: (query) => {
+      const activeRuns = query.state.data?.filter((r: any) => r.status === "running") || [];
+      return activeRuns.length > 0 ? 2000 : false;
+    },
   });
 
   const scanMutation = useMutation({

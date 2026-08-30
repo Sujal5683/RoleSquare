@@ -82,10 +82,9 @@ export function validateSheetSchema(
   // Filter out the hidden __row_id__ column if present
   const actualHeaders = actual.filter((h) => h !== "__row_id__");
 
-  // Compute fingerprints
+  // Compute expected fingerprint (used for DB storage / change detection)
   const expectedFingerprint = computeSchemaFingerprint(expected);
-
-  // Build a fake ColumnSpec[] from actual headers for fingerprint comparison
+  // Actual fingerprint also computed for storage purposes (not for match logic)
   const actualAsColumns: ColumnSpec[] = actualHeaders.map((h, i) => ({
     columnId: `unknown_${i}`,
     name: h,
@@ -94,7 +93,18 @@ export function validateSheetSchema(
     required: false,
   }));
   const actualFingerprint = computeSchemaFingerprint(actualAsColumns);
-  const fingerprintMatch = expectedFingerprint === actualFingerprint;
+
+  // ── Fingerprint match: compare column NAMES in position order ────────────
+  // The old code compared full ColumnSpecs including columnId, which always
+  // differed (app uses stable UUIDs, sheet headers have none). The correct
+  // comparison is: do the sheet headers match the app column names in order?
+  const expectedNames = [...expected]
+    .sort((a, b) => a.position - b.position)
+    .map((c) => c.name.toLowerCase().trim());
+  const actualNames = actualHeaders.map((h) => h.toLowerCase().trim());
+  const fingerprintMatch =
+    expectedNames.length === actualNames.length &&
+    expectedNames.every((name, i) => name === actualNames[i]);
 
   // -- Check for blank headers
   actualHeaders.forEach((h, i) => {

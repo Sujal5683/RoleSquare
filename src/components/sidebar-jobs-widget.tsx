@@ -23,9 +23,12 @@ export function SidebarJobsWidget() {
 
   // Fetch recent jobs and filter active ones on the client
   const { data, refetch } = useQuery<JobListResponse>({
-    queryKey: ["recent-ai-jobs-widget"],
+    queryKey: ["ai-jobs", "recent-widget"],
     queryFn: () => api.get<JobListResponse>(`/api/ai-jobs?pageSize=20`),
-    refetchInterval: 2500,
+    refetchInterval: (query) => {
+      const activeJobs = query.state.data?.data?.filter((j: any) => j.status === "running" || j.status === "queued") || [];
+      return activeJobs.length > 0 ? 2500 : false;
+    },
   });
 
   const { data: sources } = useQuery({

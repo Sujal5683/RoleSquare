@@ -442,7 +442,7 @@ export function ExtractionWizard() {
             </div>
 
             <div className="rounded-md border bg-muted text-foreground font-mono text-[11px] p-3 h-48 overflow-y-auto">
-              <LiveLogs jobId={jobId} />
+              <LiveLogs jobId={jobId} isJobFinished={jobStatus?.status === "success" || jobStatus?.status === "failed"} />
             </div>
 
             {(jobStatus?.status === "success" || jobStatus?.status === "failed") && (
@@ -459,12 +459,12 @@ export function ExtractionWizard() {
   );
 }
 
-function LiveLogs({ jobId }: { jobId: string | null }) {
+function LiveLogs({ jobId, isJobFinished }: { jobId: string | null, isJobFinished?: boolean }) {
   const { data } = useQuery({
     queryKey: ["agent-logs", jobId],
     queryFn: () => api.get<{ data: AgentLogDTO[] }>(`/api/agent-logs?jobId=${jobId}&pageSize=50`),
     enabled: !!jobId,
-    refetchInterval: 3000,
+    refetchInterval: isJobFinished ? false : 3000,
   });
 
   if (!data?.data?.length) return <span className="text-muted-foreground/50">Waiting for logs...</span>;

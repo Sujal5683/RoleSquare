@@ -2,8 +2,7 @@
 
 // SyncDashboard
 // Shows current sync status, stats, quick actions (sync now, pause, unlink),
-// conflict count, and links to history and conflict resolution.
-// Shown in a side panel or inline on the dataset detail page.
+// conflict count, schedule selector, and links to history and conflict resolution.
 
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -20,6 +19,13 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   AlertTriangle,
   CheckCircle2,
   ChevronRight,
@@ -31,11 +37,10 @@ import {
   Pause,
   Play,
   RefreshCw,
-  Settings,
-  Trash2,
+  Timer,
   Unlink,
 } from "lucide-react";
-import { formatDistanceToNow } from "date-fns";
+import { formatDistanceToNow, formatDistance } from "date-fns";
 import { cn } from "@/lib/utils";
 import { SyncStatusBadge } from "@/components/google-sheets/sync-status-badge";
 import { ConflictResolver } from "@/components/google-sheets/conflict-resolver";
@@ -57,6 +62,8 @@ interface SheetMappingDTO {
   syncState: {
     enabled: boolean;
     conflictStrategy: string;
+    scheduleMode: string;
+    scheduleExpr: string;
     lastSyncAt: string | null;
     lastSyncStatus: string | null;
     nextSyncAt: string | null;
@@ -82,6 +89,17 @@ interface SyncDashboardProps {
   onUnlinked?: () => void;
   className?: string;
 }
+
+const SCHEDULE_OPTIONS = [
+  { value: "5m",     label: "Every 5 minutes" },
+  { value: "15m",    label: "Every 15 minutes" },
+  { value: "30m",    label: "Every 30 minutes" },
+  { value: "1h",     label: "Every hour" },
+  { value: "6h",     label: "Every 6 hours" },
+  { value: "12h",    label: "Every 12 hours" },
+  { value: "1d",     label: "Every day" },
+  { value: "manual", label: "Manual only" },
+];
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
@@ -131,6 +149,19 @@ export function SyncDashboard({
     },
   });
 
+  const changeSchedule = useMutation({
+    mutationFn: (scheduleExpr: string) =>
+      api.patch(`/api/google-sheets/mappings/${sheetMappingId}`, {
+        scheduleExpr,
+        scheduleMode: scheduleExpr === "manual" ? "manual" : "interval",
+      }),
+    onSuccess: () => {
+      toast.success("Sync schedule updated");
+      queryClient.invalidateQueries({ queryKey: ["sheet-mapping", sheetMappingId] });
+    },
+    onError: () => toast.error("Failed to update schedule"),
+  });
+
   const unlinkMutation = useMutation({
     mutationFn: () =>
       api.delete(`/api/google-sheets/mappings/${sheetMappingId}`),
@@ -163,6 +194,18 @@ export function SyncDashboard({
   const isSyncing = mapping.status === "syncing";
   const isPaused = mapping.status === "paused" || !syncState?.enabled;
   const syncStatus = mapping.pendingConflicts > 0 ? "conflict" : (mapping.status as any);
+
+  // Compute next sync display
+  const nextSyncAt = syncState?.nextSyncAt ? new Date(syncState.nextSyncAt) : null;
+  const scheduleExpr = syncState?.scheduleExpr ?? "5m";
+  const isManual = syncState?.scheduleMode === "manual" || scheduleExpr === "manual";
+  const nextSyncLabel = isManual
+    ? "Manual only"
+    : nextSyncAt
+    ? nextSyncAt <= new Date()
+      ? "Due now"
+      : `in ${formatDistance(nextSyncAt, new Date())}`
+    : "Pending first sync";
 
   return (
     <div className={cn("space-y-4", className)}>
@@ -250,8 +293,8 @@ export function SyncDashboard({
         />
       </div>
 
-      {/* Direction badge */}
-      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+      {/* Direction + strategy badges */}
+      <div className="flex items-center gap-2 text-xs text-muted-foreground flex-wrap">
         <Badge variant="outline" className="text-[10px]">
           {mapping.direction === "bidirectional"
             ? "↕ Two-way"
@@ -262,6 +305,30 @@ export function SyncDashboard({
         <Badge variant="outline" className="text-[10px]">
           Conflicts: {syncState?.conflictStrategy ?? "flag"}
         </Badge>
+      </div>
+
+      {/* Next sync row */}
+      <div className="flex items-center gap-2 rounded-md border bg-muted/40 px-3 py-2">
+        <Timer className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+        <span className="text-xs text-muted-foreground flex-1">
+          {isPaused ? "Sync paused" : `Next sync: ${nextSyncLabel}`}
+        </span>
+        <Select
+          value={scheduleExpr}
+          onValueChange={(v) => changeSchedule.mutate(v)}
+          disabled={changeSchedule.isPending}
+        >
+          <SelectTrigger className="h-6 text-[10px] w-auto min-w-[110px] border-none bg-transparent px-1 focus:ring-0">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent align="end">
+            {SCHEDULE_OPTIONS.map((opt) => (
+              <SelectItem key={opt.value} value={opt.value} className="text-xs">
+                {opt.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
 
       {/* Sync now CTA */}

@@ -103,8 +103,8 @@ export interface GeminiCallOptions {
   fileParts?: GeminiPart[];
   /**
    * Per-attempt timeout in milliseconds.
-   * Default: 120_000 ms (2 minutes) — handles large multimodal documents.
-   * Lower to ~15_000 for simple text-only classification calls.
+   * Default: 25_000 ms (25 seconds) — for fast chat fallback.
+   * Override to ~120_000 for large background document classification.
    */
   timeoutMs?: number;
 }
@@ -160,7 +160,7 @@ export async function callGeminiWithFallback(
   }
 
   const genAI = new GoogleGenerativeAI(apiKey);
-  const timeoutMs = opts.timeoutMs ?? 120_000;
+  const timeoutMs = opts.timeoutMs ?? 25_000;
 
   const rateLimitErrors: string[] = [];
   const otherErrors: string[] = [];
@@ -240,7 +240,8 @@ export async function callGeminiWithFallback(
       const isOverloaded =
         errMsg.includes("503") ||
         errMsg.includes("UNAVAILABLE") ||
-        errMsg.includes("MODEL_CAPACITY_EXHAUSTED");
+        errMsg.includes("MODEL_CAPACITY_EXHAUSTED") ||
+        errMsg.includes("Timeout");
 
       if (isRateLimit || isOverloaded) {
         markBlocked(modelDef.id, modelDef.rpmCooldownMs);

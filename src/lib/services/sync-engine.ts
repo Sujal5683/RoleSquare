@@ -4,19 +4,19 @@
 // and Google Sheet rows.
 //
 // Sync cycle:
-//   1. Validate schema (fingerprint check) — abort if schema mismatch
+//   1. Validate schema (name-order fingerprint check) — abort if schema mismatch
 //   2. Fetch all app rows with their external IDs
 //   3. Fetch all sheet rows
 //   4. Match rows by stable externalId (hidden __row_id__ column)
 //   5. For each matched pair: detect conflicts, apply non-conflicting changes
-//   6. Handle unmatched app rows (sheet deletions) and new sheet rows (new data)
-//   7. Push app-only changes to sheet
-//   8. Record sync event + update sync state
+//   6. Handle unmatched app rows (new push) and new sheet rows (new import)
+//   7. Push app-only changes to sheet using rich formatting
+//   8. Record sync event + update sync state + set nextSyncAt
 //
 // Identity contract:
 //   - Each row has a stable UUID stored in column "__row_id__" in the sheet
 //   - We NEVER use row numbers as identity
-//   - Row numbers are only used to locate rows for writing
+//   - Row numbers are only used to locate rows for in-place updates
 
 import { db } from "@/lib/db";
 import { logAudit } from "@/lib/audit";
@@ -31,11 +31,15 @@ import {
 } from "@/lib/services/schema-versioning";
 import {
   getSheetAllRows,
-  writeRowsToSheet,
-  appendRowsToSheet,
-  deleteSheetRow,
   writeSheetHeaders,
 } from "@/lib/services/sheet-discovery";
+import {
+  writeFormattedSheet,
+  appendFormattedRows,
+  updateFormattedRow,
+  applyTableFormatting,
+  parseScheduleExprMs,
+} from "@/lib/services/sheets-formatter";
 import {
   isConflict,
   recordConflict,
@@ -115,12 +119,12 @@ export async function runSync(
     const sheetsAccountId = spreadsheetConnection.sheetsAccountId;
     const spreadsheetId = spreadsheetConnection.spreadsheetId;
     const sheetName = mapping.sheetName;
+    const sheetId = mapping.sheetId;
 
     // 1. Get current columns
     let columns = await getCurrentColumns(mapping.datasetId);
     if (!columns.length) {
-      // Fallback: read from DatasetColumnDef directly (handles datasets that have
-      // imported columns but no formal Schema linked yet)
+      // Fallback: read from DatasetColumnDef directly
       const rawCols = await db.datasetColumnDef.findMany({
         where: { datasetId: mapping.datasetId, isDeleted: false },
         orderBy: { position: "asc" },
@@ -166,24 +170,40 @@ export async function runSync(
     // 2a. If the sheet is completely empty (no headers), bootstrap it now.
     // This happens when a new tab is linked but no initial push was triggered.
     if (rawHeaders.length === 0 && mapping.direction !== "from_sheet") {
-      console.info(`[sync] Sheet is empty — bootstrapping headers and rows for mapping ${sheetMappingId}`);
-      await initialSheetPush(sheetMappingId, sheetsAccountId, spreadsheetId, sheetName, columns, mapping.datasetId);
+      console.info(
+        `[sync] Sheet is empty — bootstrapping headers and rows for mapping ${sheetMappingId}`
+      );
+      await initialSheetPush(
+        sheetMappingId,
+        sheetsAccountId,
+        spreadsheetId,
+        sheetId,
+        sheetName,
+        columns,
+        mapping.datasetId
+      );
 
       // After initial push all app records have been written; mark as success and return
-      result.rowsAdded = await db.datasetRecord.count({ where: { datasetId: mapping.datasetId } });
+      result.rowsAdded = await db.datasetRecord.count({
+        where: { datasetId: mapping.datasetId },
+      });
       await db.sheetMapping.update({
         where: { id: sheetMappingId },
         data: { status: "active" },
       });
       await finalizeSyncEvent(syncEvent.id, { status: "success" });
-      await updateSyncState(sheetMappingId, "success", result);
+      await updateSyncState(sheetMappingId, "success", result, mapping.syncState?.scheduleExpr);
       return result;
     }
 
     // 3. Validate schema
     const rowIdIdx = rawHeaders.indexOf(ROW_ID_HEADER);
     const dataHeaders = rawHeaders.filter((h) => h !== ROW_ID_HEADER);
-    const schemaResult = validateSheetSchema(columns, dataHeaders, mapping.dataset.recordCount);
+    const schemaResult = validateSheetSchema(
+      columns,
+      dataHeaders,
+      mapping.dataset.recordCount
+    );
 
     if (!schemaResult.valid) {
       // Schema mismatch — pause sync, don't proceed with data sync
@@ -199,7 +219,7 @@ export async function runSync(
         errorDetail: `Schema mismatch: ${changes.length} change(s) detected`,
       });
 
-      await updateSyncState(sheetMappingId, "schema_change", result);
+      await updateSyncState(sheetMappingId, "schema_change", result, mapping.syncState?.scheduleExpr);
 
       return {
         ...result,
@@ -217,7 +237,9 @@ export async function runSync(
         mapping.organizationId
       );
       if (autoResolved > 0) {
-        console.info(`[sync] Auto-resolved ${autoResolved} conflicts using strategy: ${strategy}`);
+        console.info(
+          `[sync] Auto-resolved ${autoResolved} conflicts using strategy: ${strategy}`
+        );
       }
     }
 
@@ -226,13 +248,13 @@ export async function runSync(
       .map((rawRow, i) => {
         const externalId = rowIdIdx >= 0 ? (rawRow[rowIdIdx] || "") : "";
         const values: Record<string, string> = {};
-        dataHeaders.forEach((header, hi) => {
+        dataHeaders.forEach((header) => {
           const rawIdx = rawHeaders.indexOf(header);
           values[header] = rawIdx >= 0 ? (rawRow[rawIdx] || "") : "";
         });
         return {
           externalId,
-          rowIndex: i + 2, // +2: row 1 = headers
+          rowIndex: i + 2, // +2: row 1 = headers, data starts at row 2
           values,
         };
       })
@@ -241,9 +263,6 @@ export async function runSync(
     // 6. Fetch app rows with external IDs
     const appExternalIds = await db.datasetRowExternalId.findMany({
       where: { sheetMappingId },
-      include: {
-        dataset: false,
-      },
     });
 
     const appRecords = await db.datasetRecord.findMany({
@@ -265,9 +284,7 @@ export async function runSync(
 
     // ── Direction: App → Sheet (push app changes to sheet) ────────────────────
     if (mapping.direction !== "from_sheet") {
-      const rowsToAppend: string[][] = [];
-      const sheetUpdates: Array<{ rowIndex: number; rowData: string[] }> = [];
-      // External ID records to create AFTER successful batch append
+      const rowsToAppend: Array<{ values: string[]; externalId: string }> = [];
       const pendingExternalIds: Array<{ recordId: string; externalId: string }> = [];
 
       for (const record of appRecords) {
@@ -275,53 +292,76 @@ export async function runSync(
 
         if (!extId) {
           // New app record — push to sheet as a new row
-          // IMPORTANT: create the externalId DB record AFTER the append succeeds,
-          // not before, to avoid orphaned IDs if the sheet write fails mid-way.
           const newExtId = randomUUID();
-          const rowData = buildSheetRow(record, columns, newExtId);
-          rowsToAppend.push(rowData);
-
-          // Store (extId, record.id) to create mappings after batch append
+          const rowValues = columns.map((col) => {
+            const val = record.values.find((v) => v.fieldId === col.columnId);
+            if (!val) return "";
+            try {
+              const parsed = JSON.parse(val.value);
+              return parsed == null ? "" : String(parsed);
+            } catch {
+              return String(val.value ?? "");
+            }
+          });
+          rowsToAppend.push({ values: rowValues, externalId: newExtId });
           pendingExternalIds.push({ recordId: record.id, externalId: newExtId });
-
           result.rowsAdded++;
           continue;
         }
 
         // Existing record — check if sheet row exists and if values differ
         const sheetRow = sheetRowByExternalId.get(extId);
-        if (!sheetRow) {
-          // Sheet row was deleted — skip (handled in from_sheet direction below)
-          continue;
-        }
+        if (!sheetRow) continue; // Sheet row was deleted
 
         // Check each column for differences
         let hasChanges = false;
         for (const col of columns) {
-          const appVal = record.values.find((v) => {
-            // Try matching by fieldId or field name
-            return v.fieldId === col.columnId;
-          });
+          const appVal = record.values.find((v) => v.fieldId === col.columnId);
           const appRaw = appVal ? String(appVal.value ?? "") : "";
           const sheetRaw = sheetRow.values[col.name] ?? "";
-
-          if (appRaw !== sheetRaw) {
+          // Compare JSON-decoded app value with raw sheet value
+          let appDecoded = appRaw;
+          try { appDecoded = String(JSON.parse(appRaw) ?? ""); } catch {}
+          if (appDecoded !== sheetRaw) {
             hasChanges = true;
             break;
           }
         }
 
         if (hasChanges) {
-          const rowData = buildSheetRow(record, columns, extId);
-          sheetUpdates.push({ rowIndex: sheetRow.rowIndex, rowData });
+          const rowValues = columns.map((col) => {
+            const val = record.values.find((v) => v.fieldId === col.columnId);
+            if (!val) return "";
+            try {
+              const parsed = JSON.parse(val.value);
+              return parsed == null ? "" : String(parsed);
+            } catch {
+              return String(val.value ?? "");
+            }
+          });
+          // Update in-place using rich formatting (rowIndex is 1-based, batchUpdate is 0-based)
+          await updateFormattedRow(
+            sheetsAccountId,
+            spreadsheetId,
+            sheetId,
+            sheetRow.rowIndex - 1, // convert to 0-based
+            rowValues,
+            extId
+          );
           result.rowsUpdated++;
         }
       }
 
-      // Append new rows in batch — create external ID mappings only after success
+      // Append new rows in batch using rich formatting
       if (rowsToAppend.length > 0) {
-        await appendRowsToSheet(sheetsAccountId, spreadsheetId, sheetName, rowsToAppend);
-        // Now that the append succeeded, safely create the DB mappings
+        await appendFormattedRows(
+          sheetsAccountId,
+          spreadsheetId,
+          sheetId,
+          sheetName,
+          rowsToAppend
+        );
+        // Now that the append succeeded, create the DB mappings
         for (const { recordId, externalId } of pendingExternalIds) {
           await db.datasetRowExternalId.create({
             data: {
@@ -333,11 +373,6 @@ export async function runSync(
           });
         }
       }
-
-      // Apply updates
-      for (const { rowIndex, rowData } of sheetUpdates) {
-        await writeRowsToSheet(sheetsAccountId, spreadsheetId, sheetName, [rowData], rowIndex);
-      }
     }
 
     // ── Direction: Sheet → App (pull sheet changes into app) ──────────────────
@@ -347,15 +382,13 @@ export async function runSync(
 
         if (!recordId) {
           // New sheet row — create app record
-          if (mapping.direction !== "to_sheet") {
-            await createRecordFromSheetRow(
-              mapping.datasetId,
-              columns,
-              sheetRow,
-              sheetMappingId
-            );
-            result.rowsAdded++;
-          }
+          await createRecordFromSheetRow(
+            mapping.datasetId,
+            columns,
+            sheetRow,
+            sheetMappingId
+          );
+          result.rowsAdded++;
           continue;
         }
 
@@ -366,12 +399,18 @@ export async function runSync(
         for (const col of columns) {
           const sheetRaw = sheetRow.values[col.name] ?? "";
           const appVal = appRecord.values.find((v) => v.fieldId === col.columnId);
-          const appRaw = appVal ? String(appVal.value ?? "") : "";
+          let appRaw = "";
+          if (appVal) {
+            try { appRaw = String(JSON.parse(appVal.value) ?? ""); } catch { appRaw = String(appVal.value ?? ""); }
+          }
 
           if (sheetRaw === appRaw) continue; // No change
 
           // Validate the sheet value before applying
-          const validation = validateCellValue(sheetRaw, col.dataType as Parameters<typeof validateCellValue>[1]);
+          const validation = validateCellValue(
+            sheetRaw,
+            col.dataType as Parameters<typeof validateCellValue>[1]
+          );
           if (!validation.valid) {
             result.errors++;
             console.warn(
@@ -384,7 +423,11 @@ export async function runSync(
           const extIdRecord = appExternalIds.find((e) => e.recordId === recordId);
           const lastSyncedAt = extIdRecord?.lastSyncedAt;
 
-          if (lastSyncedAt && appVal?.correctedAt && appVal.correctedAt > lastSyncedAt) {
+          if (
+            lastSyncedAt &&
+            appVal?.correctedAt &&
+            appVal.correctedAt > lastSyncedAt
+          ) {
             // Both changed — conflict!
             if (strategy === "flag") {
               await recordConflict({
@@ -412,12 +455,9 @@ export async function runSync(
         }
       }
 
-      // Handle sheet deletions: rows in app that no longer exist in sheet
+      // Handle sheet deletions
       for (const extId of appExternalIds) {
         if (!sheetRowByExternalId.has(extId.externalId)) {
-          // Sheet row was deleted
-          // NOTE: We don't auto-delete app records — we just flag the mapping
-          // as having a deletion for the user to review (unless configured otherwise)
           console.info(
             `[sync] Sheet row ${extId.externalId} no longer exists in sheet (record: ${extId.recordId})`
           );
@@ -432,7 +472,7 @@ export async function runSync(
       data: { lastSyncedAt: new Date() },
     });
 
-    // Update schema fingerprint if valid
+    // Update schema fingerprint
     const currentFingerprint = computeSchemaFingerprint(columns);
     await db.sheetMapping.update({
       where: { id: sheetMappingId },
@@ -451,7 +491,7 @@ export async function runSync(
     result.status = finalStatus;
 
     await finalizeSyncEvent(syncEvent.id, { status: finalStatus });
-    await updateSyncState(sheetMappingId, finalStatus, result);
+    await updateSyncState(sheetMappingId, finalStatus, result, mapping.syncState?.scheduleExpr);
 
     await logAudit({
       organizationId: mapping.organizationId,
@@ -475,7 +515,7 @@ export async function runSync(
     console.error(`[sync] Error syncing ${sheetMappingId}:`, errorDetail);
 
     await finalizeSyncEvent(syncEvent.id, { status: "failed", errorDetail });
-    await updateSyncState(sheetMappingId, "failed", result);
+    await updateSyncState(sheetMappingId, "failed", result, null);
 
     result.status = "failed";
     result.errorDetail = errorDetail;
@@ -488,80 +528,87 @@ export async function runSync(
 
 /**
  * Initializes a freshly-linked sheet: writes headers (including hidden __row_id__)
- * and pushes all existing app records to the sheet.
+ * and pushes all existing app records using rich formatting.
  */
 export async function initialSheetPush(
   sheetMappingId: string,
   sheetsAccountId: string,
   spreadsheetId: string,
+  sheetId: number,
   sheetName: string,
   columns: ColumnSpec[],
   datasetId: string
 ): Promise<void> {
-  // Write header row: [...column names, __row_id__]
-  const headers = [...columns.map((c) => c.name), ROW_ID_HEADER];
-  await writeSheetHeaders(sheetsAccountId, spreadsheetId, sheetName, headers);
-
-  // Push existing records
   const records = await db.datasetRecord.findMany({
     where: { datasetId },
     include: { values: true },
   });
 
-  if (!records.length) return;
+  // Build data rows
+  const dataRows: Array<{ values: string[]; externalId: string }> = [];
+  const externalIdMappings: Array<{ recordId: string; externalId: string }> = [];
 
-  const rows: string[][] = [];
   for (const record of records) {
     const extId = randomUUID();
-    const row = buildSheetRow(record, columns, extId);
-    rows.push(row);
+    const values = columns.map((col) => {
+      const val = record.values.find((v) => v.fieldId === col.columnId);
+      if (!val) return "";
+      try {
+        const parsed = JSON.parse(val.value);
+        return parsed == null ? "" : String(parsed);
+      } catch {
+        return String(val.value ?? "");
+      }
+    });
+    dataRows.push({ values, externalId: extId });
+    externalIdMappings.push({ recordId: record.id, externalId: extId });
+  }
 
-    // Save external ID mapping
+  // Write header + data rows using rich formatting
+  const columnNames = columns.map((c) => c.name);
+  await writeFormattedSheet(
+    sheetsAccountId,
+    spreadsheetId,
+    sheetId,
+    sheetName,
+    columnNames,
+    dataRows,
+    0
+  );
+
+  // Apply table formatting
+  try {
+    await applyTableFormatting(sheetsAccountId, spreadsheetId, {
+      columnCount: columns.length,
+      rowCount: dataRows.length + 1, // +1 for header
+      sheetId,
+    });
+  } catch (err) {
+    console.warn("[sync] Table formatting failed during initial push (non-fatal):", err instanceof Error ? err.message : err);
+  }
+
+  // Save external ID mappings to DB
+  for (let i = 0; i < externalIdMappings.length; i++) {
+    const { recordId, externalId } = externalIdMappings[i];
     await db.datasetRowExternalId.create({
       data: {
         datasetId,
-        recordId: record.id,
+        recordId,
         sheetMappingId,
-        externalId: extId,
-        sheetRowIndex: rows.length + 1, // +1 for header, +1 for 1-based
+        externalId,
+        sheetRowIndex: i + 2, // 1-based, row 1 = header
       },
     });
   }
 
-  // Batch write in chunks of 1000
-  const CHUNK = 1000;
-  for (let i = 0; i < rows.length; i += CHUNK) {
-    const chunk = rows.slice(i, i + CHUNK);
-    await appendRowsToSheet(sheetsAccountId, spreadsheetId, sheetName, chunk);
-  }
-
-  // Update row ID column index on mapping (it's the last column)
+  // Update row ID column index on mapping (it's the last column, 0-based)
   await db.sheetMapping.update({
     where: { id: sheetMappingId },
-    data: { rowIdColumnIndex: columns.length }, // 0-based index
+    data: { rowIdColumnIndex: columns.length },
   });
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
-
-function buildSheetRow(
-  record: { values: Array<{ fieldId: string; value: string }> },
-  columns: ColumnSpec[],
-  externalId: string
-): string[] {
-  const row = columns.map((col) => {
-    const val = record.values.find((v) => v.fieldId === col.columnId);
-    if (!val) return "";
-    try {
-      const parsed = JSON.parse(val.value);
-      return String(parsed ?? "");
-    } catch {
-      return String(val.value ?? "");
-    }
-  });
-  row.push(externalId); // hidden row ID at the end
-  return row;
-}
 
 async function createRecordFromSheetRow(
   datasetId: string,
@@ -636,17 +683,33 @@ async function finalizeSyncEvent(
   });
 }
 
+/**
+ * Updates SyncState after a sync run.
+ * Computes and persists nextSyncAt based on scheduleExpr so the cron route
+ * can tell which mappings are due for their next automatic sync.
+ */
 async function updateSyncState(
   sheetMappingId: string,
   status: string,
-  result: SyncResult
+  result: SyncResult,
+  scheduleExpr: string | null | undefined
 ): Promise<void> {
+  // Compute nextSyncAt
+  let nextSyncAt: Date | null = null;
+  if (scheduleExpr && scheduleExpr !== "manual") {
+    const delayMs = parseScheduleExprMs(scheduleExpr);
+    if (delayMs > 0) {
+      nextSyncAt = new Date(Date.now() + delayMs);
+    }
+  }
+
   await db.syncState.upsert({
     where: { sheetMappingId },
     create: {
       sheetMappingId,
       lastSyncAt: new Date(),
       lastSyncStatus: status,
+      nextSyncAt,
       syncedRows: result.rowsAdded + result.rowsUpdated,
       errorCount: result.errors,
       conflictCount: result.conflicts,
@@ -654,6 +717,7 @@ async function updateSyncState(
     update: {
       lastSyncAt: new Date(),
       lastSyncStatus: status,
+      nextSyncAt,
       syncedRows: { increment: result.rowsAdded + result.rowsUpdated },
       errorCount: { increment: result.errors },
       conflictCount: { increment: result.conflicts },

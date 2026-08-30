@@ -1,7 +1,13 @@
 // Export Service
 //
-// Exports application dataset records to Google Sheets.
-// Supports:
+// Exports application dataset records to Google Sheets with full rich formatting:
+//  - Bold frozen header row with auto-filter and header protection
+//  - Rich-text link chips for URL/Drive cells (multiple chips per cell)
+//  - Consistent column widths (80–220px), CLIP text overflow
+//  - Alternating row banding for readability
+//  - Hidden __row_id__ column appended for future sync linkage
+//
+// Supports four modes:
 //   new_sheet     — create a new Google Spreadsheet + write data
 //   new_tab       — add a new tab to an existing spreadsheet
 //   replace_tab   — overwrite an existing tab's data
@@ -12,13 +18,17 @@ import { logAudit } from "@/lib/audit";
 import {
   createSpreadsheet,
   addSheetTab,
-  writeSheetHeaders,
-  appendRowsToSheet,
-  writeRowsToSheet,
   getSpreadsheetMeta,
   renameSheetTab,
 } from "@/lib/services/sheet-discovery";
 import { getCurrentColumns } from "@/lib/services/schema-versioning";
+import {
+  writeFormattedSheet,
+  appendFormattedRows,
+  applyTableFormatting,
+} from "@/lib/services/sheets-formatter";
+import { getSheetsClient, withRetry } from "@/lib/services/google-sheets-client";
+import { randomUUID } from "crypto";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -31,7 +41,7 @@ export interface ExportParams {
   sheetsAccountId: string;
   mode: ExportMode;
   spreadsheetId?: string;    // required for new_tab / replace_tab / append_tab
-  tabName?: string;          // required for new_tab / replace_tab / append_tab
+  tabName?: string;          // required for replace_tab / append_tab
   newSheetTitle?: string;    // for new_sheet mode
   selectedColumnIds?: string[]; // if provided, only export these columns
 }
@@ -90,10 +100,11 @@ export async function exportDataset(params: ExportParams): Promise<ExportResult>
 
   if (!exportColumns.length) throw new Error("No columns to export");
 
-  // 3. Build row data
-  const headers = exportColumns.map((c) => c.name);
-  const rows: string[][] = dataset.records.map((record) =>
-    exportColumns.map((col) => {
+  // 3. Build row data — each record becomes { values: string[], externalId: string }
+  const columnNames = exportColumns.map((c) => c.name);
+
+  const dataRows = dataset.records.map((record) => {
+    const values = exportColumns.map((col) => {
       const val = record.values.find((v) => v.fieldId === col.columnId);
       if (!val) return "";
       try {
@@ -102,12 +113,14 @@ export async function exportDataset(params: ExportParams): Promise<ExportResult>
       } catch {
         return String(val.value ?? "");
       }
-    })
-  );
+    });
+    return { values, externalId: randomUUID() };
+  });
 
-  // 4. Resolve destination
+  // 4. Resolve destination spreadsheet + sheetId
   let targetSpreadsheetId: string;
   let targetSheetName: string;
+  let targetSheetId: number;
   let spreadsheetUrl: string;
 
   switch (mode) {
@@ -117,51 +130,67 @@ export async function exportDataset(params: ExportParams): Promise<ExportResult>
       const created = await createSpreadsheet(sheetsAccountId, title);
       targetSpreadsheetId = created.spreadsheetId;
       spreadsheetUrl = created.spreadsheetUrl;
-
-      // FIX 4: The default tab is always named "Sheet1" on a new spreadsheet.
-      // Writing to dataset.name would cause "Unable to parse range" — it doesn't exist yet.
-      // We write all data to "Sheet1" first, then rename it to the dataset name.
-      const safeTabName = dataset.name.slice(0, 100);
       targetSheetName = "Sheet1";
 
-      // Attempt to rename "Sheet1" → dataset name.
-      // This is done BEFORE writing so that the sheetName in the final result is accurate.
+      // Rename default "Sheet1" tab to dataset name
       try {
         const meta = await getSpreadsheetMeta(sheetsAccountId, targetSpreadsheetId);
         const defaultTab = meta.tabs[0];
         if (defaultTab?.title === "Sheet1" && defaultTab?.sheetId !== undefined) {
-          await renameSheetTab(sheetsAccountId, targetSpreadsheetId, defaultTab.sheetId, safeTabName);
+          const safeTabName = dataset.name.slice(0, 100);
+          await renameSheetTab(
+            sheetsAccountId,
+            targetSpreadsheetId,
+            defaultTab.sheetId,
+            safeTabName
+          );
           targetSheetName = safeTabName;
+          targetSheetId = defaultTab.sheetId;
+        } else {
+          targetSheetId = defaultTab?.sheetId ?? 0;
         }
       } catch {
-        // Non-fatal — fall back to "Sheet1" tab name
         console.warn("[export] Could not rename Sheet1 tab; writing to 'Sheet1'");
-        targetSheetName = "Sheet1";
+        targetSheetId = 0;
       }
       break;
     }
 
-
     case "new_tab": {
       if (!spreadsheetId) throw new Error("spreadsheetId required for new_tab mode");
       targetSpreadsheetId = spreadsheetId;
-      const newTabTitle = tabName || `${dataset.name} ${new Date().toLocaleDateString()}`;
+      const newTabTitle =
+        tabName || `${dataset.name} ${new Date().toLocaleDateString()}`;
       const tab = await addSheetTab(sheetsAccountId, spreadsheetId, newTabTitle);
       targetSheetName = tab.title;
+      targetSheetId = tab.sheetId;
       const meta = await getSpreadsheetMeta(sheetsAccountId, spreadsheetId);
-      spreadsheetUrl = meta.url || `https://docs.google.com/spreadsheets/d/${spreadsheetId}`;
+      spreadsheetUrl =
+        meta.url || `https://docs.google.com/spreadsheets/d/${spreadsheetId}`;
       break;
     }
 
     case "replace_tab":
     case "append_tab": {
       if (!spreadsheetId || !tabName) {
-        throw new Error("spreadsheetId and tabName required for replace_tab/append_tab");
+        throw new Error(
+          "spreadsheetId and tabName required for replace_tab/append_tab"
+        );
       }
       targetSpreadsheetId = spreadsheetId;
       targetSheetName = tabName;
       const meta = await getSpreadsheetMeta(sheetsAccountId, spreadsheetId);
-      spreadsheetUrl = meta.url || `https://docs.google.com/spreadsheets/d/${spreadsheetId}`;
+      spreadsheetUrl =
+        meta.url || `https://docs.google.com/spreadsheets/d/${spreadsheetId}`;
+      const matchTab = meta.tabs.find(
+        (t) => t.title === tabName
+      );
+      if (!matchTab) {
+        throw new Error(
+          `Tab "${tabName}" not found in spreadsheet. Available tabs: ${meta.tabs.map((t) => t.title).join(", ")}`
+        );
+      }
+      targetSheetId = matchTab.sheetId;
       break;
     }
 
@@ -169,27 +198,64 @@ export async function exportDataset(params: ExportParams): Promise<ExportResult>
       throw new Error(`Unknown export mode: ${mode}`);
   }
 
-  // 5. Write data
+  // 5. Write data using rich formatting
   if (mode === "replace_tab") {
-    // Clear existing data + write headers + write rows
-    await writeSheetHeaders(sheetsAccountId, targetSpreadsheetId, targetSheetName, headers);
-    if (rows.length > 0) {
-      await appendRowsToSheet(sheetsAccountId, targetSpreadsheetId, targetSheetName, rows);
-    }
+    // Clear existing content first
+    const sheets = await getSheetsClient(sheetsAccountId);
+    await withRetry(() =>
+      sheets.spreadsheets.values.clear({
+        spreadsheetId: targetSpreadsheetId,
+        range: `'${targetSheetName}'`,
+      })
+    );
+    // Write header + all rows from row 0
+    await writeFormattedSheet(
+      sheetsAccountId,
+      targetSpreadsheetId,
+      targetSheetId,
+      targetSheetName,
+      columnNames,
+      dataRows,
+      0
+    );
   } else if (mode === "append_tab") {
-    // Just append rows (no headers)
-    if (rows.length > 0) {
-      await appendRowsToSheet(sheetsAccountId, targetSpreadsheetId, targetSheetName, rows);
-    }
+    // Append rows only (no header re-write)
+    await appendFormattedRows(
+      sheetsAccountId,
+      targetSpreadsheetId,
+      targetSheetId,
+      targetSheetName,
+      dataRows
+    );
   } else {
-    // new_sheet or new_tab — write headers first, then rows
-    await writeSheetHeaders(sheetsAccountId, targetSpreadsheetId, targetSheetName, headers);
-    if (rows.length > 0) {
-      await appendRowsToSheet(sheetsAccountId, targetSpreadsheetId, targetSheetName, rows);
+    // new_sheet or new_tab — write header + rows from row 0
+    await writeFormattedSheet(
+      sheetsAccountId,
+      targetSpreadsheetId,
+      targetSheetId,
+      targetSheetName,
+      columnNames,
+      dataRows,
+      0
+    );
+  }
+
+  // 6. Apply table formatting (freeze, filter, banding, column widths, protection)
+  //    Only apply for modes that wrote a full header row
+  if (mode !== "append_tab") {
+    try {
+      await applyTableFormatting(sheetsAccountId, targetSpreadsheetId, {
+        columnCount: exportColumns.length,
+        rowCount: dataRows.length + 1, // +1 for header
+        sheetId: targetSheetId,
+      });
+    } catch (err) {
+      // Non-fatal — formatting failures don't invalidate the data export
+      console.warn("[export] Table formatting failed (non-fatal):", err instanceof Error ? err.message : err);
     }
   }
 
-  // 6. Audit log
+  // 7. Audit log
   await logAudit({
     organizationId,
     actorId: userId,
@@ -200,7 +266,7 @@ export async function exportDataset(params: ExportParams): Promise<ExportResult>
       mode,
       spreadsheetId: targetSpreadsheetId,
       sheetName: targetSheetName,
-      rowsExported: rows.length,
+      rowsExported: dataRows.length,
       columnsExported: exportColumns.length,
     },
   });
@@ -209,6 +275,6 @@ export async function exportDataset(params: ExportParams): Promise<ExportResult>
     spreadsheetId: targetSpreadsheetId,
     spreadsheetUrl,
     sheetName: targetSheetName,
-    rowsExported: rows.length,
+    rowsExported: dataRows.length,
   };
 }

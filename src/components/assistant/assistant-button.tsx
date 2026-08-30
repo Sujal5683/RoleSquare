@@ -29,9 +29,9 @@ export function AssistantButton() {
                 : "scale-100 hover:scale-105"
             )}
           >
-            {/* Pulse ring when closed */}
-            {!assistantOpen && (
-              <span className="absolute inset-0 rounded-lg animate-ping bg-primary/20 pointer-events-none" />
+            {/* Subtle glow pulse — only when closed and there are unread messages */}
+            {!assistantOpen && assistantUnread > 0 && (
+              <span className="absolute inset-0 rounded-lg bg-primary/10 animate-pulse pointer-events-none" />
             )}
 
             <img

@@ -78,15 +78,22 @@ export function ExtractionRunsTab() {
     queryKey: ["ai-jobs", "AI_EXTRACTION", page],
     queryFn: () =>
       api.get<JobListResponse>(`/api/ai-jobs?type=AI_EXTRACTION&page=${page}&pageSize=50`),
-    refetchInterval: 2000,
+    refetchInterval: (query) => {
+      const active = query.state.data?.data?.filter((j: any) => j.status === "running" || j.status === "queued") || [];
+      return active.length > 0 ? 2000 : false;
+    },
   });
+
+  const selectedJob = jobsResp?.data?.find((j) => j.id === selectedJobId);
 
   const { data: outputsResp, isLoading: outputsLoading } = useQuery<OutputListResponse>({
     queryKey: ["ai-outputs", selectedJobId],
     queryFn: () =>
       api.get<OutputListResponse>(`/api/ai-jobs/${selectedJobId}/outputs`),
     enabled: !!selectedJobId,
-    refetchInterval: selectedJobId ? 2000 : false,
+    refetchInterval: () => {
+      return (selectedJob?.status === "running" || selectedJob?.status === "queued") ? 2000 : false;
+    },
   });
 
   const { data: datasets } = useQuery({
@@ -99,7 +106,6 @@ export function ExtractionRunsTab() {
     queryFn: () => api.get<SchemaDTO[]>("/api/schemas"),
   });
 
-  const selectedJob = jobsResp?.data?.find((j) => j.id === selectedJobId);
   const outputs = outputsResp?.data ?? [];
 
   // Totals from outputs

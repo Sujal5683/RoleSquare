@@ -111,7 +111,6 @@ export function AgentLogsTab({ jobId }: AgentLogsTabProps) {
   const { data, isLoading, refetch } = useQuery<AgentLogListResponse>({
     queryKey: ["agent-logs", agentKey, level, jobId, page],
     queryFn: () => api.get<AgentLogListResponse>(`/api/agent-logs?${params.toString()}`),
-    refetchInterval: 5000, // auto-refresh every 5s
   });
 
   const logs = data?.data ?? [];
