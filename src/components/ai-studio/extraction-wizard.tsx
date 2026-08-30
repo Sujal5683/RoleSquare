@@ -20,7 +20,7 @@ import { StatusBadge } from "@/components/ui/status-badge";
 import { ArrowRight, CheckCircle2, Database, FileJson, Sparkles, Workflow, Layers, Loader2, Play, Link2, Info, Bot } from "lucide-react";
 import { useAppStore } from "@/lib/store";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-
+import { AiStudioSkeleton } from "@/components/ui/skeletons/ai-studio-skeleton";
 const ALL_AGENTS = [
   { key: "extractor", label: "Extractor", desc: "Extract raw fields from source text" },
   { key: "analyst", label: "Analyst", desc: "Cross-reference with schema rules" },
@@ -106,7 +106,7 @@ export function ExtractionWizard() {
     }
   };
 
-  if (datasetsLoading || schemasLoading) return <LoadingState rows={4} />;
+  if (datasetsLoading || schemasLoading) return <AiStudioSkeleton />;
 
   return (
     <div className="mx-auto max-w-4xl space-y-6">

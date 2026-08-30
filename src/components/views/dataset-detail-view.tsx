@@ -22,6 +22,8 @@ import {
 } from "@/components/ui/page-elements";
 import { InlineEditCell } from "./dataset-inline-edit";
 import { GoogleSheetsPanel } from "@/components/google-sheets/google-sheets-panel";
+import { DetailGridSkeleton, DetailCardSkeleton } from "@/components/ui/skeletons/dataset-detail-skeleton";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   StatusBadge,
   ConfidenceBadge,
@@ -810,6 +812,11 @@ export function DatasetDetailView() {
     [allFields, hiddenFields]
   );
 
+  const isInitialLoading = datasetLoading && (!dataset || !columnDefs);
+  const displayFields = isInitialLoading 
+    ? Array.from({ length: 5 }).map((_, i) => ({ id: `skel-col-${i}`, name: "", type: "text" as any, required: false, position: i }))
+    : visibleFields;
+
   const records = recordsPage?.data ?? [];
   const total = recordsPage?.total ?? 0;
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
@@ -904,23 +911,7 @@ export function DatasetDetailView() {
     );
   }
 
-  if (datasetLoading) {
-    return (
-      <div className="space-y-4">
-        <DetailTopBar
-          dataset={null}
-          onBack={() => setView("datasets")}
-          onRefresh={() => refetchDataset()}
-          refreshing={false}
-          onExport={(f) => exportMutation.mutate({ format: f })}
-          exporting={exportMutation.isPending}
-        />
-        <LoadingState rows={5} />
-      </div>
-    );
-  }
-
-  if (datasetError || !dataset) {
+  if (datasetId && datasetError) {
     return (
       <div className="space-y-4">
         <DetailTopBar
@@ -943,12 +934,12 @@ export function DatasetDetailView() {
   // Datasets imported from Google Sheets have DatasetColumnDef rows but the
   // schema link may not be set yet. We show a gentle banner instead of
   // redirecting the user to the Schema Builder every time.
-  const noSchema = !dataset.schema;
+  const noSchema = dataset && !dataset.schema;
 
   return (
     <div className="space-y-4">
       <DetailTopBar
-        dataset={dataset}
+        dataset={dataset ?? null}
         onBack={() => setView("datasets")}
         onRefresh={() => refetchRecords()}
         refreshing={recordsFetching}
@@ -986,7 +977,7 @@ export function DatasetDetailView() {
 
       {/* Assign Schema Dialog */}
       <AssignSchemaDialog
-        dataset={dataset}
+        dataset={dataset ?? null}
         open={assignSchemaOpen}
         onOpenChange={setAssignSchemaOpen}
       />
@@ -1460,11 +1451,17 @@ export function DatasetDetailView() {
                     Record
                   </span>
                 </TableHead>
-                {visibleFields.map((f) => (
+                {displayFields.map((f) => (
                   <TableHead
                     key={f.id}
                     className="min-w-[180px] border-r last:border-r-0 group/th px-1"
                   >
+                    {isInitialLoading ? (
+                      <div className="flex h-9 w-full items-center gap-1.5 px-2 rounded-md">
+                        <Skeleton className="h-4 w-4 rounded-full" />
+                        <Skeleton className="h-4 w-20" />
+                      </div>
+                    ) : (
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <div className="flex h-9 w-full items-center gap-1.5 cursor-pointer hover:bg-muted/60 px-2 rounded-md">
@@ -1516,20 +1513,14 @@ export function DatasetDetailView() {
                         </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
+                    )}
                   </TableHead>
                 ))}
               </TableRow>
             </TableHeader>
             <TableBody>
-              {recordsLoading ? (
-                <TableRow>
-                  <TableCell
-                    colSpan={visibleFields.length + 2}
-                    className="h-24 text-center"
-                  >
-                    <LoadingState />
-                  </TableCell>
-                </TableRow>
+              {recordsLoading || isInitialLoading ? (
+                <DetailGridSkeleton columns={displayFields.length} />
               ) : recordsError ? (
                 <TableRow>
                   <TableCell
@@ -1689,8 +1680,10 @@ export function DatasetDetailView() {
           </Table>
         </div>
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 p-4 bg-muted/10">
-          {filteredRecords.length === 0 ? (
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 p-4 bg-muted/10 min-h-[500px]">
+          {recordsLoading || isInitialLoading ? (
+            <DetailCardSkeleton />
+          ) : filteredRecords.length === 0 ? (
             <div className="col-span-full">
               <EmptyState
                 icon={<Database className="h-5 w-5" />}
@@ -2075,25 +2068,31 @@ function DetailTopBar({
         </Button>
         <div className="space-y-1">
           <div className="flex flex-wrap items-center gap-2">
-            <h1 className="text-2xl font-semibold tracking-tight">
-              {dataset?.name ?? "Dataset"}
-            </h1>
-            {dataset?.schema && (
-              <Badge variant="secondary" className="font-normal">
-                {dataset.schema.name}
-              </Badge>
-            )}
-            {dataset && (
-              <Badge variant="outline" className="font-normal text-muted-foreground">
-                <Hash className="mr-1 h-3 w-3" />
-                {dataset.recordCount} record(s)
-              </Badge>
+            {dataset ? (
+              <>
+                <h1 className="text-2xl font-semibold tracking-tight">
+                  {dataset.name}
+                </h1>
+                {dataset.schema && (
+                  <Badge variant="secondary" className="font-normal">
+                    {dataset.schema.name}
+                  </Badge>
+                )}
+                <Badge variant="outline" className="font-normal text-muted-foreground">
+                  <Hash className="mr-1 h-3 w-3" />
+                  {dataset.recordCount} record(s)
+                </Badge>
+              </>
+            ) : (
+              <Skeleton className="h-8 w-48 rounded-md" />
             )}
           </div>
-          {dataset?.description && (
+          {dataset?.description ? (
             <p className="text-sm text-muted-foreground max-w-2xl">
               {dataset.description}
             </p>
+          ) : !dataset && (
+            <Skeleton className="h-4 w-96 rounded-md mt-1" />
           )}
         </div>
       </div>

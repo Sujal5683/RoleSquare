@@ -8,6 +8,7 @@ import { api } from "@/lib/api-client";
 import { useAppStore } from "@/lib/store";
 import type { SourceDTO, SourceRunDTO, SourceStatus } from "@/lib/types";
 import { SourcesSkeleton } from "@/components/ui/skeletons/sources-skeleton";
+import { TableSkeleton } from "@/components/ui/skeletons/table-skeleton";
 import {
   PageHeader,
   StatCard,
@@ -646,7 +647,7 @@ export function SourcesView() {
         <CardContent className="p-0">
           {isLoading ? (
             <div className="p-4">
-              <TableSkeleton />
+              <SourcesSkeleton />
             </div>
           ) : isError ? (
             <div className="p-4">
