@@ -417,7 +417,7 @@ export function ExtractionWizard() {
             <div className="flex items-center justify-between">
               <div>
                 <CardTitle className="text-lg flex items-center gap-2">
-                  <Sparkles className="h-5 w-5 text-indigo-500" />
+                  <Bot className="h-5 w-5 text-indigo-500" />
                   Live Extraction Run
                 </CardTitle>
                 <CardDescription className="mt-1">

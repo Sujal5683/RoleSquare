@@ -52,7 +52,7 @@ import {
   Database,
   FileJson,
   Calendar,
-  Sparkles,
+  Wand2,
   ShieldCheck,
   AlertCircle,
   RefreshCw,
@@ -130,7 +130,7 @@ const OPERATORS = [
 ];
 
 const STEPS = [
-  { id: 0, label: "Identity", icon: <Sparkles className="h-3.5 w-3.5" /> },
+  { id: 0, label: "Identity", icon: <Wand2 className="h-3.5 w-3.5" /> },
   { id: 1, label: "Google account", icon: <Mail className="h-3.5 w-3.5" /> },
   { id: 2, label: "Rules", icon: <ShieldCheck className="h-3.5 w-3.5" /> },
   { id: 3, label: "Schedule & schema", icon: <Calendar className="h-3.5 w-3.5" /> },
@@ -509,7 +509,7 @@ export function SourceBuilderView() {
             ? `Editing "${existingSource?.name ?? "…"}"`
             : "Configure a Google Workspace source, ingestion rules, schedule, and target schema."
         }
-        icon={<Sparkles className="h-5 w-5" />}
+        icon={<Wand2 className="h-5 w-5" />}
         actions={
           <Button
             variant="outline"
@@ -906,7 +906,7 @@ export function SourceBuilderView() {
                       {isSimulating ? (
                         <RefreshCw className="mr-1.5 h-3.5 w-3.5 animate-spin" />
                       ) : (
-                        <Sparkles className="mr-1.5 h-3.5 w-3.5" />
+                        <Wand2 className="mr-1.5 h-3.5 w-3.5" />
                       )}
                       Test rules
                     </Button>

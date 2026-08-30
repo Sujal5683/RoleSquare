@@ -49,6 +49,7 @@ import {
   Download,
   Calendar,
   AlertCircle,
+  LayoutDashboard,
 } from "lucide-react";
 import { Area as RechartsArea, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip as RechartsTooltipRaw, XAxis as RechartsXAxis, YAxis as RechartsYAxis, BarChart as RechartsBarChart, Bar as RechartsBar, Legend as RechartsLegend } from "recharts";
 
@@ -105,7 +106,7 @@ export function DashboardView() {
       <PageHeader
         title="Dashboard"
         description="Real-time view of your ingestion pipeline, AI extraction activity, and review queue."
-        icon={<Activity className="h-5 w-5" />}
+        icon={<LayoutDashboard className="h-5 w-5" />}
         actions={
           <div className="flex items-center gap-2">
             <Select value={dateRange} onValueChange={setDateRange}>
@@ -166,7 +167,7 @@ export function DashboardView() {
             <StatCard
               label="Running Jobs"
               value={data.kpis.aiJobsRunning}
-              icon={<Activity className="h-4 w-4" />}
+              icon={<RefreshCw className="h-4 w-4" />}
               hint="In progress"
             />
             <StatCard

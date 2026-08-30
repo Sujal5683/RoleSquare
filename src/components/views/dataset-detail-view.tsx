@@ -2684,7 +2684,7 @@ function AiExtractDialog({
             {loading ? (
               <RefreshCw className="mr-2 h-3.5 w-3.5 animate-spin" />
             ) : (
-              <Sparkles className="mr-2 h-3.5 w-3.5" />
+              <Wand2 className="mr-2 h-3.5 w-3.5" />
             )}
             Run Extraction
           </Button>

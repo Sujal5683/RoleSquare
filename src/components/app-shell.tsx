@@ -30,6 +30,7 @@ import {
   Users,
   Share2,
   ShieldCheck,
+  History,
   Settings,
   Menu,
   Search,
@@ -46,6 +47,7 @@ import {
   MailOpen,
   PanelLeftClose,
   PanelLeftOpen,
+  Bot,
   type LucideIcon,
 } from "lucide-react";
 import type { ViewId } from "@/lib/types";
@@ -80,13 +82,13 @@ const NAV_ITEMS: NavItem[] = [
   { id: "sources", label: "Sources", icon: Inbox, group: "Workspace" },
   { id: "datasets", label: "Datasets", icon: Database, group: "Workspace" },
   { id: "schema-builder", label: "Schema Builder", icon: FileJson, group: "Workspace" },
-  { id: "ai-studio", label: "AI Studio", icon: Sparkles, group: "Workspace" },
+  { id: "ai-studio", label: "AI Studio", icon: Bot, group: "Workspace" },
   { id: "sharing", label: "Sharing Center", icon: Share2, group: "Governance" },
   { id: "organizations", label: "Organizations", icon: Building2, group: "Governance" },
   { id: "members", label: "Members", icon: Users, group: "Governance" },
   { id: "invitations", label: "Invitations", icon: MailOpen, group: "Governance" },
   { id: "usage", label: "Usage & Billing", icon: TrendingUp, group: "Account" },
-  { id: "audit", label: "Audit Logs", icon: ShieldCheck, group: "Account" },
+  { id: "audit", label: "Audit Logs", icon: History, group: "Account" },
   { id: "settings", label: "Settings", icon: Settings, group: "Account" },
 ];
 
@@ -420,7 +422,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 <Settings className="mr-2 h-4 w-4" /> Settings
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => setView("audit")}>
-                <ShieldCheck className="mr-2 h-4 w-4" /> Audit logs
+                <History className="mr-2 h-4 w-4" /> Audit logs
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem

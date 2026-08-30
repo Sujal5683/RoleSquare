@@ -145,7 +145,7 @@ export function AiStudioView() {
       <PageHeader
         title="AI Studio"
         description="Monitor extraction runs, test prompts against real text, audit agent activity, and track model usage and costs."
-        icon={<Brain className="h-5 w-5" />}
+        icon={<Bot className="h-5 w-5" />}
       />
 
       <Tabs value={tab} onValueChange={setTab}>
@@ -155,7 +155,7 @@ export function AiStudioView() {
             Extract Data
           </TabsTrigger>
           <TabsTrigger value="sandbox">
-            <Sparkles className="mr-1.5 h-3.5 w-3.5" />
+            <Bot className="mr-1.5 h-3.5 w-3.5" />
             Test Sandbox
           </TabsTrigger>
           <TabsTrigger value="insights">
@@ -187,7 +187,7 @@ function InsightsTab() {
       <Tabs value={insightTab} onValueChange={setInsightTab}>
         <TabsList>
           <TabsTrigger value="runs">
-            <Activity className="mr-1.5 h-3.5 w-3.5" />
+            <Play className="mr-1.5 h-3.5 w-3.5" />
             Extraction Runs
           </TabsTrigger>
           <TabsTrigger value="logs">
@@ -267,7 +267,7 @@ function TestSandboxTab() {
       <Card>
         <CardHeader >
           <CardTitle className="flex items-center gap-2 text-base">
-            <Sparkles className="h-4 w-4" />
+            <Bot className="h-4 w-4" />
             Input
           </CardTitle>
         </CardHeader>
@@ -367,7 +367,7 @@ function TestSandboxTab() {
             />
           ) : !result ? (
             <EmptyState
-              icon={<Sparkles className="h-5 w-5" />}
+              icon={<Bot className="h-5 w-5" />}
               title="No results yet"
               description="Run an extraction to see fields, confidence, and evidence snippets here."
             />

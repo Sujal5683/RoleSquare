@@ -86,7 +86,7 @@ export function AssistantPanel() {
         {/* Header */}
         <div className="flex h-14 shrink-0 items-center gap-3 border-b bg-card px-4">
           <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10">
-            <Sparkles className="h-4 w-4 text-primary" />
+            <Bot className="h-4 w-4 text-primary" />
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-sm font-semibold leading-none">AI Assistant</p>

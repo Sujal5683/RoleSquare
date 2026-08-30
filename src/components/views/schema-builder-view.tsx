@@ -84,7 +84,6 @@ import {
   GripVertical,
   Play,
   RefreshCw,
-  Sparkles,
   Wand2,
   AlertCircle,
   ChevronLeft,
@@ -969,7 +968,7 @@ export function SchemaBuilderView() {
             <Card>
               <CardHeader className="flex flex-row items-center justify-between">
                 <CardTitle className="text-base flex items-center gap-2">
-                  <Sparkles className="h-4 w-4" />
+                  <Wand2 className="h-4 w-4" />
                   Fields
                   <span className="text-xs font-normal text-muted-foreground">
                     ({activeSchema.fields.length})
@@ -988,7 +987,7 @@ export function SchemaBuilderView() {
                 {activeSchema.fields.length === 0 ? (
                   <div className="p-4">
                     <EmptyState
-                      icon={<Sparkles className="h-5 w-5" />}
+                      icon={<Wand2 className="h-5 w-5" />}
                       title="No fields yet"
                       description="Add your first extraction field to define what the AI should pull from each source."
                       action={
@@ -1076,7 +1075,7 @@ export function SchemaBuilderView() {
                   {testExtractionMutation.isPending ? (
                     <RefreshCw className="mr-2 h-3.5 w-3.5 animate-spin" />
                   ) : (
-                    <Sparkles className="mr-2 h-3.5 w-3.5" />
+                    <Wand2 className="mr-2 h-3.5 w-3.5" />
                   )}
                   Run extraction
                 </Button>

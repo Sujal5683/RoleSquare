@@ -11,7 +11,7 @@ import {
   Zap,
   Mail,
   Database,
-  Sparkles,
+  Wand2,
   ShieldCheck,
   FileText,
   Search,
@@ -45,7 +45,7 @@ export function LandingView({ hasSession = false }: { hasSession?: boolean }) {
           <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:24px_24px]"></div>
           <div className="relative mx-auto max-w-7xl px-4 md:px-6 text-center">
             <Badge variant="outline" className="mb-6 rounded-full px-3 py-1 font-medium bg-muted/50">
-              <Sparkles className="mr-2 h-3.5 w-3.5 text-primary" />
+              <Wand2 className="mr-2 h-3.5 w-3.5 text-primary" />
               Next-Generation Workspace Extraction
             </Badge>
             <h1 className="mx-auto max-w-4xl text-4xl font-bold tracking-tight sm:text-5xl md:text-6xl lg:text-7xl">
@@ -291,7 +291,7 @@ const CAPABILITIES = [
   { icon: Mail, title: "Gmail Integration", description: "Historical scan and incremental sync via Gmail history cursors. Watch auto-renewal before 7-day expiry." },
   { icon: GitBranch, title: "Visual Rule Builder", description: "Sender, subject, body, date, attachment, and link filters as deterministic condition groups." },
   { icon: FileText, title: "Document Processing", description: "Extract from PDF, DOCX, XLSX, CSV, TXT, HTML, Docs, and Sheets. Chunked and page-preserving." },
-  { icon: Sparkles, title: "Schema-Driven AI", description: "Define fields with exact types, instructions, and validations. Prompts are auto-generated under the hood." },
+  { icon: Wand2, title: "Schema-Driven AI", description: "Define fields with exact types, instructions, and validations. Prompts are auto-generated under the hood." },
   { icon: Database, title: "Queryable Datasets", description: "Dynamic data grid with filters, sorts, saved views, and CSV/Excel exporting capabilities." },
   { icon: Network, title: "Governed Sharing", description: "Request, approve, and revoke access at dataset, view, record, field, and row levels." },
 ];
