@@ -18,7 +18,7 @@ import {
   EmptyState,
   ErrorState,
 } from "@/components/ui/page-elements";
-import { TableSkeleton } from "@/components/ui/skeletons/table-skeleton";
+import { MembersSkeleton } from "@/components/ui/skeletons/members-skeleton";
 import {
   StatusBadge,
   RoleBadge,
@@ -580,9 +580,7 @@ export function MembersView() {
               className="mx-4 mb-4"
             />
           ) : isLoading ? (
-            <div className="px-4 pb-6">
-              <TableSkeleton />
-            </div>
+            <MembersSkeleton />
           ) : isError ? (
             <div className="px-4 pb-6">
               <ErrorState

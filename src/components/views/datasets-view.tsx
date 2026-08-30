@@ -12,7 +12,7 @@ import {
   EmptyState,
   ErrorState,
 } from "@/components/ui/page-elements";
-import { DashboardSkeleton } from "@/components/ui/skeletons/dashboard-skeleton";
+import { DatasetsSkeleton } from "@/components/ui/skeletons/datasets-skeleton";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Card, CardContent } from "@/components/ui/card";
@@ -389,7 +389,7 @@ export function DatasetsView() {
 
       {/* Grid of dataset cards */}
       {isLoading ? (
-        <div className="py-4"><DashboardSkeleton /></div>
+        <DatasetsSkeleton />
       ) : isError ? (
         <ErrorState
           message="Failed to load datasets"
@@ -423,7 +423,9 @@ export function DatasetsView() {
             ? "grid gap-4 sm:grid-cols-2"
             : "grid gap-4 sm:grid-cols-2 lg:grid-cols-3"
         }>
-          {filtered.map((d) => (
+          {filtered.map((d) => {
+            const isTemp = d.id.startsWith("temp-");
+            return (
             <Card
               key={d.id}
               className={`flex p-4 transition-shadow hover:shadow-md ${viewMode === "list" ? "flex-row gap-4" : "flex-col gap-3"}`}
@@ -437,8 +439,9 @@ export function DatasetsView() {
                     <div className="flex items-start justify-between">
                       <div className="min-w-0 w-full">
                         <button
-                          onClick={() => openDataset(d.id, d.name)}
-                          className="block w-full text-left text-base font-semibold leading-tight truncate hover:underline"
+                          onClick={isTemp ? undefined : () => openDataset(d.id, d.name)}
+                          disabled={isTemp}
+                          className={`block w-full text-left text-base font-semibold leading-tight truncate ${isTemp ? "text-muted-foreground" : "hover:underline"}`}
                           title={d.name}
                         >
                           {d.name}
@@ -483,13 +486,13 @@ export function DatasetsView() {
                             </Tooltip>
                           </TooltipProvider>
                         ) : (
-                          <Button variant="ghost" size="icon" className="h-8 w-8" aria-label="Share dataset" onClick={() => handleShare(d)}>
+                          <Button variant="ghost" size="icon" className="h-8 w-8" aria-label="Share dataset" onClick={() => handleShare(d)} disabled={isTemp}>
                             <Share2 className="h-4 w-4" />
                           </Button>
                         )}
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="icon" className="h-8 w-8" aria-label="Dataset actions">
+                              <Button variant="ghost" size="icon" className="h-8 w-8" aria-label="Dataset actions" disabled={isTemp}>
                                 <MoreHorizontal className="h-4 w-4" />
                               </Button>
                             </DropdownMenuTrigger>
@@ -595,7 +598,7 @@ export function DatasetsView() {
                       )}
                     </div>
                     {viewMode !== "list" && (
-                      <Button variant="outline" size="sm" onClick={() => openDataset(d.id, d.name)}>
+                      <Button variant="outline" size="sm" onClick={() => openDataset(d.id, d.name)} disabled={isTemp}>
                         Open
                         <ChevronRight className="ml-1.5 h-3.5 w-3.5" />
                       </Button>
@@ -685,7 +688,8 @@ export function DatasetsView() {
                 </div>
               )}
             </Card>
-          ))}
+            );
+          })}
         </div>
       )}
 

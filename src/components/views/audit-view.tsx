@@ -11,7 +11,7 @@ import {
   EmptyState,
   ErrorState,
 } from "@/components/ui/page-elements";
-import { TableSkeleton } from "@/components/ui/skeletons/table-skeleton";
+import { AuditSkeleton } from "@/components/ui/skeletons/audit-skeleton";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -418,7 +418,7 @@ export function AuditView() {
         </CardHeader>
         <CardContent>
           {isLoading ? (
-            <TableSkeleton />
+            <AuditSkeleton />
           ) : isError ? (
             <ErrorState
               message="Failed to load audit logs"

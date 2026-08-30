@@ -7,7 +7,7 @@ import { toast } from "sonner";
 import { api } from "@/lib/api-client";
 import { useAppStore } from "@/lib/store";
 import type { SourceDTO, SourceRunDTO, SourceStatus } from "@/lib/types";
-import { TableSkeleton } from "@/components/ui/skeletons/table-skeleton";
+import { SourcesSkeleton } from "@/components/ui/skeletons/sources-skeleton";
 import {
   PageHeader,
   StatCard,

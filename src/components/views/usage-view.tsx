@@ -458,8 +458,8 @@ export function UsageView() {
           </CardHeader>
           <CardContent className="p-0">
             <div className="divide-y max-h-[30vh] overflow-y-auto">
-              {data.costByMetric.map((m) => (
-                <div key={m.metricType} className="flex items-center gap-3 px-4 py-3">
+              {data.costByMetric.map((m, i) => (
+                <div key={`${m.metricType}-${i}`} className="flex items-center gap-3 px-4 py-3">
                   <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300">
                     {getMetricIcon(m.metricType)}
                   </div>

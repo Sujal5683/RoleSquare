@@ -9,7 +9,7 @@ import type { DatasetAccessDTO } from "@/lib/types";
 import { EmptyState, ErrorState } from "@/components/ui/page-elements";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { TableSkeleton } from "@/components/ui/skeletons/table-skeleton";
+import { SharingSkeleton } from "@/components/ui/skeletons/sharing-skeleton";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -68,7 +68,7 @@ export function ReceivedTab({ onRowClick }: ReceivedTabProps) {
   });
 
   if (!activeOrgId) return <EmptyState icon={<Building2 className="h-5 w-5" />} title="No organization selected" description="" />;
-  if (isLoading) return <div className="p-4"><TableSkeleton /></div>;
+  if (isLoading) return <div className="p-4"><SharingSkeleton /></div>;
   if (isError) return <ErrorState message="Failed to load shared datasets" onRetry={() => refetch()} />;
 
   const received = data?.received ?? [];

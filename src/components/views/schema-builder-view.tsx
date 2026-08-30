@@ -422,27 +422,22 @@ export function SchemaBuilderView() {
     mutationFn: (payload: { name: string; description?: string }) =>
       api.post<SchemaDTO>("/api/schemas", payload),
     onMutate: async (payload) => {
-      await queryClient.cancelQueries({ queryKey: ["schemas", activeOrgId] });
-      const previousSchemas = queryClient.getQueryData(["schemas", activeOrgId]);
-      queryClient.setQueryData(["schemas", activeOrgId], (old: any) => {
-        const newSchema = { id: "temp-" + Date.now(), ...payload, fields: [], _count: { datasets: 0 }, createdAt: new Date().toISOString() };
-        return [...(old || []), newSchema];
-      });
-      setCreateOpen(false);
+      // Don't inject optimistic schema because activeSchemaId auto-selects it and causes 404s
+      // on the schema detail fetch before the real ID comes back.
+      // Just clear the form and wait for the real schema to be returned.
       setNewName("");
       setNewDescription("");
-      return { previousSchemas };
     },
     onSuccess: (schema) => {
       toast.success("Schema created", {
         description: schema.name,
       });
+      setCreateOpen(false);
       // Navigate to the new schema via the store so other views stay in sync.
       openSchema(schema.id, schema.name);
       setActiveSchemaId(schema.id);
     },
-    onError: (err: unknown, newSchema, context: any) => {
-      queryClient.setQueryData(["schemas", activeOrgId], context?.previousSchemas);
+    onError: (err: unknown) => {
       const msg = err instanceof Error ? err.message : "Failed to create schema";
       toast.error("Create failed", { description: msg });
     },
@@ -452,17 +447,19 @@ export function SchemaBuilderView() {
   });
 
   const deleteSchemaMutation = useMutation({
-    mutationFn: () => api.delete(`/api/schemas/${activeSchemaId}`),
-    onMutate: async () => {
+    mutationFn: (id: string) => api.delete(`/api/schemas/${id}`),
+    onMutate: async (id: string) => {
       await queryClient.cancelQueries({ queryKey: ["schemas", activeOrgId] });
       const previousSchemas = queryClient.getQueryData(["schemas", activeOrgId]);
       queryClient.setQueryData(["schemas", activeOrgId], (old: any) => 
-        (old || []).filter((s: any) => s.id !== activeSchemaId)
+        (old || []).filter((s: any) => s.id !== id)
       );
       setDeleteOpen(false);
       const currentActive = activeSchemaId;
-      setActiveSchemaId(null);
-      openSchema(null);
+      if (activeSchemaId === id) {
+        setActiveSchemaId(null);
+        openSchema(null);
+      }
       return { previousSchemas, currentActive };
     },
     onSuccess: () => {
@@ -1354,7 +1351,9 @@ export function SchemaBuilderView() {
               disabled={deleteSchemaMutation.isPending}
               onClick={(e) => {
                 e.preventDefault();
-                deleteSchemaMutation.mutate();
+                if (activeSchemaId) {
+                  deleteSchemaMutation.mutate(activeSchemaId);
+                }
               }}
             >
               {deleteSchemaMutation.isPending ? "Deleting…" : "Delete schema"}

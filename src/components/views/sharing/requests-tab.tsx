@@ -9,7 +9,7 @@ import type { SharingRequestDTO, DatasetDTO } from "@/lib/types";
 import { EmptyState, ErrorState } from "@/components/ui/page-elements";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { TableSkeleton } from "@/components/ui/skeletons/table-skeleton";
+import { SharingSkeleton } from "@/components/ui/skeletons/sharing-skeleton";
 import { Badge } from "@/components/ui/badge";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
@@ -173,7 +173,7 @@ export function RequestsTab({ onRowClick }: RequestsTabProps) {
   };
 
   if (!activeOrgId) return <EmptyState icon={<Building2 className="h-5 w-5" />} title="No organization selected" description="" />;
-  if (isLoading) return <div className="p-4"><TableSkeleton /></div>;
+  if (isLoading) return <div className="p-4"><SharingSkeleton /></div>;
   if (isError) return <ErrorState message="Failed to load sharing requests" onRetry={() => refetch()} />;
 
   const outgoing = data?.outgoing ?? [];

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 import { useAppStore, type SessionUser } from "@/lib/store";
 import { api } from "@/lib/api-client";
 import { createClient } from "@/lib/supabase/client";
@@ -93,6 +94,7 @@ const NAV_ITEMS: NavItem[] = [
 ];
 
 export function AppShell({ children }: { children: React.ReactNode }) {
+  const queryClient = useQueryClient();
   const view = useAppStore((s) => s.view);
   const setView = useAppStore((s) => s.setView);
   const sidebarOpen = useAppStore((s) => s.sidebarOpen);
@@ -156,6 +158,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   }, [setActiveOrgId]);
 
   async function handleSignOut() {
+    // 1. Wipe the in-memory React Query cache so no sensitive data lingers
+    queryClient.clear();
+    
+    // 2. Erase the offline persister cache from local storage 
+    //    (to clean up any data left by previous app versions)
+    if (typeof window !== "undefined") {
+      window.localStorage.removeItem("REACT_QUERY_OFFLINE_CACHE");
+    }
+
+    // 3. Clear session and redirect
     await fetch("/api/auth/logout", { method: "POST" });
     router.push("/");
     router.refresh();
