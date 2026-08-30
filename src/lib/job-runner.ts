@@ -1,99 +1,105 @@
-import { processGmailScan } from "@/lib/pipelines/gmail";
-import { processDriveScan } from "@/lib/pipelines/drive";
-import { processDocsScan } from "@/lib/pipelines/docs";
-import { processSheetsScan } from "@/lib/pipelines/sheets";
-import { processFormsScan } from "@/lib/pipelines/forms";
-// RoleSquare — in-process job runner.
+// RoleSquare — Resilient Background Job Runner
 //
-// This module provides a lightweight, in-process job processor that
-// handles GMAIL_SCAN, EXPORT, and AI_EXTRACTION jobs. It is NOT a
-// production-grade queue worker — it runs inside the Next.js process
-// and processes jobs one at a time with idempotency checks.
+// Architecture: Fan-Out Queue (industry standard for AI ETL pipelines)
 //
-// Design goals:
-//   - Jobs are safe to execute more than once (idempotent).
-//   - Progress is persisted at each stage.
-//   - Failures are classified as retryable or terminal.
-//   - Stale jobs (running for >10 minutes) are marked as failed.
-//   - Dead-letter queue: jobs with 5+ attempts are moved to "dlq".
+//  1. AI_EXTRACTION (Master Job)
+//     Reads N unprocessed source records → inserts N individual EXTRACT_SINGLE_ROW
+//     child jobs → returns immediately (does NOT process rows itself).
 //
-// The runner is started lazily on first API request and runs a polling
-// loop every 5 seconds. It stops when no jobs are queued/running.
+//  2. EXTRACT_SINGLE_ROW (Worker Job)
+//     Processes exactly ONE row:
+//       a. Build source text from DatasetRecord values
+//       b. exploreLinkedContent() → downloads Drive files → Gemini File API URIs
+//       c. extractWithLLM() → calls Gemini with multimodal fileParts[]
+//       d. Persists DatasetRecord + DatasetValue rows in the target dataset
+//     If Gemini throws GeminiRateLimitExhaustedError → job goes back to `queued`
+//     (not `failed`) → automatically retried in the next cycle. Zero data lost.
+//
+//  3. Concurrent polling — processNextJobCycle() picks up to 8 jobs simultaneously
+//     using Promise.allSettled(). Each job runs in isolation.
+//
+// Key invariants:
+//   - STALE_JOB_THRESHOLD_MS increased to 10 minutes per row (was 10 min per 50-row batch)
+//   - GeminiRateLimitExhaustedError always re-queues the row (isRetryableError)
+//   - Drive file content is fetched ONCE per row; if LLM fails, only the LLM is retried
+//   - No cross-row data contamination: each EXTRACT_SINGLE_ROW call is a separate HTTP req
 
-import { db } from "@/lib/db";
-import { logAudit } from "@/lib/audit";
-import { bumpUsageMetric } from "@/lib/usage";
-import { getGmailClient, extractEmailBody, extractAttachments, extractDriveLinks, getHeader } from "@/lib/google-client";
-import { parseEmailFields } from "@/lib/email-parser";
+import { processGmailScan }  from "@/lib/pipelines/gmail";
+import { processDriveScan }  from "@/lib/pipelines/drive";
+import { processDocsScan }   from "@/lib/pipelines/docs";
+import { processSheetsScan } from "@/lib/pipelines/sheets";
+import { processFormsScan }  from "@/lib/pipelines/forms";
+
+import { db }                           from "@/lib/db";
+import { logAudit }                     from "@/lib/audit";
+import { bumpUsageMetric }              from "@/lib/usage";
+import {
+  getGmailClient,
+  extractEmailBody,
+  extractAttachments,
+  extractDriveLinks,
+  getHeader,
+}                                       from "@/lib/google-client";
+import { parseEmailFields }             from "@/lib/email-parser";
+import type { ParsedEmailFields }       from "@/lib/email-parser";
 import { ensureDefaultDataset, writeDefaultDatasetRecord } from "@/lib/dataset-provisioner";
-import { extractWithLLM } from "@/lib/extraction";
+import { extractWithLLM }               from "@/lib/extraction";
 import { exploreLinkedContent, extractAllUrls, filterDriveUrls } from "@/lib/drive-reader";
 import { agentInfo, agentWarn, agentError } from "@/lib/agent-logger";
-import { computeCost } from "@/lib/model-pricing";
-import crypto from "crypto";
+import { computeCost }                  from "@/lib/model-pricing";
+import { GeminiRateLimitExhaustedError } from "@/lib/gemini";
+import crypto                           from "crypto";
 
-const STALE_JOB_THRESHOLD_MS = 10 * 60 * 1000; // 10 minutes
+// ── Constants ─────────────────────────────────────────────────────────────────
+
+/** 10 minutes per single-row job — large Drive folders can take ~60–90s */
+const STALE_JOB_THRESHOLD_MS = 10 * 60 * 1000;
 const MAX_ATTEMPTS = 5;
+/** How many jobs to run concurrently in one processNextJobCycle() call */
+const CONCURRENT_WORKERS = 8;
+/** How many EXTRACT_SINGLE_ROW children to fan-out per AI_EXTRACTION master job */
+const FAN_OUT_BATCH_SIZE  = 50;
+
+// ── Job cycle (called by /api/jobs/process) ───────────────────────────────────
 
 /**
- * Processes a single job from the queue and marks stale jobs.
- * This is meant to be called by an isolated API route or cron job,
- * rather than running in an infinite loop inside the Next.js process.
+ * Marks stale jobs then picks up to CONCURRENT_WORKERS queued jobs and
+ * runs them in parallel using Promise.allSettled (errors in one don't
+ * cancel others).
  */
 export async function processNextJobCycle() {
   try {
     await processStaleJobs();
-    const job = await pickNextJob();
-    if (job) {
-      await processJob(job);
-    }
+    const jobs = await pickNextJobs(CONCURRENT_WORKERS);
+    if (jobs.length === 0) return;
+    await Promise.allSettled(jobs.map((job) => processJob(job)));
   } catch (err) {
     console.error("[job-runner] error in cycle:", err);
   }
 }
 
-/**
- * Marks jobs that have been "running" for too long as failed.
- */
+// ── Stale job detection ───────────────────────────────────────────────────────
+
 async function processStaleJobs() {
   const cutoff = new Date(Date.now() - STALE_JOB_THRESHOLD_MS);
   const staleJobs = await db.aiJob.findMany({
-    where: {
-      status: "running",
-      startedAt: { lt: cutoff },
-    },
+    where: { status: "running", startedAt: { lt: cutoff } },
     select: { id: true, organizationId: true, payload: true },
   });
 
   for (const job of staleJobs) {
     await db.aiJob.update({
       where: { id: job.id },
-      data: {
-        status: "failed",
-        errorMessage: "Job timed out (stale)",
-        finishedAt: new Date(),
-      },
+      data: { status: "failed", errorMessage: "Job timed out (stale)", finishedAt: new Date() },
     });
-
     try {
       if (job.payload) {
         const parsed = JSON.parse(job.payload);
-        if (parsed.runId) {
-          await db.sourceRun.updateMany({
-            where: { id: parsed.runId },
-            data: { status: "failed", errorMessage: "Job timed out (stale)" },
-          });
-        }
-        if (parsed.sourceId) {
-          await db.source.updateMany({
-            where: { id: parsed.sourceId },
-            data: { runState: "idle" },
-          });
-        }
+        if (parsed.runId)    await db.sourceRun.updateMany({ where: { id: parsed.runId },    data: { status: "failed", errorMessage: "Job timed out (stale)" } });
+        if (parsed.sourceId) await db.source.updateMany({   where: { id: parsed.sourceId }, data: { runState: "idle" } });
       }
-    } catch (e) {
-      // ignore
-    }
+    } catch { /* ignore */ }
+
     await logAudit({
       organizationId: job.organizationId,
       actorType: "system",
@@ -106,37 +112,32 @@ async function processStaleJobs() {
   }
 }
 
-/**
- * Picks the next queued job, atomically transitioning it to "running".
- * Returns null if no jobs are queued.
- */
-async function pickNextJob() {
-  const queued = await db.aiJob.findFirst({
+// ── Job picking — takes up to N jobs atomically ───────────────────────────────
+
+async function pickNextJobs(limit: number) {
+  const queued = await db.aiJob.findMany({
     where: { status: "queued" },
     orderBy: { createdAt: "asc" },
+    take: limit,
   });
-  if (!queued) return null;
+  if (!queued.length) return [];
 
-  // Atomically transition to running
-  try {
-    const updated = await db.aiJob.update({
-      where: { id: queued.id, status: "queued" },
-      data: {
-        status: "running",
-        startedAt: new Date(),
-        attempts: { increment: 1 },
-      },
-    });
-    return updated;
-  } catch {
-    // Another worker picked it up — skip
-    return null;
-  }
+  const picked = await Promise.allSettled(
+    queued.map((j) =>
+      db.aiJob.update({
+        where: { id: j.id, status: "queued" },
+        data: { status: "running", startedAt: new Date(), attempts: { increment: 1 } },
+      })
+    )
+  );
+
+  return picked
+    .filter((r) => r.status === "fulfilled")
+    .map((r) => (r as PromiseFulfilledResult<any>).value);
 }
 
-/**
- * Processes a single job. Catches all errors and classifies them.
- */
+// ── Single job dispatcher ─────────────────────────────────────────────────────
+
 async function processJob(job: {
   id: string;
   organizationId: string;
@@ -145,7 +146,7 @@ async function processJob(job: {
   payload: string;
   attempts: number;
 }) {
-  console.log(`[job-runner] processing job ${job.id} (${job.type}, attempt ${job.attempts})`);
+  console.log(`[job-runner] job ${job.id} type=${job.type} attempt=${job.attempts}`);
 
   try {
     if (job.userId) {
@@ -159,55 +160,29 @@ async function processJob(job: {
     let result: Record<string, unknown> = {};
 
     switch (job.type) {
-      case "GMAIL_SCAN":
-        result = await processGmailScan(job, payload);
-        break;
-      case "DRIVE_SCAN":
-        result = await processDriveScan(job, payload);
-        break;
-      case "DOCS_SCAN":
-        result = await processDocsScan(job, payload);
-        break;
-      case "SHEETS_SCAN":
-        result = await processSheetsScan(job, payload);
-        break;
-      case "FORMS_SCAN":
-        result = await processFormsScan(job, payload);
-        break;
-      case "DETERMINISTIC_SYNC":
-        result = await processDeterministicSync(job, payload);
-        break;
-      case "EXPORT":
-        result = await processExport(job, payload);
-        break;
-      case "AI_EXTRACTION":
-        result = await processAiExtraction(job, payload);
-        break;
-      default:
-        // Unknown job type — mark as success with a note
-        result = { skipped: true, reason: `Unknown job type: ${job.type}` };
+      case "GMAIL_SCAN":          result = await processGmailScan(job, payload);              break;
+      case "DRIVE_SCAN":          result = await processDriveScan(job, payload);              break;
+      case "DOCS_SCAN":           result = await processDocsScan(job, payload);               break;
+      case "SHEETS_SCAN":         result = await processSheetsScan(job, payload);             break;
+      case "FORMS_SCAN":          result = await processFormsScan(job, payload);              break;
+      case "DETERMINISTIC_SYNC":  result = await processDeterministicSync(job, payload);      break;
+      case "EXPORT":              result = await processExport(job, payload);                 break;
+      case "AI_EXTRACTION":       result = await processAiExtractionMaster(job, payload);     break;
+      case "EXTRACT_SINGLE_ROW":  result = await processSingleRowExtraction(job, payload);    break;
+      default:                    result = { skipped: true, reason: `Unknown type: ${job.type}` };
     }
 
     await db.aiJob.update({
       where: { id: job.id },
-      data: {
-        status: "success",
-        progress: 100,
-        result: JSON.stringify(result),
-        finishedAt: new Date(),
-        errorMessage: null,
-      },
+      data: { status: "success", progress: 100, result: JSON.stringify(result), finishedAt: new Date(), errorMessage: null },
     });
+    console.log(`[job-runner] job ${job.id} done`);
 
-    console.log(`[job-runner] job ${job.id} completed successfully`);
   } catch (err) {
     const errorMessage = err instanceof Error ? err.message : "Unknown error";
-    const isRetryable = isRetryableError(err);
-
-    // Dead-letter if too many attempts
-    const shouldDlq = job.attempts >= MAX_ATTEMPTS;
-
-    const finalStatus = shouldDlq ? "dlq" : isRetryable ? "queued" : "failed";
+    const isRetryable  = isRetryableError(err);
+    const shouldDlq    = job.attempts >= MAX_ATTEMPTS;
+    const finalStatus  = shouldDlq ? "dlq" : isRetryable ? "queued" : "failed";
 
     await db.aiJob.update({
       where: { id: job.id },
@@ -217,28 +192,16 @@ async function processJob(job: {
           ? `Dead-lettered after ${MAX_ATTEMPTS} attempts: ${errorMessage}`
           : errorMessage,
         finishedAt: shouldDlq || !isRetryable ? new Date() : null,
-        startedAt: isRetryable ? null : undefined,
+        startedAt:  isRetryable ? null : undefined,
       },
     });
 
     if (finalStatus !== "queued") {
       try {
         const parsed = JSON.parse(job.payload || "{}");
-        if (parsed.runId) {
-          await db.sourceRun.updateMany({
-            where: { id: parsed.runId, status: "running" },
-            data: { status: "failed", errorMessage },
-          });
-        }
-        if (parsed.sourceId) {
-          await db.source.updateMany({
-            where: { id: parsed.sourceId },
-            data: { runState: "idle" },
-          });
-        }
-      } catch (e) {
-        // ignore
-      }
+        if (parsed.runId)    await db.sourceRun.updateMany({ where: { id: parsed.runId,    status: "running" }, data: { status: "failed", errorMessage } });
+        if (parsed.sourceId) await db.source.updateMany({   where: { id: parsed.sourceId },                    data: { runState: "idle" } });
+      } catch { /* ignore */ }
     }
 
     await logAudit({
@@ -247,68 +210,477 @@ async function processJob(job: {
       action: "update",
       entity: "job",
       entityId: job.id,
-      after: {
-        status: finalStatus,
-        error: errorMessage,
-        attempts: job.attempts,
-      },
+      after: { status: finalStatus, error: errorMessage, attempts: job.attempts },
       reason: shouldDlq ? "dead_lettered" : isRetryable ? "retry_queued" : "failed",
     });
 
-    console.error(`[job-runner] job ${job.id} failed: ${errorMessage}`);
+    console.error(`[job-runner] job ${job.id} → ${finalStatus}: ${errorMessage}`);
   }
 }
 
+/**
+ * Classifies errors as retryable (job goes back to queued) or terminal.
+ * GeminiRateLimitExhaustedError is always retryable — this is the primary
+ * guard against silent data loss when all Gemini models are temporarily busy.
+ */
 function isRetryableError(err: unknown): boolean {
+  // Rate limit exhausted across all Gemini models → always retry
+  if (err instanceof GeminiRateLimitExhaustedError) return true;
+
   if (err instanceof Error) {
     const msg = err.message.toLowerCase();
-    // Network errors, timeouts, and rate limits are retryable
     if (
-      msg.includes("timeout") || 
-      msg.includes("rate limit") || 
-      msg.includes("network") ||
-      msg.includes("econnreset") ||
-      msg.includes("forcibly closed") ||
-      msg.includes("wsarecv")
-    ) {
-      return true;
-    }
-    // Prisma transaction conflicts are retryable
-    if (msg.includes("transaction") || msg.includes("write conflict")) {
-      return true;
-    }
+      msg.includes("timeout")        ||
+      msg.includes("rate limit")     ||
+      msg.includes("network")        ||
+      msg.includes("econnreset")     ||
+      msg.includes("forcibly closed")||
+      msg.includes("wsarecv")        ||
+      msg.includes("resource_exhausted") ||
+      msg.includes("model_capacity_exhausted")
+    ) return true;
+    if (msg.includes("transaction") || msg.includes("write conflict")) return true;
   }
   return false;
 }
 
-// ── Job Processors ──────────────────────────────────────────────────────
-
-/**
- * GMAIL_SCAN job processor.
- *
- * Calls the Gmail API to fetch real emails matching the source's filter rules.
- * For each matched message:
- *   1. Upserts an Email row (deduplicated by googleMessageId).
- *   2. Discovers and stores EmailAttachment rows.
- *   3. Discovers and stores EmailLink rows (Google Drive/Docs URLs).
- * Updates the SourceRun stats with real counts.
- */
-
+// ── Progress helper ───────────────────────────────────────────────────────────
 
 export async function updateRunProgress(runId: string, progress: number, _stage: string) {
-  await db.sourceRun.update({
-    where: { id: runId },
-    data: { progress },
-  });
+  await db.sourceRun.update({ where: { id: runId }, data: { progress } });
 }
 
+// ── AI_EXTRACTION: Master (Fan-Out) ──────────────────────────────────────────
+
 /**
- * DETERMINISTIC_SYNC job processor.
+ * The master AI_EXTRACTION job.
+ * 
+ * Instead of processing rows directly, it:
+ *   1. Finds all unprocessed source records (up to FAN_OUT_BATCH_SIZE)
+ *   2. Inserts one EXTRACT_SINGLE_ROW child job per record
+ *   3. Returns immediately — child jobs are picked up in subsequent cycles
  *
- * Reads all Email rows with processingStatus="matched" for a source and
- * writes deterministic DatasetRecord + DatasetValue rows into the Default Dataset.
- * Zero AI tokens consumed.
+ * This prevents the 10-minute stale timeout from killing a large batch,
+ * and isolates failures to individual rows instead of entire batches.
  */
+async function processAiExtractionMaster(
+  job: { id: string; organizationId: string },
+  payload: Record<string, unknown>
+): Promise<Record<string, unknown>> {
+  // Support both Mode A (legacy sourceId-based) and Mode B (two-step pipeline)
+  const sourceDatasetId  = payload.sourceDatasetId  as string | undefined;
+  const targetDatasetId  = payload.targetDatasetId  as string | undefined;
+  const targetSchemaId   = payload.targetSchemaId   as string | undefined;
+  const exploreDriveLinks = payload.exploreDriveLinks !== false;
+  const driveConnectionId = payload.driveConnectionId as string | undefined;
+  const maxContentBytes   = typeof payload.maxContentBytes === "number" ? payload.maxContentBytes : undefined;
+
+  // ── Mode B: Two-step pipeline ──
+  if (sourceDatasetId && targetDatasetId && targetSchemaId) {
+    // Find records already processed in target dataset
+    const doneEmails = await db.datasetRecord.findMany({
+      where: { datasetId: targetDatasetId, sourceEmailId: { not: null } },
+      select: { sourceEmailId: true },
+    });
+    const doneEmailIds = new Set(doneEmails.map((r) => r.sourceEmailId as string));
+
+    const sourceRecords = await db.datasetRecord.findMany({
+      where: { datasetId: sourceDatasetId },
+      select: { id: true, sourceEmailId: true },
+      take: FAN_OUT_BATCH_SIZE,
+      orderBy: { createdAt: "asc" },
+    });
+    const unprocessed = sourceRecords.filter(
+      (r) => !r.sourceEmailId || !doneEmailIds.has(r.sourceEmailId)
+    );
+
+    if (unprocessed.length === 0) {
+      return { fanOut: 0, note: "All records already processed" };
+    }
+
+    // Create one child job per unprocessed record
+    await db.aiJob.createMany({
+      data: unprocessed.map((record) => ({
+        organizationId: job.organizationId,
+        type:           "EXTRACT_SINGLE_ROW",
+        status:         "queued",
+        agentKey:       "extractor",
+        payload: JSON.stringify({
+          sourceRecordId: record.id,
+          targetDatasetId,
+          targetSchemaId,
+          exploreDriveLinks,
+          driveConnectionId,
+          maxContentBytes,
+          // Back-reference to master job for logging
+          masterJobId: job.id,
+        }),
+        progress: 0,
+      })),
+    });
+
+    // If there might be more records, queue another master job
+    if (sourceRecords.length === FAN_OUT_BATCH_SIZE) {
+      await db.aiJob.create({
+        data: {
+          organizationId: job.organizationId,
+          type:           "AI_EXTRACTION",
+          status:         "queued",
+          payload: JSON.stringify({
+            sourceDatasetId,
+            targetDatasetId,
+            targetSchemaId,
+            exploreDriveLinks,
+            driveConnectionId,
+            maxContentBytes,
+          }),
+          progress: 0,
+        },
+      });
+    }
+
+    await agentInfo(job.id, job.organizationId, "extractor",
+      `Fan-out: queued ${unprocessed.length} EXTRACT_SINGLE_ROW jobs`, { total: unprocessed.length });
+
+    return { fanOut: unprocessed.length, hasMore: sourceRecords.length === FAN_OUT_BATCH_SIZE };
+  }
+
+  // ── Mode A: Legacy (sourceId-based) ──
+  const sourceId  = payload.sourceId  as string | undefined;
+  const datasetId = payload.datasetId as string | undefined;
+  if (!sourceId || !datasetId) return { note: "Missing sourceId or datasetId" };
+
+  const emails = await db.email.findMany({
+    where: { sourceId, processingStatus: "matched" },
+    select: { id: true },
+    take: FAN_OUT_BATCH_SIZE,
+  });
+
+  if (emails.length === 0) return { fanOut: 0, note: "No unprocessed emails" };
+
+  await db.aiJob.createMany({
+    data: emails.map((email) => ({
+      organizationId: job.organizationId,
+      type:    "EXTRACT_SINGLE_ROW",
+      status:  "queued",
+      agentKey: "extractor",
+      payload: JSON.stringify({ emailId: email.id, datasetId, sourceId, masterJobId: job.id }),
+      progress: 0,
+    })),
+  });
+
+  if (emails.length === FAN_OUT_BATCH_SIZE) {
+    await db.aiJob.create({
+      data: {
+        organizationId: job.organizationId,
+        type:    "AI_EXTRACTION",
+        status:  "queued",
+        payload: JSON.stringify({ sourceId, datasetId }),
+        progress: 0,
+      },
+    });
+  }
+
+  return { fanOut: emails.length };
+}
+
+// ── EXTRACT_SINGLE_ROW: Worker ────────────────────────────────────────────────
+
+/**
+ * Processes exactly ONE source record. This is the atomic unit of extraction.
+ *
+ * Flow:
+ *   1. Load source record fields from DB
+ *   2. Collect all URLs from record values
+ *   3. exploreLinkedContent() → Drive API downloads → Gemini File API upload
+ *   4. extractWithLLM() → Gemini multimodal call (fileParts + text)
+ *   5. Persist DatasetRecord + DatasetValue rows
+ *
+ * On GeminiRateLimitExhaustedError → throws → job-runner marks as `queued` → auto-retry
+ * On any other error → throws → job-runner marks as `failed` (or re-queues if retryable)
+ *
+ * Data isolation: each call is completely independent. Gemini has no memory of
+ * previous rows. Cross-row hallucination is architecturally impossible.
+ */
+async function processSingleRowExtraction(
+  job: { id: string; organizationId: string },
+  payload: Record<string, unknown>
+): Promise<Record<string, unknown>> {
+  // ── Mode B: two-step pipeline row ──
+  if (payload.sourceRecordId) {
+    return processSingleRowModeB(job, payload);
+  }
+  // ── Mode A: legacy email row ──
+  if (payload.emailId) {
+    return processSingleRowModeA(job, payload);
+  }
+  return { note: "EXTRACT_SINGLE_ROW: missing sourceRecordId or emailId" };
+}
+
+// ── Mode B single row ─────────────────────────────────────────────────────────
+
+async function processSingleRowModeB(
+  job: { id: string; organizationId: string },
+  payload: Record<string, unknown>
+): Promise<Record<string, unknown>> {
+  const sourceRecordId   = payload.sourceRecordId   as string;
+  const targetDatasetId  = payload.targetDatasetId  as string;
+  const targetSchemaId   = payload.targetSchemaId   as string;
+  const exploreDriveLinks = payload.exploreDriveLinks !== false;
+  const driveConnectionId = payload.driveConnectionId as string | undefined;
+  const maxContentBytes   = typeof payload.maxContentBytes === "number" ? payload.maxContentBytes : 200_000;
+
+  // Load schema fields
+  const schemaFields = await db.schemaField.findMany({
+    where: { schemaId: targetSchemaId },
+    orderBy: { position: "asc" },
+    select: { id: true, name: true, type: true, description: true, instructions: true, required: true, options: true, confidenceThreshold: true },
+  });
+  if (!schemaFields.length) throw new Error(`Schema ${targetSchemaId} has no fields`);
+
+  // Load source record
+  const sourceRecord = await db.datasetRecord.findUnique({
+    where: { id: sourceRecordId },
+    include: { values: true },
+  });
+  if (!sourceRecord) throw new Error(`Source record ${sourceRecordId} not found`);
+
+  // Check if already processed (idempotency)
+  if (sourceRecord.sourceEmailId) {
+    const existing = await db.datasetRecord.findFirst({
+      where: { datasetId: targetDatasetId, sourceEmailId: sourceRecord.sourceEmailId },
+    });
+    if (existing) return { skipped: true, reason: "already_processed" };
+  }
+
+  // Build field name → value map
+  const fieldIds = sourceRecord.values.map((v) => v.fieldId);
+  const defaultFields = await db.schemaField.findMany({
+    where: { id: { in: fieldIds } },
+    select: { id: true, name: true },
+  });
+  const nameById = new Map(defaultFields.map((f) => [f.id, f.name]));
+
+  const textLines = sourceRecord.values
+    .map((v) => {
+      let val: unknown;
+      try { val = JSON.parse(v.value); } catch { val = v.value; }
+      return val ? `${nameById.get(v.fieldId) ?? v.fieldId}: ${val}` : null;
+    })
+    .filter(Boolean) as string[];
+
+  const sourceText = ["=== EMAIL RECORD ===", ...textLines, "=== END ==="].join("\n");
+
+  // ── Drive link exploration ──
+  let driveContent: Awaited<ReturnType<typeof exploreLinkedContent>> | undefined;
+
+  if (exploreDriveLinks) {
+    const allValues = sourceRecord.values.map((v) => {
+      try { return String(JSON.parse(v.value) ?? ""); } catch { return v.value; }
+    }).join(" ");
+
+    const allUrls   = extractAllUrls(allValues + " " + sourceText);
+    const driveUrls = filterDriveUrls(allUrls);
+    const otherUrls = allUrls.filter((u) => !driveUrls.includes(u)).slice(0, 3);
+    const urlsToExplore = [...driveUrls, ...otherUrls];
+
+    if (urlsToExplore.length > 0) {
+      // Non-fatal: Drive failures don't abort extraction — we fall back to text-only
+      try {
+        driveContent = await exploreLinkedContent(urlsToExplore, {
+          connectionId:    driveConnectionId,
+          organizationId:  job.organizationId,
+          maxBytes:        maxContentBytes,
+        });
+        await agentInfo(job.id, job.organizationId, "extractor",
+          `Record ${sourceRecordId}: Drive explored ${driveContent.filesRead.length} files (${driveContent.fileParts.length} uploaded to File API)`,
+          { filesRead: driveContent.filesRead, failed: driveContent.failedFiles }
+        );
+      } catch (err) {
+        await agentWarn(job.id, job.organizationId, "extractor",
+          `Record ${sourceRecordId}: Drive exploration failed — proceeding with text-only extraction`,
+          { error: err instanceof Error ? err.message : String(err) }
+        );
+      }
+    }
+  }
+
+  // ── LLM extraction — THROWS on rate-limit exhaustion → triggers job retry ──
+  const fieldInputs = schemaFields.map((f) => ({
+    name: f.name, type: f.type, description: f.description,
+    instructions: f.instructions, required: f.required,
+    options: f.options ? JSON.parse(f.options) : undefined,
+    confidenceThreshold: f.confidenceThreshold,
+  }));
+
+  const extractionResult = await extractWithLLM({
+    fields:      fieldInputs,
+    sourceText,
+    sourceFile:  `dataset:record:${sourceRecordId}`,
+    driveContent,
+  });
+
+  // ── Guard: skip empty LLM response but don't mark row as "extracted" ──
+  // The job will be retried (it's re-queued with queued status by the runner)
+  if (!extractionResult.fields.length) {
+    throw new Error(`LLM returned 0 fields for record ${sourceRecordId} — will retry`);
+  }
+
+  // ── Persist results ──
+  const normName = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
+
+  const record = await db.datasetRecord.create({
+    data: {
+      datasetId:     targetDatasetId,
+      sourceEmailId: sourceRecord.sourceEmailId,
+      status:        extractionResult.overallConfidence >= 0.7 ? "valid" : "needs_review",
+      confidence:    extractionResult.overallConfidence,
+    },
+  });
+
+  let valuesWritten = 0;
+  for (const fieldResult of extractionResult.fields) {
+    const sf = schemaFields.find((f) => normName(f.name) === normName(fieldResult.fieldName));
+    if (!sf) continue;
+    await db.datasetValue.create({
+      data: {
+        recordId:      record.id,
+        fieldId:       sf.id,
+        value:         JSON.stringify(fieldResult.value ?? null),
+        confidence:    fieldResult.confidence,
+        evidence:      fieldResult.evidence || "",
+        sourceFile:    fieldResult.sourceFile,
+        modelUsed:     extractionResult.modelUsed,
+        promptVersion: extractionResult.promptVersion,
+      },
+    });
+    valuesWritten++;
+  }
+
+  if (valuesWritten === 0) {
+    // All fields were filtered out (name mismatch) — delete empty record and throw
+    await db.datasetRecord.delete({ where: { id: record.id } });
+    throw new Error(`Record ${sourceRecordId}: all ${extractionResult.fields.length} LLM fields failed schema name matching`);
+  }
+
+  // Update target dataset record count
+  await db.dataset.update({ where: { id: targetDatasetId }, data: { recordCount: { increment: 1 } } });
+
+  const tokens   = extractionResult.tokensUsed;
+  const costUsd  = computeCost(extractionResult.modelUsed, extractionResult.promptTokens ?? 0, extractionResult.completionTokens ?? 0);
+
+  // Write AiOutput for cost tracking
+  await db.aiOutput.create({
+    data: {
+      jobId:            job.id,
+      modelUsed:        extractionResult.modelUsed,
+      promptHash:       crypto.createHash("md5").update(sourceText.slice(0, 200)).digest("hex"),
+      rawResponse:      JSON.stringify(extractionResult.fields),
+      tokensUsed:       tokens,
+      promptTokens:     extractionResult.promptTokens ?? 0,
+      completionTokens: extractionResult.completionTokens ?? 0,
+      costUsd,
+    },
+  });
+
+  if (tokens > 0) await bumpUsageMetric(job.organizationId, "ai_tokens", tokens);
+
+  await agentInfo(job.id, job.organizationId, "extractor",
+    `Record ${sourceRecordId}: extracted ${valuesWritten} fields via ${extractionResult.modelUsed}`,
+    { confidence: extractionResult.overallConfidence, tokens, costUsd, fileParts: driveContent?.fileParts.length ?? 0 }
+  );
+
+  return { sourceRecordId, valuesWritten, tokens, modelUsed: extractionResult.modelUsed };
+}
+
+// ── Mode A single row (legacy) ────────────────────────────────────────────────
+
+async function processSingleRowModeA(
+  job: { id: string; organizationId: string },
+  payload: Record<string, unknown>
+): Promise<Record<string, unknown>> {
+  const emailId   = payload.emailId   as string;
+  const datasetId = payload.datasetId as string;
+  const sourceId  = payload.sourceId  as string;
+
+  const email = await db.email.findUnique({ where: { id: emailId } });
+  if (!email) throw new Error(`Email ${emailId} not found`);
+  if (email.processingStatus === "extracted") return { skipped: true, reason: "already_extracted" };
+
+  const source = await db.source.findUnique({
+    where: { id: sourceId },
+    include: { schema: { include: { fields: { orderBy: { position: "asc" } } } } },
+  });
+  if (!source?.schema?.fields?.length) throw new Error(`Source ${sourceId} has no schema/fields`);
+
+  const schemaFields = source.schema.fields.map((f) => ({
+    name: f.name, type: f.type, description: f.description,
+    instructions: f.instructions, required: f.required,
+    options: f.options ? JSON.parse(f.options) : undefined,
+    confidenceThreshold: f.confidenceThreshold,
+  }));
+
+  const sourceText = [
+    `From: ${email.fromAddress}`,
+    `To: ${email.toAddress}`,
+    `Subject: ${email.subject}`,
+    `Date: ${email.receivedAt.toISOString()}`,
+    `---`,
+    email.bodyText || email.snippet,
+  ].join("\n");
+
+  // throws → job retries
+  const extractionResult = await extractWithLLM({ fields: schemaFields, sourceText, sourceFile: `gmail:${email.googleMessageId}` });
+  if (!extractionResult.fields.length) throw new Error(`LLM returned 0 fields for email ${emailId}`);
+
+  const normName = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
+
+  const record = await db.datasetRecord.create({
+    data: { datasetId, sourceEmailId: email.id, status: "valid", confidence: extractionResult.overallConfidence },
+  });
+
+  for (const fieldResult of extractionResult.fields) {
+    const sf = source.schema!.fields.find((f) => normName(f.name) === normName(fieldResult.fieldName));
+    if (!sf) continue;
+    await db.datasetValue.create({
+      data: {
+        recordId:      record.id,
+        fieldId:       sf.id,
+        value:         JSON.stringify(fieldResult.value ?? null),
+        confidence:    fieldResult.confidence,
+        evidence:      fieldResult.evidence || "",
+        sourceFile:    `gmail:${email.googleMessageId}`,
+        modelUsed:     extractionResult.modelUsed,
+        promptVersion: extractionResult.promptVersion,
+      },
+    });
+  }
+
+  await db.email.update({ where: { id: emailId }, data: { processingStatus: "extracted" } });
+  await db.dataset.update({ where: { id: datasetId }, data: { recordCount: { increment: 1 } } });
+
+  const tokens  = extractionResult.tokensUsed;
+  const costUsd = computeCost(extractionResult.modelUsed, extractionResult.promptTokens ?? 0, extractionResult.completionTokens ?? 0);
+
+  await db.aiOutput.create({
+    data: {
+      jobId:            job.id,
+      modelUsed:        extractionResult.modelUsed,
+      promptHash:       crypto.createHash("md5").update(sourceText.slice(0, 200)).digest("hex"),
+      rawResponse:      JSON.stringify(extractionResult.fields),
+      tokensUsed:       tokens,
+      promptTokens:     extractionResult.promptTokens ?? 0,
+      completionTokens: extractionResult.completionTokens ?? 0,
+      costUsd,
+    },
+  });
+
+  if (tokens > 0) await bumpUsageMetric(job.organizationId, "ai_tokens", tokens);
+  return { emailId, tokens, modelUsed: extractionResult.modelUsed };
+}
+
+// ── DETERMINISTIC_SYNC ────────────────────────────────────────────────────────
+
 async function processDeterministicSync(
   job: { id: string; organizationId: string },
   payload: Record<string, unknown>
@@ -316,49 +688,36 @@ async function processDeterministicSync(
   const sourceId = payload.sourceId as string | undefined;
   if (!sourceId) return { note: "Missing sourceId" };
 
-  // Ensure default dataset exists (idempotent)
   const datasetId = await ensureDefaultDataset(sourceId);
 
-  // Load the source's schema id
-  const source = await db.source.findUnique({
-    where: { id: sourceId },
-    select: { schemaId: true },
-  });
-  if (!source?.schemaId) return { note: "Source has no schemaId after provisioning — unexpected" };
+  const source = await db.source.findUnique({ where: { id: sourceId }, select: { schemaId: true } });
+  if (!source?.schemaId) return { note: "Source has no schemaId" };
 
-  // Process unsynced emails in batches of 50
-  // Take 51 to detect if there are more after this batch (off-by-one fix)
   const emails = await db.email.findMany({
     where: { sourceId, processingStatus: "matched" },
     take: 51,
     orderBy: { receivedAt: "asc" },
   });
-  const hasMore = emails.length === 51;
+  const hasMore   = emails.length === 51;
   const batchEmails = emails.slice(0, 50);
-
   let recordsSynced = 0;
 
   for (const email of batchEmails) {
-    // Re-fetch full Gmail message to get body/attachments for parsing
-    // Note: we rely on bodyText stored during GMAIL_SCAN
-    const parsedFields = {
+    const parsedFields: ParsedEmailFields = {
       Date: email.receivedAt.toISOString(),
       Sender: email.fromAddress,
       To: email.toAddress,
       CC: email.ccAddresses ?? "",
       Subject: email.subject,
       Body: email.bodyText ?? email.snippet ?? "",
-      Signature: "", // Will be extracted below from bodyText
+      Signature: "",
       "Attachments Summary": "",
       "Drive Links": "",
       "Form Links": "",
       "Other Links": "",
     };
 
-    // Re-run deterministic parsing on stored bodyText
     if (email.bodyText) {
-      const { default: SIG_PATTERNS } = await import("@/lib/email-parser").then((m) => ({ default: null, ...m }));
-      // Use parseEmailFields signature extraction via a lightweight re-parse
       const fullText = email.bodyText;
       const sigDelimiters = [
         /^--\s*$/m, /^_{3,}/m, /^-{3,}/m,
@@ -370,117 +729,80 @@ async function processDeterministicSync(
       for (const p of sigDelimiters) {
         const match = fullText.match(p);
         if (match && match.index !== undefined) {
-          mainBody = fullText.slice(0, match.index).trim();
+          mainBody  = fullText.slice(0, match.index).trim();
           signature = fullText.slice(match.index).trim();
           break;
         }
       }
-      parsedFields.Body = mainBody;
+      parsedFields.Body      = mainBody;
       parsedFields.Signature = signature;
 
-      // Links from bodyText
-      const allUrls = [...new Set((fullText.match(/https?:\/\/[^\s"'<>)]+/g) ?? []))];
+      const allUrls   = [...new Set((fullText.match(/https?:\/\/[^\s"'<>)]+/g) ?? []))];
       const driveLinks: string[] = [];
-      const formLinks: string[] = [];
+      const formLinks:  string[] = [];
       const otherLinks: string[] = [];
       for (const url of allUrls) {
-        if (url.includes("docs.google.com/forms") || url.includes("forms.gle")) {
-          formLinks.push(url);
-        } else if (url.includes("docs.google.com") || url.includes("drive.google.com") || url.includes("sheets.google.com")) {
-          driveLinks.push(url);
-        } else {
-          otherLinks.push(url);
-        }
+        if (url.includes("docs.google.com/forms") || url.includes("forms.gle")) formLinks.push(url);
+        else if (url.includes("docs.google.com") || url.includes("drive.google.com")) driveLinks.push(url);
+        else otherLinks.push(url);
       }
       parsedFields["Drive Links"] = driveLinks.join(", ");
-      parsedFields["Form Links"] = formLinks.join(", ");
+      parsedFields["Form Links"]  = formLinks.join(", ");
       parsedFields["Other Links"] = otherLinks.join(", ");
     }
 
-    // Load email's attachments for summary
     const attachments = await db.emailAttachment.findMany({
       where: { emailId: email.id },
       select: { filename: true, mimeType: true, size: true },
     });
     if (attachments.length > 0) {
-      const details = attachments.map((a) => {
-        const ext = a.filename.split(".").pop()?.toLowerCase() ?? "file";
-        const sizeKb = (a.size / 1024).toFixed(0);
-        return `${a.filename} (${ext}, ${sizeKb}KB)`;
-      }).join("; ");
-      parsedFields["Attachments Summary"] = `${attachments.length} attachment(s): ${details}`;
+      parsedFields["Attachments Summary"] = `${attachments.length} attachment(s): ` +
+        attachments.map((a) => {
+          const ext   = a.filename.split(".").pop()?.toLowerCase() ?? "file";
+          const sizeKb = (a.size / 1024).toFixed(0);
+          return `${a.filename} (${ext}, ${sizeKb}KB)`;
+        }).join("; ");
     }
 
     await writeDefaultDatasetRecord(email.id, datasetId, parsedFields, source.schemaId);
-
-    // Mark email as extracted
-    await db.email.update({
-      where: { id: email.id },
-      data: { processingStatus: "extracted" },
-    });
-
+    await db.email.update({ where: { id: email.id }, data: { processingStatus: "extracted" } });
     recordsSynced++;
   }
 
-  // If there are more unprocessed emails, queue another DETERMINISTIC_SYNC
   if (hasMore) {
     await db.aiJob.create({
-      data: {
-        organizationId: job.organizationId,
-        type: "DETERMINISTIC_SYNC",
-        status: "queued",
-        payload: JSON.stringify({ sourceId }),
-        progress: 0,
-      },
+      data: { organizationId: job.organizationId, type: "DETERMINISTIC_SYNC", status: "queued", payload: JSON.stringify({ sourceId }), progress: 0 },
     });
   }
 
   return { recordsSynced, emailsProcessed: batchEmails.length };
 }
 
+// ── EXPORT ────────────────────────────────────────────────────────────────────
 
-/**
- * EXPORT job processor.
- *
- * Generates a CSV/JSON export of the dataset and stores the result.
- * For small datasets, the data URL is generated synchronously in the
- * route handler — this processor handles larger exports.
- */
 async function processExport(
-  job: { id: string; organizationId: string; payload: string },
-  payload: { datasetId?: string; format?: string; datasetName?: string }
+  job: { id: string; organizationId: string },
+  payload: { datasetId?: string; format?: string }
 ): Promise<Record<string, unknown>> {
   const { datasetId, format = "csv" } = payload;
-  if (!datasetId) {
-    throw new Error("Missing datasetId in EXPORT payload");
-  }
+  if (!datasetId) throw new Error("Missing datasetId in EXPORT payload");
 
   const dataset = await db.dataset.findUnique({
     where: { id: datasetId },
     include: {
       schema: { include: { fields: { orderBy: { position: "asc" } } } },
-      records: {
-        include: { values: true },
-        orderBy: { createdAt: "asc" },
-      },
+      records: { include: { values: true }, orderBy: { createdAt: "asc" } },
     },
   });
+  if (!dataset || dataset.organizationId !== job.organizationId) throw new Error("Dataset not found");
 
-  if (!dataset || dataset.organizationId !== job.organizationId) {
-    throw new Error("Dataset not found");
-  }
-
-  const fields = dataset.schema?.fields ?? [];
+  const fields      = dataset.schema?.fields ?? [];
   const recordCount = dataset.records.length;
 
   if (format === "json") {
     const data = dataset.records.map((r) => {
       const byField = new Map<string, any>(r.values.map((v: any) => [v.fieldId, v]));
-      const obj: Record<string, unknown> = {
-        recordId: r.id,
-        status: r.status,
-        confidence: r.confidence,
-      };
+      const obj: Record<string, unknown> = { recordId: r.id, status: r.status, confidence: r.confidence };
       for (const f of fields) {
         const v = byField.get(f.id);
         obj[f.name] = v ? JSON.parse(v.value) : null;
@@ -490,487 +812,20 @@ async function processExport(
     return { format, recordCount, data };
   }
 
-  // CSV format
   const header = ["recordId", "status", "confidence", ...fields.map((f) => f.name)];
-  const rows = dataset.records.map((r) => {
+  const rows   = dataset.records.map((r) => {
     const byField = new Map<string, any>(r.values.map((v: any) => [v.fieldId, v]));
     return [
-      r.id,
-      r.status,
-      String(r.confidence ?? 0),
+      r.id, r.status, String(r.confidence ?? 0),
       ...fields.map((f) => {
         const v = byField.get(f.id);
         if (!v) return "";
-        try {
-          const parsed = JSON.parse(v.value);
-          return typeof parsed === "string" ? parsed : JSON.stringify(parsed);
-        } catch {
-          return v.value;
-        }
+        try { const p = JSON.parse(v.value); return typeof p === "string" ? p : JSON.stringify(p); }
+        catch { return v.value; }
       }),
     ];
   });
 
   const csv = [header, ...rows].map((r) => r.join(",")).join("\n");
-
-  return {
-    format,
-    recordCount,
-    csvLength: csv.length,
-    generatedAt: new Date().toISOString(),
-  };
-}
-
-/**
- * AI_EXTRACTION job processor.
- *
- * Supports two modes:
- *
- * Mode A — Legacy (sourceId-based): reads Email rows, runs LLM on raw email content.
- *   Payload: { sourceId, datasetId }
- *
- * Mode B — Two-Step Pipeline (recommended): reads DatasetRecord rows from the
- *   Default Dataset and runs LLM on deterministic text to populate Custom Dataset.
- *   Payload: { sourceDatasetId, targetDatasetId, targetSchemaId }
- */
-async function processAiExtraction(
-  job: { id: string; organizationId: string; payload: string },
-  payload: Record<string, unknown>
-): Promise<Record<string, unknown>> {
-  // Mode B — forward to two-step pipeline
-  const sourceDatasetId = payload.sourceDatasetId as string | undefined;
-  const targetDatasetId = payload.targetDatasetId as string | undefined;
-  const targetSchemaId  = payload.targetSchemaId  as string | undefined;
-  // New Drive exploration options (default exploreDriveLinks to true)
-  const exploreDriveLinks = payload.exploreDriveLinks !== false;
-  const driveConnectionId = payload.driveConnectionId as string | undefined;
-  const maxContentBytes   = typeof payload.maxContentBytes === "number" ? payload.maxContentBytes : undefined;
-
-  if (sourceDatasetId && targetDatasetId && targetSchemaId) {
-    return processTwoStepExtraction(job, {
-      sourceDatasetId,
-      targetDatasetId,
-      targetSchemaId,
-      exploreDriveLinks,
-      driveConnectionId,
-      maxContentBytes,
-    });
-  }
-
-  // Mode A — Legacy
-  const sourceId = payload.sourceId as string | undefined;
-  const datasetId = payload.datasetId as string | undefined;
-
-  if (!sourceId || !datasetId) {
-    return { note: "Missing sourceId or datasetId — skipping" };
-  }
-
-  // Load source → schema → fields
-  const source = await db.source.findUnique({
-    where: { id: sourceId },
-    include: {
-      schema: { include: { fields: { orderBy: { position: "asc" } } } },
-    },
-  });
-  if (!source?.schema?.fields?.length) {
-    return { note: "Source has no schema/fields configured" };
-  }
-
-  const schemaFields = source.schema.fields.map((f) => ({
-    name: f.name,
-    type: f.type,
-    description: f.description,
-    instructions: f.instructions,
-    required: f.required,
-    options: f.options ? JSON.parse(f.options) : undefined,
-    confidenceThreshold: f.confidenceThreshold,
-  }));
-
-  // Find unprocessed emails for this source
-  const emails = await db.email.findMany({
-    where: { sourceId, processingStatus: "matched" },
-    take: 50, // process in batches
-  });
-
-  let recordsExtracted = 0;
-  let totalTokens = 0;
-
-  for (const email of emails) {
-    const sourceText = [
-      `From: ${email.fromAddress}`,
-      `To: ${email.toAddress}`,
-      `Subject: ${email.subject}`,
-      `Date: ${email.receivedAt.toISOString()}`,
-      `---`,
-      email.bodyText || email.snippet,
-    ].join("\n");
-
-    let extractionResult;
-    try {
-      extractionResult = await extractWithLLM({
-        fields: schemaFields,
-        sourceText,
-        sourceFile: `gmail:${email.googleMessageId}`,
-      });
-    } catch (err) {
-      console.error(`[job-runner] AI extraction failed for email ${email.id}:`, err);
-      await db.email.update({ where: { id: email.id }, data: { processingStatus: "rejected" } });
-      continue;
-    }
-
-    // Persist DatasetRecord + DatasetValue rows
-    const record = await db.datasetRecord.create({
-      data: {
-        datasetId,
-        sourceEmailId: email.id,
-        status: "valid",
-        confidence: extractionResult.overallConfidence,
-      },
-    });
-
-    // FIX 3 (Mode A): Normalize field names before matching so LLM variations
-    // ("Invoice Number" vs "invoice_number") don't silently drop values.
-    const normFieldName = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
-
-    for (const fieldResult of extractionResult.fields) {
-      const schemaField = source.schema!.fields.find(
-        (f) => normFieldName(f.name) === normFieldName(fieldResult.fieldName)
-      );
-      if (!schemaField) continue;
-
-      await db.datasetValue.create({
-        data: {
-          recordId: record.id,
-          fieldId: schemaField.id,
-          value: JSON.stringify(fieldResult.value ?? null),
-          confidence: fieldResult.confidence,
-          evidence: fieldResult.evidence || "",
-          sourceFile: fieldResult.sourceFile ?? `gmail:${email.googleMessageId}`,
-          modelUsed: extractionResult.modelUsed,
-          promptVersion: extractionResult.promptVersion,
-        },
-      });
-    }
-
-    // Update email processing status
-    await db.email.update({
-      where: { id: email.id },
-      data: { processingStatus: "extracted" },
-    });
-
-    recordsExtracted++;
-    totalTokens += extractionResult.tokensUsed;
-
-    // Write AiOutput with split token counts and cost
-    const costUsd = computeCost(
-      extractionResult.modelUsed,
-      extractionResult.promptTokens ?? 0,
-      extractionResult.completionTokens ?? 0
-    );
-    await db.aiOutput.create({
-      data: {
-        jobId: job.id,
-        modelUsed: extractionResult.modelUsed,
-        promptHash: crypto.createHash("md5").update(sourceText.slice(0, 200)).digest("hex"),
-        rawResponse: JSON.stringify(extractionResult.fields),
-        tokensUsed: extractionResult.tokensUsed,
-        promptTokens: extractionResult.promptTokens ?? 0,
-        completionTokens: extractionResult.completionTokens ?? 0,
-        costUsd,
-      },
-    });
-    await agentInfo(job.id, job.organizationId, "extractor", `Extracted ${extractionResult.fields.length} fields from email ${email.id}`, { confidence: extractionResult.overallConfidence, tokens: extractionResult.tokensUsed, costUsd });
-  }
-
-  // Update dataset record count
-  await db.dataset.update({
-    where: { id: datasetId },
-    data: { recordCount: { increment: recordsExtracted } },
-  });
-
-  // Bump AI token usage
-  if (totalTokens > 0) {
-    await bumpUsageMetric(job.organizationId, "ai_tokens", totalTokens);
-  }
-
-  // If we processed a full batch of 50, there might be more emails waiting.
-  // Take 51 to detect overflow; queue another job only if truly needed.
-  if (emails.length === 50) {
-    await db.aiJob.create({
-      data: {
-        organizationId: job.organizationId,
-        type: "AI_EXTRACTION",
-        status: "queued",
-        payload: JSON.stringify({ sourceId, datasetId }),
-        progress: 0,
-      },
-    });
-  }
-
-  return { recordsExtracted, totalTokens, emailsProcessed: emails.length };
-}
-
-/**
- * Two-step extraction: reads text from Default Dataset records, runs LLM
- * on deterministic content to populate a Custom Dataset.
- */
-async function processTwoStepExtraction(
-  job: { id: string; organizationId: string },
-  { sourceDatasetId, targetDatasetId, targetSchemaId, exploreDriveLinks, driveConnectionId, maxContentBytes }: {
-    sourceDatasetId: string;
-    targetDatasetId: string;
-    targetSchemaId: string;
-    exploreDriveLinks?: boolean;
-    driveConnectionId?: string;
-    maxContentBytes?: number;
-  }
-): Promise<Record<string, unknown>> {
-  const schemaFields = await db.schemaField.findMany({
-    where: { schemaId: targetSchemaId },
-    orderBy: { position: "asc" },
-    select: { id: true, name: true, type: true, description: true, instructions: true, required: true, options: true, confidenceThreshold: true },
-  });
-  if (!schemaFields.length) return { note: "Target schema has no fields" };
-
-  const fieldInputs = schemaFields.map((f) => ({
-    name: f.name,
-    type: f.type,
-    description: f.description,
-    instructions: f.instructions,
-    required: f.required,
-    options: f.options ? JSON.parse(f.options) : undefined,
-    confidenceThreshold: f.confidenceThreshold,
-  }));
-
-  const doneEmails = await db.datasetRecord.findMany({
-    where: { datasetId: targetDatasetId, sourceEmailId: { not: null } },
-    select: { sourceEmailId: true },
-  });
-  const doneEmailIds = new Set(doneEmails.map((r) => r.sourceEmailId as string));
-
-  const sourceRecords = await db.datasetRecord.findMany({
-    where: { datasetId: sourceDatasetId },
-    include: { values: true },
-    take: 50,
-    orderBy: { createdAt: "asc" },
-  });
-  const unprocessed = sourceRecords.filter(
-    (r) => !r.sourceEmailId || !doneEmailIds.has(r.sourceEmailId)
-  );
-
-  let recordsExtracted = 0;
-  let totalTokens = 0;
-  let totalDriveFilesRead = 0;
-
-  // FIX 3 (Mode B): Normalize field names so "Invoice Number" matches "invoice_number".
-  const normFieldName = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
-
-  const total = unprocessed.length;
-  let processed = 0;
-
-  for (const sourceRecord of unprocessed) {
-    const fieldIds = sourceRecord.values.map((v) => v.fieldId);
-    const defaultFields = await db.schemaField.findMany({
-      where: { id: { in: fieldIds } },
-      select: { id: true, name: true },
-    });
-    const nameById = new Map(defaultFields.map((f) => [f.id, f.name]));
-
-    // Build a richer labeled source text for better LLM context
-    const textLines = sourceRecord.values
-      .map((v) => {
-        let val: unknown;
-        try { val = JSON.parse(v.value); } catch { val = v.value; }
-        return val ? `${nameById.get(v.fieldId) ?? v.fieldId}: ${val}` : null;
-      })
-      .filter(Boolean);
-
-    const sourceText = [
-      "=== EMAIL RECORD ===",
-      ...(textLines as string[]),
-      "=== END ===",
-    ].join("\n");
-
-    // ── Drive Link Exploration ──────────────────────────────────────────────
-    // When exploreDriveLinks is enabled, find all URLs in the record's field
-    // values and explore them (Drive folders/files + external links).
-    let driveContent: import("@/lib/drive-reader").DriveExplorationResult | undefined = undefined;
-
-    if (exploreDriveLinks) {
-      // Collect all raw text values from this record
-      const allValues = sourceRecord.values.map((v) => {
-        try { return String(JSON.parse(v.value) ?? ""); } catch { return v.value; }
-      }).join(" ");
-
-      // Extract all URLs and focus on Drive-type links
-      const allUrls = extractAllUrls(allValues + " " + sourceText);
-      const driveUrls = filterDriveUrls(allUrls);
-      const nonDriveUrls = allUrls.filter((u) => !driveUrls.includes(u)).slice(0, 3); // limit external to 3
-      const urlsToExplore = [...driveUrls, ...nonDriveUrls];
-
-      if (urlsToExplore.length > 0) {
-        try {
-          const result = await exploreLinkedContent(urlsToExplore, {
-            connectionId: driveConnectionId,
-            organizationId: job.organizationId,
-            maxBytes: maxContentBytes ?? 500_000,
-          });
-          driveContent = result;
-          totalDriveFilesRead += result.filesRead.length;
-
-          // Log exploration summary
-          await agentInfo(
-            job.id,
-            job.organizationId,
-            "extractor",
-            `Drive exploration: read ${result.filesRead.length} file(s) from ${urlsToExplore.length} link(s) for record ${sourceRecord.id}${result.truncated ? " (content truncated)" : ""}`,
-            {
-              filesRead: result.filesRead,
-              failedFiles: result.failedFiles,
-              totalChars: result.totalChars,
-              truncated: result.truncated,
-            }
-          );
-
-          if (result.failedFiles.length > 0) {
-            await agentInfo(
-              job.id,
-              job.organizationId,
-              "extractor",
-              `Drive exploration: ${result.failedFiles.length} file(s) could not be read`,
-              { failedFiles: result.failedFiles }
-            );
-          }
-        } catch (err) {
-          // Drive exploration failure is non-fatal — log and continue with text-only extraction
-          await agentInfo(
-            job.id,
-            job.organizationId,
-            "extractor",
-            `Drive exploration failed for record ${sourceRecord.id}, falling back to text-only: ${err instanceof Error ? err.message : String(err)}`,
-            {}
-          );
-        }
-      }
-    }
-    // ── End Drive Link Exploration ──────────────────────────────────────────
-
-    let extractionResult;
-    try {
-      extractionResult = await extractWithLLM({
-        fields: fieldInputs,
-        sourceText,
-        sourceFile: `dataset:${sourceDatasetId}:record:${sourceRecord.id}`,
-        driveContent,
-      });
-    } catch (err) {
-      console.error(`[job-runner] Two-step extraction failed for record ${sourceRecord.id}:`, err);
-      processed++;
-      continue;
-    }
-
-
-    // FIX 3 (empty guard): Skip creating a record if LLM returned no fields.
-    // Without this, empty DatasetRecord rows appear in the UI as blank rows.
-    if (!extractionResult.fields.length) {
-      console.warn(`[job-runner] Two-step: LLM returned 0 fields for record ${sourceRecord.id} — skipping`);
-      processed++;
-      continue;
-    }
-
-    const record = await db.datasetRecord.create({
-      data: {
-        datasetId: targetDatasetId,
-        sourceEmailId: sourceRecord.sourceEmailId,
-        status: extractionResult.overallConfidence >= 0.7 ? "valid" : "needs_review",
-        confidence: extractionResult.overallConfidence,
-      },
-    });
-
-    let valuesWritten = 0;
-    for (const fieldResult of extractionResult.fields) {
-      // FIX 3: Use normalized comparison instead of strict equality
-      const sf = schemaFields.find(
-        (f) => normFieldName(f.name) === normFieldName(fieldResult.fieldName)
-      );
-      if (!sf) continue;
-      await db.datasetValue.create({
-        data: {
-          recordId: record.id,
-          fieldId: sf.id,
-          value: JSON.stringify(fieldResult.value ?? null),
-          confidence: fieldResult.confidence,
-          evidence: fieldResult.evidence || "",
-          sourceFile: fieldResult.sourceFile,
-          modelUsed: extractionResult.modelUsed,
-          promptVersion: extractionResult.promptVersion,
-        },
-      });
-      valuesWritten++;
-    }
-
-    // If still no values written after normalization, delete the empty record
-    if (valuesWritten === 0) {
-      await db.datasetRecord.delete({ where: { id: record.id } });
-      processed++;
-      continue;
-    }
-
-    recordsExtracted++;
-    totalTokens += extractionResult.tokensUsed;
-
-    // Update progress so the UI progress bar moves
-    processed++;
-    const progress = Math.round((processed / Math.max(total, 1)) * 90);
-    await db.aiJob.update({
-      where: { id: job.id },
-      data: { progress },
-    });
-
-    // Write AiOutput with accurate cost
-    const costUsd = computeCost(
-      extractionResult.modelUsed,
-      extractionResult.promptTokens ?? 0,
-      extractionResult.completionTokens ?? 0
-    );
-    await db.aiOutput.create({
-      data: {
-        jobId: job.id,
-        modelUsed: extractionResult.modelUsed,
-        promptHash: crypto.createHash("md5").update(sourceText.slice(0, 200)).digest("hex"),
-        rawResponse: JSON.stringify(extractionResult.fields),
-        tokensUsed: extractionResult.tokensUsed,
-        promptTokens: extractionResult.promptTokens ?? 0,
-        completionTokens: extractionResult.completionTokens ?? 0,
-        costUsd,
-      },
-    });
-    await agentInfo(job.id, job.organizationId, "extractor", `Two-step: extracted ${valuesWritten} fields from record ${sourceRecord.id}`, { confidence: extractionResult.overallConfidence, tokens: extractionResult.tokensUsed, costUsd });
-  } // end for loop
-
-  await db.dataset.update({ where: { id: targetDatasetId }, data: { recordCount: { increment: recordsExtracted } } });
-  if (totalTokens > 0) await bumpUsageMetric(job.organizationId, "ai_tokens", totalTokens);
-
-  // Take 51 to detect more records; only re-queue if truly overflowed
-  if (unprocessed.length === 50) {
-    await db.aiJob.create({
-      data: {
-        organizationId: job.organizationId,
-        type: "AI_EXTRACTION",
-        status: "queued",
-        payload: JSON.stringify({
-          sourceDatasetId,
-          targetDatasetId,
-          targetSchemaId,
-          // Preserve Drive exploration options across batches
-          exploreDriveLinks,
-          driveConnectionId,
-          maxContentBytes,
-        }),
-        progress: 0,
-      },
-    });
-  }
-
-  return { recordsExtracted, totalTokens, sourceRecordsProcessed: unprocessed.length, totalDriveFilesRead };
+  return { format, recordCount, csvLength: csv.length, generatedAt: new Date().toISOString() };
 }

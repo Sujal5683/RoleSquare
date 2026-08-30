@@ -67,7 +67,7 @@ export async function processDocsScan(
         [`https://docs.google.com/document/d/${documentId}`],
         { connectionId: source.googleConnectionId, maxBytes: 100000 }
       );
-      contentText = explored.combinedText || "";
+      contentText = explored.plainText || "";
     } catch (readErr) {
       console.warn(`[docs-scan] Could not extract text from doc ${documentId}`);
     }

@@ -98,7 +98,7 @@ export async function processDriveScan(
             [`https://drive.google.com/open?id=${file.id}`],
             { connectionId: source.googleConnectionId, maxBytes: 50000 }
           );
-          contentText = explored.combinedText || "";
+          contentText = explored.plainText || "";
         } catch (readErr) {
           console.warn(`[drive-scan] Could not extract text from file ${file.id}`);
         }
