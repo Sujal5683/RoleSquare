@@ -15,7 +15,7 @@
 //     If Gemini throws GeminiRateLimitExhaustedError → job goes back to `queued`
 //     (not `failed`) → automatically retried in the next cycle. Zero data lost.
 //
-//  3. Concurrent polling — processNextJobCycle() picks up to 8 jobs simultaneously
+//  3. Concurrent polling — processNextJobCycle() picks up to 7 jobs simultaneously
 //     using Promise.allSettled(). Each job runs in isolation.
 //
 // Key invariants:
@@ -31,6 +31,7 @@ import { processSheetsScan } from "@/lib/pipelines/sheets";
 import { processFormsScan }  from "@/lib/pipelines/forms";
 
 import { db }                           from "@/lib/db";
+import { enqueueJob }                   from "@/lib/queue";
 import { logAudit }                     from "@/lib/audit";
 import { bumpUsageMetric }              from "@/lib/usage";
 import {
@@ -56,89 +57,44 @@ import crypto                           from "crypto";
 const STALE_JOB_THRESHOLD_MS = 10 * 60 * 1000;
 const MAX_ATTEMPTS = 5;
 /** How many jobs to run concurrently in one processNextJobCycle() call */
-const CONCURRENT_WORKERS = 8;
+const CONCURRENT_WORKERS = 7;
 /** How many EXTRACT_SINGLE_ROW children to fan-out per AI_EXTRACTION master job */
 const FAN_OUT_BATCH_SIZE  = 50;
 
-// ── Job cycle (called by /api/jobs/process) ───────────────────────────────────
+// ── Job cycle (no-op stub — BullMQ worker handles all processing) ─────────────
 
 /**
- * Marks stale jobs then picks up to CONCURRENT_WORKERS queued jobs and
- * runs them in parallel using Promise.allSettled (errors in one don't
- * cancel others).
+ * @deprecated BullMQ worker now handles all job processing.
+ * This stub exists so that:
+ *   - POST /api/jobs/process continues to compile and return {success:true}
+ *   - Frontend sidebar widget keeps working without code changes
+ *   - Any legacy callers that fetch /api/jobs/process don't error
+ *
+ * The actual processing happens in src/worker.ts via BullMQ.
  */
 export async function processNextJobCycle() {
-  try {
-    await processStaleJobs();
-    const jobs = await pickNextJobs(CONCURRENT_WORKERS);
-    if (jobs.length === 0) return;
-    await Promise.allSettled(jobs.map((job) => processJob(job)));
-  } catch (err) {
-    console.error("[job-runner] error in cycle:", err);
-  }
+  // no-op — BullMQ worker is running as a separate process
+  // Jobs pushed to Redis are picked up immediately without HTTP polling
 }
 
-// ── Stale job detection ───────────────────────────────────────────────────────
+// ── Stale job detection (handled natively by BullMQ) ─────────────────────────
+// BullMQ uses the `timeout` option set in queue.ts (10 min per job).
+// Timed-out jobs are automatically moved to the failed state by BullMQ.
+// The worker's `failed` event then updates the Postgres AiJob row.
+// The functions below are kept as stubs for any direct imports that may exist.
 
-async function processStaleJobs() {
-  const cutoff = new Date(Date.now() - STALE_JOB_THRESHOLD_MS);
-  const staleJobs = await db.aiJob.findMany({
-    where: { status: "running", startedAt: { lt: cutoff } },
-    select: { id: true, organizationId: true, payload: true },
-  });
+async function processStaleJobs() { /* handled by BullMQ timeout */ }
 
-  for (const job of staleJobs) {
-    await db.aiJob.update({
-      where: { id: job.id },
-      data: { status: "failed", errorMessage: "Job timed out (stale)", finishedAt: new Date() },
-    });
-    try {
-      if (job.payload) {
-        const parsed = JSON.parse(job.payload);
-        if (parsed.runId)    await db.sourceRun.updateMany({ where: { id: parsed.runId },    data: { status: "failed", errorMessage: "Job timed out (stale)" } });
-        if (parsed.sourceId) await db.source.updateMany({   where: { id: parsed.sourceId }, data: { runState: "idle" } });
-      }
-    } catch { /* ignore */ }
-
-    await logAudit({
-      organizationId: job.organizationId,
-      actorType: "system",
-      action: "update",
-      entity: "job",
-      entityId: job.id,
-      after: { status: "failed", reason: "stale_timeout" },
-      reason: "Job marked as stale",
-    });
-  }
+async function pickNextJobs(_limit: number) {
+  // handled by BullMQ — not needed
+  return [];
 }
 
-// ── Job picking — takes up to N jobs atomically ───────────────────────────────
 
-async function pickNextJobs(limit: number) {
-  const queued = await db.aiJob.findMany({
-    where: { status: "queued" },
-    orderBy: { createdAt: "asc" },
-    take: limit,
-  });
-  if (!queued.length) return [];
 
-  const picked = await Promise.allSettled(
-    queued.map((j) =>
-      db.aiJob.update({
-        where: { id: j.id, status: "queued" },
-        data: { status: "running", startedAt: new Date(), attempts: { increment: 1 } },
-      })
-    )
-  );
+// ── Single job dispatcher (exported for BullMQ worker) ───────────────────────
 
-  return picked
-    .filter((r) => r.status === "fulfilled")
-    .map((r) => (r as PromiseFulfilledResult<any>).value);
-}
-
-// ── Single job dispatcher ─────────────────────────────────────────────────────
-
-async function processJob(job: {
+export async function processJob(job: {
   id: string;
   organizationId: string;
   userId: string | null;
@@ -298,44 +254,29 @@ async function processAiExtractionMaster(
       return { fanOut: 0, note: "All records already processed" };
     }
 
-    // Create one child job per unprocessed record
-    await db.aiJob.createMany({
-      data: unprocessed.map((record) => ({
+    // Create one child job per unprocessed record via BullMQ
+    for (const record of unprocessed) {
+      await enqueueJob({
         organizationId: job.organizationId,
-        type:           "EXTRACT_SINGLE_ROW",
-        status:         "queued",
-        agentKey:       "extractor",
-        payload: JSON.stringify({
+        type: "EXTRACT_SINGLE_ROW",
+        agentKey: "extractor",
+        payload: {
           sourceRecordId: record.id,
           targetDatasetId,
           targetSchemaId,
           exploreDriveLinks,
           driveConnectionId,
           maxContentBytes,
-          // Back-reference to master job for logging
           masterJobId: job.id,
-        }),
-        progress: 0,
-      })),
-    });
-
-    // If there might be more records, queue another master job
-    if (sourceRecords.length === FAN_OUT_BATCH_SIZE) {
-      await db.aiJob.create({
-        data: {
-          organizationId: job.organizationId,
-          type:           "AI_EXTRACTION",
-          status:         "queued",
-          payload: JSON.stringify({
-            sourceDatasetId,
-            targetDatasetId,
-            targetSchemaId,
-            exploreDriveLinks,
-            driveConnectionId,
-            maxContentBytes,
-          }),
-          progress: 0,
         },
+      });
+    }
+
+    if (sourceRecords.length === FAN_OUT_BATCH_SIZE) {
+      await enqueueJob({
+        organizationId: job.organizationId,
+        type: "AI_EXTRACTION",
+        payload: { sourceDatasetId, targetDatasetId, targetSchemaId, exploreDriveLinks, driveConnectionId, maxContentBytes },
       });
     }
 
@@ -358,26 +299,21 @@ async function processAiExtractionMaster(
 
   if (emails.length === 0) return { fanOut: 0, note: "No unprocessed emails" };
 
-  await db.aiJob.createMany({
-    data: emails.map((email) => ({
+  // Mode A fan-out via BullMQ
+  for (const email of emails) {
+    await enqueueJob({
       organizationId: job.organizationId,
-      type:    "EXTRACT_SINGLE_ROW",
-      status:  "queued",
+      type: "EXTRACT_SINGLE_ROW",
       agentKey: "extractor",
-      payload: JSON.stringify({ emailId: email.id, datasetId, sourceId, masterJobId: job.id }),
-      progress: 0,
-    })),
-  });
+      payload: { emailId: email.id, datasetId, sourceId, masterJobId: job.id },
+    });
+  }
 
   if (emails.length === FAN_OUT_BATCH_SIZE) {
-    await db.aiJob.create({
-      data: {
-        organizationId: job.organizationId,
-        type:    "AI_EXTRACTION",
-        status:  "queued",
-        payload: JSON.stringify({ sourceId, datasetId }),
-        progress: 0,
-      },
+    await enqueueJob({
+      organizationId: job.organizationId,
+      type: "AI_EXTRACTION",
+      payload: { sourceId, datasetId },
     });
   }
 
@@ -693,14 +629,14 @@ async function processDeterministicSync(
   const source = await db.source.findUnique({ where: { id: sourceId }, select: { schemaId: true } });
   if (!source?.schemaId) return { note: "Source has no schemaId" };
 
-  // Fetch up to 501 to check if there are more
+  // Fetch up to 51 to check if there are more (batch size = 50 for finer UI progress granularity)
   const emails = await db.email.findMany({
     where: { sourceId, processingStatus: "matched" },
-    take: 501,
+    take: 51,
     orderBy: { receivedAt: "asc" },
   });
-  const hasMore   = emails.length === 501;
-  const batchEmails = emails.slice(0, 500);
+  const hasMore   = emails.length === 51;
+  const batchEmails = emails.slice(0, 50);
 
   const emailBatchToInsert: { emailId: string, fields: ParsedEmailFields }[] = [];
 
@@ -780,8 +716,10 @@ async function processDeterministicSync(
   }
 
   if (hasMore) {
-    await db.aiJob.create({
-      data: { organizationId: job.organizationId, type: "DETERMINISTIC_SYNC", status: "queued", payload: JSON.stringify({ sourceId }), progress: 0 },
+    await enqueueJob({
+      organizationId: job.organizationId,
+      type: "DETERMINISTIC_SYNC",
+      payload: { sourceId },
     });
   }
 

@@ -4,6 +4,7 @@ import { ensureDefaultDataset } from "@/lib/dataset-provisioner";
 import { bumpUsageMetric } from "@/lib/usage";
 import { getGmailClient, extractEmailBody, extractAttachments, extractDriveLinks, getHeader } from "@/lib/google-client";
 import { agentInfo } from "@/lib/agent-logger";
+import { enqueueJob } from "@/lib/queue";
 import crypto from "crypto";
 
 export async function processGmailScan(
@@ -246,14 +247,10 @@ export async function processGmailScan(
   // Always queue a DETERMINISTIC_SYNC job to populate the Default Dataset.
   // This runs even if emailsMatched is 0 (clears stale state safely).
   if (emailsMatched > 0) {
-    await db.aiJob.create({
-      data: {
-        organizationId: job.organizationId,
-        type: "DETERMINISTIC_SYNC",
-        status: "queued",
-        payload: JSON.stringify({ sourceId }),
-        progress: 0,
-      },
+    await enqueueJob({
+      organizationId: job.organizationId,
+      type: "DETERMINISTIC_SYNC",
+      payload: { sourceId },
     });
   }
 

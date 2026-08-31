@@ -4,6 +4,8 @@ allowBuilds:
   '@prisma/engines': true
   '@swc/core': true
   es5-ext: true
+  esbuild: true
+  msgpackr-extract: true
   prisma: true
   sharp: true
   unrs-resolver: true

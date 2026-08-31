@@ -13,8 +13,9 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { requireOrgContext, AuthError, authErrorResponse , requireRole} from "@/lib/auth";
+import { requireOrgContext, AuthError, authErrorResponse, requireRole } from "@/lib/auth";
 import { logAudit } from "@/lib/audit";
+import { enqueueJob } from "@/lib/queue";
 
 
 export async function POST(req: NextRequest) {
@@ -101,29 +102,22 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Queue the AI_EXTRACTION job
-    const job = await db.aiJob.create({
-      data: {
-        organizationId,
-        userId: user.id,
-        type: "AI_EXTRACTION",
-        status: "queued",
-        agentKey: agentKeys.length > 0 ? agentKeys[0] : "extractor",
-        payload: JSON.stringify({
-          sourceDatasetId,
-          targetDatasetId,
-          targetSchemaId: schemaId,
-          agentKeys,
-          extraInstructions,
-          // Drive exploration options
-          exploreDriveLinks,
-          ...(driveConnectionId ? { driveConnectionId } : {}),
-        }),
-        progress: 0,
+    // Queue the AI_EXTRACTION job via BullMQ
+    const jobId = await enqueueJob({
+      organizationId,
+      userId: user.id,
+      type: "AI_EXTRACTION",
+      agentKey: agentKeys.length > 0 ? agentKeys[0] : "extractor",
+      payload: {
+        sourceDatasetId,
+        targetDatasetId,
+        targetSchemaId: schemaId,
+        agentKeys,
+        extraInstructions,
+        exploreDriveLinks,
+        ...(driveConnectionId ? { driveConnectionId } : {}),
       },
     });
-
-    fetch(new URL("/api/jobs/process", req.url).toString(), { method: "POST" }).catch(() => {});
 
     await logAudit({
       organizationId,
@@ -131,7 +125,7 @@ export async function POST(req: NextRequest) {
       action: "extract",
       entity: "dataset",
       entityId: targetDatasetId,
-      after: { sourceDatasetId, schemaId, targetDatasetId, jobId: job.id },
+      after: { sourceDatasetId, schemaId, targetDatasetId, jobId },
     });
 
     return NextResponse.json(

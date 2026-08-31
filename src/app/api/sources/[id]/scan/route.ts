@@ -10,6 +10,7 @@ import { serializeSourceRun } from "@/lib/serialize";
 import { dispatchWebhookEvent } from "@/lib/webhook-dispatcher";
 
 import { getJobTypeForSource } from "@/lib/types";
+import { enqueueJob }          from "@/lib/queue";
 
 export async function POST(
   req: NextRequest,
@@ -54,32 +55,20 @@ export async function POST(
       );
     }
 
-    const created = await db.$transaction(async (tx) => {
-      const now = new Date();
-      const run = await tx.sourceRun.create({
-        data: {
-          sourceId: id,
-          status: "running",
-          mode,
-          progress: 0,
-          startedAt: now,
-        },
+    const now = new Date();
+    const run = await db.$transaction(async (tx) => {
+      const r = await tx.sourceRun.create({
+        data: { sourceId: id, status: "running", mode, progress: 0, startedAt: now },
       });
-      const job = await tx.aiJob.create({
-        data: {
-          organizationId,
-          userId: user.id,
-          type: getJobTypeForSource(source.sourceType as any),
-          status: "queued", // Job runner picks up "queued" jobs
-          payload: JSON.stringify({ sourceId: id, runId: run.id, mode, triggeredBy: "scan" }),
-          progress: 0,
-        },
-      });
-      await tx.source.update({
-        where: { id },
-        data: { lastRunAt: now, runState: "scanning" },
-      });
-      return { run, job };
+      await tx.source.update({ where: { id }, data: { lastRunAt: now, runState: "scanning" } });
+      return r;
+    });
+
+    const jobId = await enqueueJob({
+      organizationId,
+      userId: user.id,
+      type:   getJobTypeForSource(source.sourceType as any),
+      payload: { sourceId: id, runId: run.id, mode, triggeredBy: "scan" },
     });
 
     await logAudit({
@@ -88,27 +77,16 @@ export async function POST(
       action: "scan",
       entity: "source",
       entityId: id,
-      after: { mode, runId: created.run.id, jobId: created.job.id },
+      after: { mode, runId: run.id, jobId },
     });
 
-    // Dispatch webhook event for scan start
     dispatchWebhookEvent({
       event: "source.run_started",
       organizationId,
-      data: {
-        sourceId: id,
-        runId: created.run.id,
-        jobId: created.job.id,
-        mode,
-        triggeredBy: "scan",
-      },
+      data: { sourceId: id, runId: run.id, jobId, mode, triggeredBy: "scan" },
     });
 
-    fetch(new URL("/api/jobs/process", req.url).toString(), { method: "POST" }).catch(() => {});
-
-    return NextResponse.json(serializeSourceRun(created.run), {
-      status: 201,
-    });
+    return NextResponse.json(serializeSourceRun(run), { status: 201 });
   } catch (err) {
     if (err instanceof AuthError) return authErrorResponse(err);
     return NextResponse.json(

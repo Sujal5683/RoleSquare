@@ -94,6 +94,9 @@ import {
   MoreHorizontal,
   Settings2,
   Eye,
+  EyeOff,
+  Lock,
+  Info,
 } from "lucide-react";
 
 // ── Constants ────────────────────────────────────────────────────────────
@@ -284,11 +287,13 @@ import { useActiveOrg } from "@/hooks/use-active-org";
 
 interface SortableFieldItemProps {
   field: SchemaFieldDTO;
+  isDefault: boolean;
   onEdit: (f: SchemaFieldDTO) => void;
   onDelete: (f: SchemaFieldDTO) => void;
+  onToggleHidden: (f: SchemaFieldDTO) => void;
 }
 
-function SortableFieldItem({ field, onEdit, onDelete }: SortableFieldItemProps) {
+function SortableFieldItem({ field, isDefault, onEdit, onDelete, onToggleHidden }: SortableFieldItemProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
     useSortable({ id: field.id });
 
@@ -299,13 +304,15 @@ function SortableFieldItem({ field, onEdit, onDelete }: SortableFieldItemProps) 
     opacity: isDragging ? 0.8 : 1,
   };
 
+  const isHidden = field.isHidden;
+
   return (
     <div
       ref={setNodeRef}
       style={style}
       className={`flex items-start gap-3 px-4 py-3 bg-card hover:bg-muted/40 relative ${
         isDragging ? "shadow-md rounded-md ring-1 ring-border" : ""
-      }`}
+      } ${isHidden ? "opacity-50" : ""}`}
     >
       <button
         type="button"
@@ -317,11 +324,17 @@ function SortableFieldItem({ field, onEdit, onDelete }: SortableFieldItemProps) 
       </button>
       <div className="flex-1 min-w-0">
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-sm font-medium">{field.name}</span>
+          {isDefault && <Lock className="h-3 w-3 text-muted-foreground/60 shrink-0" aria-label="System field — name and type are locked" />}
+          <span className={`text-sm font-medium ${isHidden ? "line-through text-muted-foreground" : ""}`}>{field.name}</span>
           <FieldTypeBadge type={field.type} />
           {field.required && (
             <span className="inline-flex items-center rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-700 dark:bg-amber-950 dark:text-amber-300">
               required
+            </span>
+          )}
+          {isHidden && (
+            <span className="inline-flex items-center rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
+              hidden
             </span>
           )}
           {field.options && field.options.length > 0 && (
@@ -342,31 +355,47 @@ function SortableFieldItem({ field, onEdit, onDelete }: SortableFieldItemProps) 
             {field.description}
           </p>
         )}
-        {field.instructions && (
+        {!isDefault && field.instructions && (
           <p className="mt-0.5 text-[10px] text-muted-foreground/80 italic truncate">
             {field.instructions}
           </p>
         )}
       </div>
       <div className="flex items-center gap-1">
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-7 w-7"
-          onClick={() => onEdit(field)}
-          aria-label="Edit field"
-        >
-          <Pencil className="h-3.5 w-3.5" />
-        </Button>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-7 w-7 text-muted-foreground hover:text-destructive"
-          onClick={() => onDelete(field)}
-          aria-label="Delete field"
-        >
-          <Trash2 className="h-3.5 w-3.5" />
-        </Button>
+        {/* Hide/show toggle for default schema fields; edit button for custom fields */}
+        {isDefault ? (
+          <Button
+            variant="ghost"
+            size="icon"
+            className={`h-7 w-7 ${isHidden ? "text-muted-foreground" : "text-foreground"}`}
+            onClick={() => onToggleHidden(field)}
+            aria-label={isHidden ? "Show field" : "Hide field"}
+            title={isHidden ? "Click to show this field in your dataset" : "Click to hide this field from your dataset"}
+          >
+            {isHidden ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+          </Button>
+        ) : (
+          <>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7"
+              onClick={() => onEdit(field)}
+              aria-label="Edit field"
+            >
+              <Pencil className="h-3.5 w-3.5" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7 text-muted-foreground hover:text-destructive"
+              onClick={() => onDelete(field)}
+              aria-label="Delete field"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </Button>
+          </>
+        )}
       </div>
     </div>
   );
@@ -593,6 +622,34 @@ export function SchemaBuilderView() {
       queryClient.invalidateQueries({ queryKey: ["schema", activeSchemaId] });
       queryClient.invalidateQueries({ queryKey: ["schemas", activeOrgId] });
     }
+  });
+
+  const toggleFieldVisibilityMutation = useMutation({
+    mutationFn: ({ fieldId, isHidden }: { fieldId: string; isHidden: boolean }) =>
+      api.patch<SchemaFieldDTO>(
+        `/api/schemas/${activeSchemaId}/fields/${fieldId}`,
+        { isHidden }
+      ),
+    onMutate: async ({ fieldId, isHidden }) => {
+      await queryClient.cancelQueries({ queryKey: ["schema", activeSchemaId] });
+      const previous = queryClient.getQueryData(["schema", activeSchemaId]);
+      queryClient.setQueryData(["schema", activeSchemaId], (old: any) => {
+        if (!old) return old;
+        return { ...old, fields: old.fields.map((f: any) => f.id === fieldId ? { ...f, isHidden } : f) };
+      });
+      return { previous };
+    },
+    onSuccess: (_, { isHidden }) => {
+      toast.success(isHidden ? "Field hidden" : "Field visible");
+    },
+    onError: (err: unknown, _, context: any) => {
+      queryClient.setQueryData(["schema", activeSchemaId], context?.previous);
+      const msg = err instanceof Error ? err.message : "Failed to update field";
+      toast.error("Update failed", { description: msg });
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ["schema", activeSchemaId] });
+    },
   });
 
   const testExtractionMutation = useMutation({
@@ -837,26 +894,38 @@ export function SchemaBuilderView() {
                 <CardTitle className="text-base flex items-center gap-2">
                   <FileText className="h-4 w-4" />
                   Schema metadata
+                  {activeSchema.isDefault && (
+                    <span className="inline-flex items-center gap-1 rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-[10px] font-medium text-blue-700 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-300">
+                      <Lock className="h-2.5 w-2.5" />
+                      Default Schema
+                    </span>
+                  )}
                 </CardTitle>
                 <div className="flex items-center gap-1">
-                  <Button
-                    variant={isEditingMetadata ? "secondary" : "ghost"}
-                    size="icon"
-                    className="h-7 w-7"
-                    onClick={() => setIsEditingMetadata(!isEditingMetadata)}
-                    aria-label="Toggle edit mode"
-                  >
-                    <Pencil className="h-3.5 w-3.5" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-7 w-7 text-muted-foreground hover:text-destructive"
-                    onClick={() => setDeleteOpen(true)}
-                    aria-label="Delete schema"
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </Button>
+                  {/* Don't allow editing the name of default schemas */}
+                  {!activeSchema.isDefault && (
+                    <Button
+                      variant={isEditingMetadata ? "secondary" : "ghost"}
+                      size="icon"
+                      className="h-7 w-7"
+                      onClick={() => setIsEditingMetadata(!isEditingMetadata)}
+                      aria-label="Toggle edit mode"
+                    >
+                      <Pencil className="h-3.5 w-3.5" />
+                    </Button>
+                  )}
+                  {/* Never show delete for default schemas */}
+                  {!activeSchema.isDefault && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                      onClick={() => setDeleteOpen(true)}
+                      aria-label="Delete schema"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  )}
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <Button variant="ghost" size="icon" className="h-7 w-7">
@@ -1047,16 +1116,28 @@ export function SchemaBuilderView() {
                     ({activeSchema.fields.length})
                   </span>
                 </CardTitle>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => handleOpenFieldEditor()}
-                >
-                  <Plus className="mr-2 h-3.5 w-3.5" />
-                  Add field
-                </Button>
+                {/* Add field is not allowed for default schemas — user can only hide/show */}
+                {!activeSchema.isDefault && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => handleOpenFieldEditor()}
+                  >
+                    <Plus className="mr-2 h-3.5 w-3.5" />
+                    Add field
+                  </Button>
+                )}
               </CardHeader>
               <CardContent className="p-0">
+                {/* Info callout for default schema */}
+                {activeSchema.isDefault && (
+                  <div className="flex items-start gap-2.5 mx-4 mt-4 mb-3 rounded-lg border border-blue-200 bg-blue-50 p-3 text-xs text-blue-800 dark:border-blue-800 dark:bg-blue-950/50 dark:text-blue-300">
+                    <Info className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+                    <span>
+                      These are system-managed fields used for Gmail deterministic scanning. You can <strong>hide</strong> fields you don&apos;t need using the eye icon, but their names and types cannot be changed. Hidden fields are skipped during scanning.
+                    </span>
+                  </div>
+                )}
                 {activeSchema.fields.length === 0 ? (
                   <div className="p-4">
                     <EmptyState
@@ -1064,13 +1145,15 @@ export function SchemaBuilderView() {
                       title="No fields yet"
                       description="Add your first extraction field to define what the AI should pull from each source."
                       action={
-                        <Button
-                          size="sm"
-                          onClick={() => handleOpenFieldEditor()}
-                        >
-                          <Plus className="mr-2 h-3.5 w-3.5" />
-                          Add field
-                        </Button>
+                        !activeSchema.isDefault ? (
+                          <Button
+                            size="sm"
+                            onClick={() => handleOpenFieldEditor()}
+                          >
+                            <Plus className="mr-2 h-3.5 w-3.5" />
+                            Add field
+                          </Button>
+                        ) : undefined
                       }
                     />
                   </div>
@@ -1089,8 +1172,15 @@ export function SchemaBuilderView() {
                           <SortableFieldItem
                             key={f.id}
                             field={f}
+                            isDefault={activeSchema.isDefault}
                             onEdit={handleOpenFieldEditor}
                             onDelete={setDeleteFieldTarget}
+                            onToggleHidden={(field) =>
+                              toggleFieldVisibilityMutation.mutate({
+                                fieldId: field.id,
+                                isHidden: !field.isHidden,
+                              })
+                            }
                           />
                         ))}
                       </SortableContext>

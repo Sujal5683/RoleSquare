@@ -4,6 +4,7 @@ import { ensureDefaultDataset } from "@/lib/dataset-provisioner";
 import { bumpUsageMetric } from "@/lib/usage";
 import { getFormsClient } from "@/lib/google-client";
 import { agentInfo } from "@/lib/agent-logger";
+import { enqueueJob } from "@/lib/queue";
 
 export async function processFormsScan(
   job: { id: string; organizationId: string; payload: string },
@@ -120,14 +121,10 @@ export async function processFormsScan(
   await bumpUsageMetric(job.organizationId, "emails_scanned", responsesMatched);
 
   if (responsesMatched > 0) {
-    await db.aiJob.create({
-      data: {
-        organizationId: job.organizationId,
-        type: "DETERMINISTIC_SYNC",
-        status: "queued",
-        payload: JSON.stringify({ sourceId }),
-        progress: 0,
-      },
+    await enqueueJob({
+      organizationId: job.organizationId,
+      type: "DETERMINISTIC_SYNC",
+      payload: { sourceId },
     });
   }
 

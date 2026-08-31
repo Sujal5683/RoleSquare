@@ -29,6 +29,7 @@
 
 import { db } from "@/lib/db";
 import { logAudit } from "@/lib/audit";
+import { enqueueJob } from "@/lib/queue";
 
 // ── Tool metadata ──────────────────────────────────────────────────────────
 
@@ -195,18 +196,14 @@ export async function executeTool(
       const run = await db.sourceRun.create({
         data: { sourceId, status: "running", mode, progress: 0, startedAt: now },
       });
-      await db.aiJob.create({
-        data: {
-          organizationId, type: "GMAIL_SCAN", status: "queued",
-          payload: JSON.stringify({ sourceId, runId: run.id, mode, triggeredBy: "assistant" }),
-          progress: 0,
-        },
+      const jobId = await enqueueJob({
+        organizationId,
+        type: "GMAIL_SCAN",
+        payload: { sourceId, runId: run.id, mode, triggeredBy: "assistant" },
       });
       await db.source.update({ where: { id: sourceId }, data: { lastRunAt: now, runState: "scanning" } });
-      // Kick the job processor (fire-and-forget)
-      fetch(new URL("/api/jobs/process", appOrigin).toString(), { method: "POST" }).catch(() => {});
       await logAudit({ organizationId, actorId: userId, actorType: "ai", action: "trigger_scan", entity: "source", entityId: sourceId });
-      return { runId: run.id, sourceId, mode, status: "queued" };
+      return { runId: run.id, sourceId, mode, jobId, status: "queued" };
     }
 
     case "create_source": {
@@ -577,8 +574,12 @@ export async function executeTool(
       const jobId = requireString(args.jobId, "jobId");
       const job = await db.aiJob.findUnique({ where: { id: jobId } });
       if (!job || job.organizationId !== organizationId) throw new Error(`Job ${jobId} not found`);
-      await db.aiJob.update({ where: { id: jobId }, data: { status: "queued", attempts: 0, errorMessage: null } });
-      fetch(new URL("/api/jobs/process", appOrigin).toString(), { method: "POST" }).catch(() => {});
+      // Re-push to BullMQ so it gets picked up immediately
+      await enqueueJob({
+        organizationId,
+        type:    job.type,
+        payload: job.payload ? JSON.parse(job.payload) : {},
+      });
       await logAudit({ organizationId, actorId: userId, actorType: "ai", action: "retry_job", entity: "ai_job", entityId: jobId });
       return { jobId, status: "re-queued" };
     }
@@ -722,18 +723,13 @@ export async function executeTool(
       const dataset = await db.dataset.findUnique({ where: { id: datasetId } });
       if (!dataset || dataset.organizationId !== organizationId) throw new Error(`Dataset ${datasetId} not found`);
       
-      const job = await db.aiJob.create({
-        data: {
-          organizationId,
-          type: "EXPORT",
-          status: "queued",
-          payload: JSON.stringify({ datasetId, target: "google_sheets", mode: toolName === "export_dataset_to_sheets" ? "full" : "sync" }),
-          progress: 0
-        }
+      const jobId = await enqueueJob({
+        organizationId,
+        type: "EXPORT",
+        payload: { datasetId, target: "google_sheets", mode: toolName === "export_dataset_to_sheets" ? "full" : "sync" },
       });
-      fetch(new URL("/api/jobs/process", appOrigin).toString(), { method: "POST" }).catch(() => {});
       await logAudit({ organizationId, actorId: userId, actorType: "ai", action: toolName, entity: "dataset", entityId: datasetId });
-      return { ok: true, jobId: job.id, status: "queued" };
+      return { ok: true, jobId, status: "queued" };
     }
 
     // ── Debugging ──────────────────────────────────────────────────────────

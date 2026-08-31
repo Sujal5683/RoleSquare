@@ -115,11 +115,14 @@ export async function writeDefaultDatasetRecord(
   // Load schema fields to get types for column creation
   const schemaFields = await db.schemaField.findMany({
     where: { schemaId },
-    select: { id: true, name: true, type: true, required: true },
+    select: { id: true, name: true, type: true, required: true, isHidden: true },
   });
 
+  // Filter out hidden fields — user has opted to not include them in their dataset
+  const visibleFields = schemaFields.filter((f) => !f.isHidden);
+
   // Merge incoming fields with DatasetColumnDef (additive — never removes columns)
-  const incomingFieldSpecs = schemaFields.map((f) => ({
+  const incomingFieldSpecs = visibleFields.map((f) => ({
     id: f.id,
     name: f.name,
     type: f.type,
@@ -199,11 +202,14 @@ export async function writeDefaultDatasetRecordsBulk(
   // Load schema fields to get types for column creation
   const schemaFields = await db.schemaField.findMany({
     where: { schemaId },
-    select: { id: true, name: true, type: true, required: true },
+    select: { id: true, name: true, type: true, required: true, isHidden: true },
   });
 
+  // Filter out hidden fields — user has opted to not include them in their dataset
+  const visibleFields = schemaFields.filter((f) => !f.isHidden);
+
   // Merge incoming fields with DatasetColumnDef (additive — never removes columns)
-  const incomingFieldSpecs = schemaFields.map((f) => ({
+  const incomingFieldSpecs = visibleFields.map((f) => ({
     id: f.id,
     name: f.name,
     type: f.type,

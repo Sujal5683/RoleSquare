@@ -100,6 +100,14 @@ export async function DELETE(
       );
     }
 
+    // Prevent deletion of the system-provisioned Default Email Schema
+    if (before.isDefault) {
+      return NextResponse.json(
+        { error: "The Default Email Schema cannot be deleted. It is required for Gmail deterministic parsing." },
+        { status: 403 }
+      );
+    }
+
     // Count affected datasets before unlinking
     const affectedDatasets = await db.dataset.count({ where: { schemaId: id } });
 

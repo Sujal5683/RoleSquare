@@ -4,8 +4,9 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { requireOrgContext, AuthError, authErrorResponse } from "@/lib/auth";
+import { requireOrgContext, requireRole, AuthError, authErrorResponse } from "@/lib/auth";
 import { serializeAiJob } from "@/lib/serialize";
+import { enqueueJob } from "@/lib/queue";
 
 export async function GET(req: NextRequest) {
   try {
@@ -72,17 +73,15 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const job = await db.aiJob.create({
-      data: {
-        organizationId,
-        userId: user.id,
-        type: body.type,
-        payload: body.payload ? JSON.stringify(body.payload) : "{}",
-        status: "queued",
-      },
+    const jobId = await enqueueJob({
+      organizationId,
+      userId: user.id,
+      type:   body.type,
+      payload: body.payload ?? {},
     });
 
-    return NextResponse.json(serializeAiJob(job));
+    const job = await db.aiJob.findUnique({ where: { id: jobId } });
+    return NextResponse.json(serializeAiJob(job!));
   } catch (err) {
     if (err instanceof AuthError) return authErrorResponse(err);
     return NextResponse.json(

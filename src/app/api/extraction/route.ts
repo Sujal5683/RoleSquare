@@ -19,8 +19,6 @@ import type { ExtractionFieldResult } from "@/lib/types";
 
 export async function POST(req: NextRequest) {
   try {
-    // Ensure the in-process job runner is alive so any queued AI jobs are
-    fetch(new URL("/api/jobs/process", req.url).toString(), { method: "POST" }).catch(() => {});
     const { user, organizationId } = await requireRole(req, "member");
     const body = await req.json().catch(() => ({}));
     const schemaId = String(body?.schemaId ?? "").trim();

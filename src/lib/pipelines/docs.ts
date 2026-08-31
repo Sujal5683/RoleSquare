@@ -5,6 +5,7 @@ import { bumpUsageMetric } from "@/lib/usage";
 import { getDocsClient } from "@/lib/google-client";
 import { agentInfo } from "@/lib/agent-logger";
 import { exploreLinkedContent } from "@/lib/drive-reader";
+import { enqueueJob } from "@/lib/queue";
 
 export async function processDocsScan(
   job: { id: string; organizationId: string; payload: string },
@@ -121,14 +122,10 @@ export async function processDocsScan(
   await bumpUsageMetric(job.organizationId, "emails_scanned", docsMatched);
 
   if (docsMatched > 0) {
-    await db.aiJob.create({
-      data: {
-        organizationId: job.organizationId,
-        type: "DETERMINISTIC_SYNC",
-        status: "queued",
-        payload: JSON.stringify({ sourceId }),
-        progress: 0,
-      },
+    await enqueueJob({
+      organizationId: job.organizationId,
+      type: "DETERMINISTIC_SYNC",
+      payload: { sourceId },
     });
   }
 

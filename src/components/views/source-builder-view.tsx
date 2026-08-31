@@ -57,6 +57,8 @@ import {
   ShieldCheck,
   AlertCircle,
   RefreshCw,
+  Lock,
+  Info,
 } from "lucide-react";
 
 // ── Types ────────────────────────────────────────────────────────────────
@@ -420,6 +422,15 @@ export function SourceBuilderView() {
   );
   const selectedSchema = schemas?.find((s) => s.id === form.schemaId);
   const selectedDataset = datasets?.find((d) => d.id === form.datasetId);
+
+  // The system-provisioned default email schema
+  const defaultSchema = schemas?.find((s) => s.isDefault);
+
+  // Auto-select the default schema whenever the source type is gmail
+  // (render-time state adjustment — React-recommended pattern)
+  if (form.sourceType === "gmail" && defaultSchema && form.schemaId !== defaultSchema.id) {
+    setForm((f) => ({ ...f, schemaId: defaultSchema.id }));
+  }
 
   // ── Step validation ───────────────────────────────────────────────────
   const stepValid = useMemo(() => {
@@ -1093,36 +1104,57 @@ export function SourceBuilderView() {
                         <FileJson className="h-3.5 w-3.5" />
                         Extraction schema
                       </Label>
-                      <button
-                        type="button"
-                        className="text-xs text-primary hover:underline"
-                        onClick={() => openSchema(null)}
-                      >
-                        Create new schema
-                      </button>
+                      {form.sourceType !== "gmail" && (
+                        <button
+                          type="button"
+                          className="text-xs text-primary hover:underline"
+                          onClick={() => openSchema(null)}
+                        >
+                          Create new schema
+                        </button>
+                      )}
                     </div>
-                    <Select
-                      value={form.schemaId || "none"}
-                      onValueChange={(v) =>
-                        setForm((f) => ({
-                          ...f,
-                          schemaId: v === "none" ? "" : v,
-                        }))
-                      }
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Choose a schema (optional)" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none" className="font-bold">Generate Automatically</SelectItem>
-                        <SelectSeparator />
-                        {(schemas ?? []).map((s) => (
-                          <SelectItem key={s.id} value={s.id}>
-                            {s.name} · v{s.version} ({s.fields.length} fields)
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+
+                    {/* Gmail sources are locked to the Default Schema */}
+                    {form.sourceType === "gmail" ? (
+                      <>
+                        <div className="flex items-center gap-2 rounded-md border bg-muted/30 px-3 py-2">
+                          <Lock className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                          <span className="text-sm font-medium flex-1">
+                            {defaultSchema ? `${defaultSchema.name} · v${defaultSchema.version} (${defaultSchema.fields.length} fields)` : "Default Email Schema (loading…)"}
+                          </span>
+                        </div>
+                        <div className="flex items-start gap-2 rounded-lg border border-blue-200 bg-blue-50 p-2.5 text-xs text-blue-800 dark:border-blue-800 dark:bg-blue-950/50 dark:text-blue-300">
+                          <Info className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+                          <span>
+                            Gmail sources always use the <strong>Default Email Schema</strong> for deterministic scanning. You can hide individual fields you don&apos;t need in the Schema Builder.
+                          </span>
+                        </div>
+                      </>
+                    ) : (
+                      <Select
+                        value={form.schemaId || "none"}
+                        onValueChange={(v) =>
+                          setForm((f) => ({
+                            ...f,
+                            schemaId: v === "none" ? "" : v,
+                          }))
+                        }
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Choose a schema (optional)" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none" className="font-bold">Generate Automatically</SelectItem>
+                          <SelectSeparator />
+                          {(schemas ?? []).map((s) => (
+                            <SelectItem key={s.id} value={s.id}>
+                              {s.name} · v{s.version} ({s.fields.length} fields)
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
                   </div>
 
                   <div className="space-y-2">

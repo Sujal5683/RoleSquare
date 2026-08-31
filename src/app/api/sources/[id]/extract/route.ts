@@ -10,6 +10,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { requireOrgContext, AuthError, authErrorResponse , requireRole} from "@/lib/auth";
 import { logAudit } from "@/lib/audit";
+import { enqueueJob } from "@/lib/queue";
 
 
 export async function POST(
@@ -106,18 +107,15 @@ export async function POST(
       );
     }
 
-    const job = await db.aiJob.create({
-      data: {
-        organizationId,
-        userId: user.id,
-        type: "AI_EXTRACTION",
-        status: "queued",
-        payload: JSON.stringify({
-          sourceDatasetId: source.datasetId,
-          targetDatasetId,
-          targetSchemaId: schemaId,
-        }),
-        progress: 0,
+    const jobId = await enqueueJob({
+      organizationId,
+      userId: user.id,
+      type: "AI_EXTRACTION",
+      agentKey: "extractor",
+      payload: {
+        sourceDatasetId: source.datasetId,
+        targetDatasetId,
+        targetSchemaId: schemaId,
       },
     });
 
@@ -127,13 +125,11 @@ export async function POST(
       action: "extract",
       entity: "source",
       entityId: id,
-      after: { schemaId, targetDatasetId, jobId: job.id },
+      after: { schemaId, targetDatasetId, jobId },
     });
 
-    fetch(new URL("/api/jobs/process", req.url).toString(), { method: "POST" }).catch(() => {});
-
     return NextResponse.json(
-      { jobId: job.id, targetDatasetId, message: "AI extraction queued" },
+      { jobId, targetDatasetId, message: "AI extraction queued" },
       { status: 202 }
     );
   } catch (err) {

@@ -341,6 +341,7 @@ model SchemaField {
   validation        String? // JSON: { min?: number, max?: number, regex?: string }
   position          Int     @default(0)
   confidenceThreshold Float  @default(0.7) // min confidence before routing to review (0..1)
+  isHidden          Boolean @default(false) // if true, skip this field in deterministic sync output
 
   schema Schema @relation(fields: [schemaId], references: [id], onDelete: Cascade)
 

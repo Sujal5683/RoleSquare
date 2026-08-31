@@ -130,6 +130,7 @@ export interface SchemaFieldDTO {
   validation: Record<string, unknown> | null;
   position: number;
   confidenceThreshold: number;
+  isHidden: boolean;
 }
 
 export interface SchemaDTO {
