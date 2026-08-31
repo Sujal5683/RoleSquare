@@ -177,7 +177,8 @@ async function processBullJob(bullJob: Job): Promise<void> {
 const worker = new Worker(QUEUE_NAME, processBullJob, {
   connection:       workerRedis,
   concurrency:      CONCURRENT_WORKERS,
-  stalledInterval:  30_000,          // check for stalled jobs every 30s
+  drainDelay:       300,             // 5 minutes long-polling (saves Redis requests)
+  stalledInterval:  300_000,         // check for stalled jobs every 5 mins
   maxStalledCount:  2,               // max times a job can be re-run after being stalled
   lockDuration:     STALE_LOCK_MS,   // how long worker holds the lock per job
 });

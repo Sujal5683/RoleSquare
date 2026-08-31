@@ -129,7 +129,7 @@ export async function POST(req: NextRequest) {
     });
 
     return NextResponse.json(
-      { jobId: job.id, targetDatasetId },
+      { jobId, targetDatasetId },
       { status: 201 }
     );
   } catch (err) {

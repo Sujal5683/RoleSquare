@@ -174,61 +174,64 @@ export async function callGeminiWithFallback(
       continue;
     }
 
+    let timeoutId: NodeJS.Timeout | undefined;
     try {
       console.info(`[gemini] trying model ${modelDef.id}`);
 
-      const model = genAI.getGenerativeModel({
-        model: modelDef.id,
-        systemInstruction: opts.system,
-        generationConfig: {
-          temperature: opts.temperature ?? 0.2,
-          maxOutputTokens: opts.maxOutputTokens ?? 4096,
-        },
-        safetySettings: [
-          { category: HarmCategory.HARM_CATEGORY_HARASSMENT,        threshold: HarmBlockThreshold.BLOCK_NONE },
-          { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH,       threshold: HarmBlockThreshold.BLOCK_NONE },
-          { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_NONE },
-          { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_NONE },
-        ],
-      });
+      // Use an AbortController to natively cancel the underlying fetch request
+      // and stop any internal SDK retries if the model hangs.
+      const abortController = new AbortController();
+      timeoutId = setTimeout(() => abortController.abort(new Error(`Timeout: ${modelDef.id} did not respond within ${timeoutMs / 1000}s`)), timeoutMs);
 
-      const history = messages.slice(0, -1).map((m) => ({
-        role: m.role,
-        parts: [{ text: m.content }],
-      }));
-      const lastMessage = messages[messages.length - 1];
-      const chat = model.startChat({ history });
+      const model = genAI.getGenerativeModel(
+          {
+            model: modelDef.id,
+            systemInstruction: opts.system,
+            generationConfig: {
+              temperature: opts.temperature ?? 0.2,
+              maxOutputTokens: opts.maxOutputTokens ?? 4096,
+            },
+            safetySettings: [
+              { category: HarmCategory.HARM_CATEGORY_HARASSMENT,        threshold: HarmBlockThreshold.BLOCK_NONE },
+              { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH,       threshold: HarmBlockThreshold.BLOCK_NONE },
+              { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_NONE },
+              { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_NONE },
+            ],
+          },
+          // Pass signal to requestOptions so the SDK natively cancels the request
+          { apiClient: "rolesquare", customHeaders: { "x-goog-api-client": "rolesquare" }, signal: abortController.signal } as any
+        );
 
-      // Multimodal message: prepend file parts before the text instruction
-      // so Gemini sees the raw document before the schema/extraction prompt.
-      const messagePayload =
-        opts.fileParts && opts.fileParts.length > 0
-          ? { parts: [...opts.fileParts, { text: lastMessage.content }] }
-          : lastMessage.content;
+        const history = messages.slice(0, -1).map((m) => ({
+          role: m.role,
+          parts: [{ text: m.content }],
+        }));
+        const lastMessage = messages[messages.length - 1];
+        const chat = model.startChat({ history });
 
-      const result = await Promise.race([
-        chat.sendMessage(messagePayload as any),
-        new Promise<never>((_, reject) =>
-          setTimeout(
-            () => reject(new Error(`Timeout: ${modelDef.id} did not respond within ${timeoutMs / 1000}s`)),
-            timeoutMs
-          )
-        ),
-      ]);
+        // Multimodal message: prepend file parts before the text instruction
+        const messagePayload =
+          opts.fileParts && opts.fileParts.length > 0
+            ? { parts: [...opts.fileParts, { text: lastMessage.content }] }
+            : lastMessage.content;
 
-      const response = result.response;
-      const text = response.text();
-      const usageMetadata = response.usageMetadata;
-      const promptTokens     = usageMetadata?.promptTokenCount     ?? 0;
-      const completionTokens = usageMetadata?.candidatesTokenCount ?? 0;
-      const tokensUsed       = promptTokens + completionTokens;
+        const result = await chat.sendMessage(messagePayload as any);
 
+        const response = result.response;
+        const text = response.text();
+        const usageMetadata = response.usageMetadata;
+        const promptTokens     = usageMetadata?.promptTokenCount     ?? 0;
+        const completionTokens = usageMetadata?.candidatesTokenCount ?? 0;
+        const tokensUsed       = promptTokens + completionTokens;
+
+      clearTimeout(timeoutId);
       markSuccess(modelDef.id);
       console.info(`[gemini] ${modelDef.id} OK — ${tokensUsed} tokens (${promptTokens}p + ${completionTokens}c)`);
 
       return { text, modelUsed: modelDef.id, modelDisplayName: modelDef.displayName, tokensUsed, promptTokens, completionTokens };
 
     } catch (err) {
+      clearTimeout(timeoutId);
       const errMsg = err instanceof Error ? err.message : String(err);
 
       const isRateLimit =
