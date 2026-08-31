@@ -17,7 +17,13 @@ import { db } from "@/lib/db";
 
 // ── Redis connection ───────────────────────────────────────────────────────────
 
-const REDIS_URL = process.env.REDIS_URL || "redis://localhost:6379";
+let REDIS_URL = process.env.REDIS_URL?.trim() || "redis://localhost:6379";
+try {
+  new URL(REDIS_URL);
+} catch (e) {
+  console.warn("[queue] Invalid REDIS_URL provided. Falling back to localhost.");
+  REDIS_URL = "redis://localhost:6379";
+}
 
 /**
  * Shared IORedis connection used by the BullMQ Queue (producers).
