@@ -135,8 +135,8 @@ export function DashboardView() {
         <EmptyState title="No data" description="Dashboard data could not be loaded." />
       ) : (
         <>
-          {/* KPI cards */}
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+          {/* KPI cards — 2 cols on mobile, 3 on sm, 6 on xl */}
+          <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 xl:grid-cols-6">
             <StatCard
               label="Connected Accounts"
               value={data.kpis.connectedAccounts}
@@ -187,7 +187,7 @@ export function DashboardView() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="h-[250px] w-full mt-0">
+              <div className="h-[180px] sm:h-[250px] w-full mt-0">
                 <ResponsiveContainer width="100%" height="100%">
                   <AreaChart data={data.chartData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
                     <defs>

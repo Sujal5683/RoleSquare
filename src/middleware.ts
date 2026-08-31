@@ -26,6 +26,11 @@ const PUBLIC_PATHS = [
   "/api/debug-error",
   "/api/jobs/process",               // Internal/cron job processing trigger
   "/api/cron",                       // Cron jobs
+  // PWA assets — must be accessible without auth so the browser can install the app
+  "/manifest.json",
+  "/sw.js",
+  "/offline.html",
+  "/icons",
 ];
 
 function isPublicPath(pathname: string): boolean {
@@ -95,8 +100,9 @@ export const config = {
      * - _next/static  (static files)
      * - _next/image   (image optimization)
      * - favicon.ico
-     * - public folder assets
+     * - PWA assets: sw.js, manifest.json, offline.html, /icons/*
+     * - public folder assets (svg, png, jpg, etc.)
      */
-    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+    "/((?!_next/static|_next/image|favicon.ico|sw\.js|manifest\.json|offline\.html|icons/.*|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
   ],
 };
