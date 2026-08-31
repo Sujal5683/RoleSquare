@@ -168,12 +168,9 @@ export async function updateRunProgress(runId: string, progress: number, _stage:
  * The master AI_EXTRACTION job.
  * 
  * Instead of processing rows directly, it:
- *   1. Finds all unprocessed source records (up to FAN_OUT_BATCH_SIZE)
+ *   1. Finds all unprocessed source records
  *   2. Inserts one EXTRACT_SINGLE_ROW child job per record
- *   3. Returns immediately — child jobs are picked up in subsequent cycles
- *
- * This prevents the 10-minute stale timeout from killing a large batch,
- * and isolates failures to individual rows instead of entire batches.
+ *   3. Returns deferred: true so it stays running while children execute
  */
 async function processAiExtractionMaster(
   job: { id: string; organizationId: string },
@@ -187,72 +184,59 @@ async function processAiExtractionMaster(
   const driveConnectionId = payload.driveConnectionId as string | undefined;
   const maxContentBytes   = typeof payload.maxContentBytes === "number" ? payload.maxContentBytes : undefined;
 
+  let totalQueued = 0;
+
   // ── Mode B: Two-step pipeline ──
   if (sourceDatasetId && targetDatasetId && targetSchemaId) {
-    // Find records already processed in target dataset.
-    // We use sourceEmailId as a generic "source record ID" column:
-    //   - For Mode A (email-origin): stores the email's DB id
-    //   - For Mode B (dataset-origin): stores the source DatasetRecord id
-    // This gives us a reliable dedup key regardless of origin.
     const doneRecords = await db.datasetRecord.findMany({
       where: { datasetId: targetDatasetId, sourceEmailId: { not: null } },
       select: { sourceEmailId: true },
     });
     const doneSourceRecordIds = new Set(doneRecords.map((r) => r.sourceEmailId as string));
 
-    // Fetch the next batch of source records that haven't been extracted yet.
-    // We over-fetch by 1 (FAN_OUT_BATCH_SIZE + 1) to know if there are more pages.
-    const sourceRecords = await db.datasetRecord.findMany({
-      where: {
-        datasetId: sourceDatasetId,
-        // Skip records already present in target (using sourceRecordId stored in sourceEmailId)
-        id: { notIn: Array.from(doneSourceRecordIds) },
-      },
+    const allSourceRecords = await db.datasetRecord.findMany({
+      where: { datasetId: sourceDatasetId },
       select: { id: true, sourceEmailId: true },
-      take: FAN_OUT_BATCH_SIZE + 1,
-      orderBy: { createdAt: "asc" },
     });
 
-    const hasMore = sourceRecords.length > FAN_OUT_BATCH_SIZE;
-    const batch = sourceRecords.slice(0, FAN_OUT_BATCH_SIZE);
+    const unprocessed = allSourceRecords.filter((r) => !doneSourceRecordIds.has(r.sourceEmailId ?? r.id));
 
-    if (batch.length === 0) {
+    if (unprocessed.length === 0) {
       return { fanOut: 0, note: "All records already processed" };
     }
 
-    // Create one child job per unprocessed record via BullMQ
-    for (const record of batch) {
-      await enqueueJob({
-        organizationId: job.organizationId,
-        type: "EXTRACT_SINGLE_ROW",
-        agentKey: "extractor",
-        payload: {
-          sourceRecordId: record.id,
-          targetDatasetId,
-          targetSchemaId,
-          exploreDriveLinks,
-          driveConnectionId,
-          maxContentBytes,
-          masterJobId: job.id,
-        },
-      });
+    // Chunking to speed up Redis enqueueing and avoid blocking the event loop
+    const chunk = 50;
+    for (let i = 0; i < unprocessed.length; i += chunk) {
+      const batch = unprocessed.slice(i, i + chunk);
+      await Promise.all(
+        batch.map((record) =>
+          enqueueJob({
+            organizationId: job.organizationId,
+            type: "EXTRACT_SINGLE_ROW",
+            agentKey: "extractor",
+            payload: {
+              sourceRecordId: record.id,
+              targetDatasetId,
+              targetSchemaId,
+              exploreDriveLinks,
+              driveConnectionId,
+              maxContentBytes,
+              masterJobId: job.id,
+            },
+          })
+        )
+      );
     }
 
-    // If there are more records beyond this batch, enqueue another master job
-    // to fan-out the next batch (pagination through all source records).
-    if (hasMore) {
-      await enqueueJob({
-        organizationId: job.organizationId,
-        type: "AI_EXTRACTION",
-        payload: { sourceDatasetId, targetDatasetId, targetSchemaId, exploreDriveLinks, driveConnectionId, maxContentBytes },
-      });
-    }
+    totalQueued = unprocessed.length;
 
     await agentInfo(job.id, job.organizationId, "extractor",
-      `Fan-out: queued ${batch.length} EXTRACT_SINGLE_ROW jobs (hasMore=${hasMore})`,
-      { total: batch.length, hasMore });
+      `Fan-out: queued ${totalQueued} EXTRACT_SINGLE_ROW jobs`,
+      { total: totalQueued }
+    );
 
-    return { fanOut: batch.length, hasMore, deferred: true };
+    return { fanOut: totalQueued, deferred: true };
   }
 
   // ── Mode A: Legacy (sourceId-based) ──
@@ -263,30 +247,27 @@ async function processAiExtractionMaster(
   const emails = await db.email.findMany({
     where: { sourceId, processingStatus: "matched" },
     select: { id: true },
-    take: FAN_OUT_BATCH_SIZE,
   });
 
   if (emails.length === 0) return { fanOut: 0, note: "No unprocessed emails" };
 
-  // Mode A fan-out via BullMQ
-  for (const email of emails) {
-    await enqueueJob({
-      organizationId: job.organizationId,
-      type: "EXTRACT_SINGLE_ROW",
-      agentKey: "extractor",
-      payload: { emailId: email.id, datasetId, sourceId, masterJobId: job.id },
-    });
+  const chunk = 50;
+  for (let i = 0; i < emails.length; i += chunk) {
+    const batch = emails.slice(i, i + chunk);
+    await Promise.all(
+      batch.map((email) =>
+        enqueueJob({
+          organizationId: job.organizationId,
+          type: "EXTRACT_SINGLE_ROW",
+          agentKey: "extractor",
+          payload: { emailId: email.id, datasetId, sourceId, masterJobId: job.id },
+        })
+      )
+    );
   }
 
-  if (emails.length === FAN_OUT_BATCH_SIZE) {
-    await enqueueJob({
-      organizationId: job.organizationId,
-      type: "AI_EXTRACTION",
-      payload: { sourceId, datasetId },
-    });
-  }
-
-  return { fanOut: emails.length, deferred: true };
+  totalQueued = emails.length;
+  return { fanOut: totalQueued, deferred: true };
 }
 
 // ── EXTRACT_SINGLE_ROW: Worker ────────────────────────────────────────────────
@@ -499,16 +480,25 @@ async function processSingleRowModeB(
   );
 
   // Update master job progress.
-  // We count done vs. total in the source dataset to compute a progress %.
-  // NOTE: we do NOT auto-mark the master as 'success' here — the BullMQ worker
-  // event handler in worker.ts handles that when the master job itself finishes.
-  // Auto-marking here creates a race condition where the master appears done
-  // before all child jobs have completed.
   if (payload.masterJobId) {
     const totalSource = await db.datasetRecord.count({ where: { datasetId: sourceRecord.datasetId } });
     const doneSource  = await db.datasetRecord.count({ where: { datasetId: targetDatasetId, sourceEmailId: { not: null } } });
-    if (totalSource > 0) {
-      const prog = Math.min(99, Math.round((doneSource / totalSource) * 100)); // cap at 99 — worker sets 100 on completion
+    
+    const pendingSiblings = await db.aiJob.count({
+      where: {
+        type: "EXTRACT_SINGLE_ROW",
+        payload: { contains: payload.masterJobId as string },
+        status: { in: ["queued", "running", "retry"] },
+      },
+    });
+
+    if (pendingSiblings <= 1) {
+      await db.aiJob.updateMany({
+        where: { id: payload.masterJobId as string, status: { in: ["running", "queued"] } },
+        data: { status: "success", progress: 100, finishedAt: new Date() },
+      });
+    } else if (totalSource > 0) {
+      const prog = Math.min(99, Math.round((doneSource / totalSource) * 100));
       await db.aiJob.updateMany({
         where: { id: payload.masterJobId as string, status: { in: ["running", "queued"] } },
         data:  { progress: prog },
@@ -602,6 +592,24 @@ async function processSingleRowModeA(
   });
 
   if (tokens > 0) await bumpUsageMetric(job.organizationId, "ai_tokens", tokens);
+
+  if (payload.masterJobId) {
+    const pendingSiblings = await db.aiJob.count({
+      where: {
+        type: "EXTRACT_SINGLE_ROW",
+        payload: { contains: payload.masterJobId as string },
+        status: { in: ["queued", "running", "retry"] },
+      },
+    });
+
+    if (pendingSiblings <= 1) {
+      await db.aiJob.updateMany({
+        where: { id: payload.masterJobId as string, status: { in: ["running", "queued"] } },
+        data: { status: "success", progress: 100, finishedAt: new Date() },
+      });
+    }
+  }
+
   return { emailId, tokens, modelUsed: extractionResult.modelUsed };
 }
 
