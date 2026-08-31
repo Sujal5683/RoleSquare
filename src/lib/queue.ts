@@ -17,7 +17,7 @@ import { db } from "@/lib/db";
 
 // ── Redis connection ───────────────────────────────────────────────────────────
 
-const REDIS_URL = process.env.REDIS_URL ?? "redis://localhost:6379";
+const REDIS_URL = process.env.REDIS_URL || "redis://localhost:6379";
 
 /**
  * Shared IORedis connection used by the BullMQ Queue (producers).
@@ -50,7 +50,6 @@ export const jobQueue = new Queue(QUEUE_NAME, {
     },
     removeOnComplete: { age: 60 * 60 * 24 }, // keep 24h for debugging
     removeOnFail:     { age: 60 * 60 * 72 }, // keep 72h for inspection
-    timeout: 10 * 60 * 1000, // 10 min per job — matches STALE_JOB_THRESHOLD_MS
   },
 });
 

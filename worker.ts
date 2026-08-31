@@ -32,7 +32,7 @@ const CONCURRENT_WORKERS  = 7;
 const MAX_ATTEMPTS        = 5;
 const STALE_LOCK_MS       = 10 * 60 * 1000 + 5000; // slightly above 10 min job timeout
 
-const REDIS_URL = process.env.REDIS_URL ?? "redis://localhost:6379";
+const REDIS_URL = process.env.REDIS_URL || "redis://localhost:6379";
 
 // ── Worker-specific Redis connection ──────────────────────────────────────────
 // BullMQ requires a SEPARATE connection for the Worker vs the Queue.
