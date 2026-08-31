@@ -104,74 +104,30 @@ export async function processJob(job: {
 }) {
   console.log(`[job-runner] job ${job.id} type=${job.type} attempt=${job.attempts}`);
 
-  try {
-    if (job.userId) {
-      const { checkUserLimits } = await import("@/lib/usage");
-      await checkUserLimits(job.userId, "jobs");
-      await checkUserLimits(job.userId, "tokens");
-      await checkUserLimits(job.userId, "records");
-    }
-
-    const payload = JSON.parse(job.payload || "{}");
-    let result: Record<string, unknown> = {};
-
-    switch (job.type) {
-      case "GMAIL_SCAN":          result = await processGmailScan(job, payload);              break;
-      case "DRIVE_SCAN":          result = await processDriveScan(job, payload);              break;
-      case "DOCS_SCAN":           result = await processDocsScan(job, payload);               break;
-      case "SHEETS_SCAN":         result = await processSheetsScan(job, payload);             break;
-      case "FORMS_SCAN":          result = await processFormsScan(job, payload);              break;
-      case "DETERMINISTIC_SYNC":  result = await processDeterministicSync(job, payload);      break;
-      case "EXPORT":              result = await processExport(job, payload);                 break;
-      case "AI_EXTRACTION":       result = await processAiExtractionMaster(job, payload);     break;
-      case "EXTRACT_SINGLE_ROW":  result = await processSingleRowExtraction(job, payload);    break;
-      default:                    result = { skipped: true, reason: `Unknown type: ${job.type}` };
-    }
-
-    await db.aiJob.update({
-      where: { id: job.id },
-      data: { status: "success", progress: 100, result: JSON.stringify(result), finishedAt: new Date(), errorMessage: null },
-    });
-    console.log(`[job-runner] job ${job.id} done`);
-
-  } catch (err) {
-    const errorMessage = err instanceof Error ? err.message : "Unknown error";
-    const isRetryable  = isRetryableError(err);
-    const shouldDlq    = job.attempts >= MAX_ATTEMPTS;
-    const finalStatus  = shouldDlq ? "dlq" : isRetryable ? "queued" : "failed";
-
-    await db.aiJob.update({
-      where: { id: job.id },
-      data: {
-        status: finalStatus,
-        errorMessage: shouldDlq
-          ? `Dead-lettered after ${MAX_ATTEMPTS} attempts: ${errorMessage}`
-          : errorMessage,
-        finishedAt: shouldDlq || !isRetryable ? new Date() : null,
-        startedAt:  isRetryable ? null : undefined,
-      },
-    });
-
-    if (finalStatus !== "queued") {
-      try {
-        const parsed = JSON.parse(job.payload || "{}");
-        if (parsed.runId)    await db.sourceRun.updateMany({ where: { id: parsed.runId,    status: "running" }, data: { status: "failed", errorMessage } });
-        if (parsed.sourceId) await db.source.updateMany({   where: { id: parsed.sourceId },                    data: { runState: "idle" } });
-      } catch { /* ignore */ }
-    }
-
-    await logAudit({
-      organizationId: job.organizationId,
-      actorType: "system",
-      action: "update",
-      entity: "job",
-      entityId: job.id,
-      after: { status: finalStatus, error: errorMessage, attempts: job.attempts },
-      reason: shouldDlq ? "dead_lettered" : isRetryable ? "retry_queued" : "failed",
-    });
-
-    console.error(`[job-runner] job ${job.id} → ${finalStatus}: ${errorMessage}`);
+  if (job.userId) {
+    const { checkUserLimits } = await import("@/lib/usage");
+    await checkUserLimits(job.userId, "jobs");
+    await checkUserLimits(job.userId, "tokens");
+    await checkUserLimits(job.userId, "records");
   }
+
+  const payload = JSON.parse(job.payload || "{}");
+  let result: Record<string, unknown> = {};
+
+  switch (job.type) {
+    case "GMAIL_SCAN":          result = await processGmailScan(job, payload);              break;
+    case "DRIVE_SCAN":          result = await processDriveScan(job, payload);              break;
+    case "DOCS_SCAN":           result = await processDocsScan(job, payload);               break;
+    case "SHEETS_SCAN":         result = await processSheetsScan(job, payload);             break;
+    case "FORMS_SCAN":          result = await processFormsScan(job, payload);              break;
+    case "DETERMINISTIC_SYNC":  result = await processDeterministicSync(job, payload);      break;
+    case "EXPORT":              result = await processExport(job, payload);                 break;
+    case "AI_EXTRACTION":       result = await processAiExtractionMaster(job, payload);     break;
+    case "EXTRACT_SINGLE_ROW":  result = await processSingleRowExtraction(job, payload);    break;
+    default:                    result = { skipped: true, reason: `Unknown type: ${job.type}` };
+  }
+
+  return result;
 }
 
 /**
