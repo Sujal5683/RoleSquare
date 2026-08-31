@@ -931,7 +931,6 @@ function SecuritySection() {
           </DialogHeader>
           <div className="flex flex-col items-center gap-4 py-4">
             {qrCodeDataUri ? (
-              // eslint-disable-next-line @next/next/no-img-element
               <img src={qrCodeDataUri} alt="QR Code" className="w-48 h-48 border rounded" />
             ) : (
               <div className="w-48 h-48 bg-muted animate-pulse rounded" />
