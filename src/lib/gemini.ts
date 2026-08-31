@@ -199,7 +199,7 @@ export async function callGeminiWithFallback(
             ],
           },
           // Pass signal to requestOptions so the SDK natively cancels the request
-          { apiClient: "rolesquare", customHeaders: { "x-goog-api-client": "rolesquare" }, signal: abortController.signal } as any
+          { apiClient: "rolesquare", signal: abortController.signal } as any
         );
 
         const history = messages.slice(0, -1).map((m) => ({
