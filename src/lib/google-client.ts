@@ -10,6 +10,7 @@
 import { google, type gmail_v1 } from "googleapis";
 import { db } from "@/lib/db";
 import { decryptToken, encryptToken, refreshAccessToken } from "@/lib/google-auth";
+import { withRetry } from "@/lib/with-retry";
 
 // ────────────────────────────────────────────────────────────────────────────
 // Internal: resolve a valid (non-expired) access token for a connection
@@ -67,7 +68,41 @@ async function resolveAccessToken(connectionId: string): Promise<string> {
 }
 
 // ────────────────────────────────────────────────────────────────────────────
-// Gmail client
+// Resilient Auth Client Factory
+// ────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Creates an OAuth2 client that intercepts all requests and wraps them
+ * in the withRetry logic (with a 60s timeout). This provides automatic
+ * resilience against TCP drops on public/institutional networks for all
+ * Google APIs (Gmail, Drive, Docs, etc.) without touching each pipeline.
+ */
+function createResilientAuthClient(accessToken: string) {
+  const auth = new google.auth.OAuth2(
+    process.env.GOOGLE_CLIENT_ID,
+    process.env.GOOGLE_CLIENT_SECRET
+  );
+  auth.setCredentials({ access_token: accessToken });
+
+  const originalRequest = auth.request.bind(auth);
+  
+  // @ts-ignore - overriding the request method of the OAuth2Client
+  auth.request = async (opts: any) => {
+    // Inject a 60s timeout if one isn't already specified
+    if (!opts.timeout) opts.timeout = 60_000;
+    
+    return withRetry(() => originalRequest(opts), {
+      label: `Google API ${opts.method || "GET"} ${opts.url}`,
+      maxAttempts: 4,
+      baseDelayMs: 500,
+    });
+  };
+
+  return auth;
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// API Clients
 // ────────────────────────────────────────────────────────────────────────────
 
 /**
@@ -76,39 +111,31 @@ async function resolveAccessToken(connectionId: string): Promise<string> {
  */
 export async function getGmailClient(connectionId: string): Promise<gmail_v1.Gmail> {
   const accessToken = await resolveAccessToken(connectionId);
-  const auth = new google.auth.OAuth2(
-    process.env.GOOGLE_CLIENT_ID,
-    process.env.GOOGLE_CLIENT_SECRET
-  );
-  auth.setCredentials({ access_token: accessToken });
+  const auth = createResilientAuthClient(accessToken);
   return google.gmail({ version: "v1", auth });
 }
 
 export async function getDriveClient(connectionId: string) {
   const accessToken = await resolveAccessToken(connectionId);
-  const auth = new google.auth.OAuth2(process.env.GOOGLE_CLIENT_ID, process.env.GOOGLE_CLIENT_SECRET);
-  auth.setCredentials({ access_token: accessToken });
+  const auth = createResilientAuthClient(accessToken);
   return google.drive({ version: "v3", auth });
 }
 
 export async function getSheetsClient(connectionId: string) {
   const accessToken = await resolveAccessToken(connectionId);
-  const auth = new google.auth.OAuth2(process.env.GOOGLE_CLIENT_ID, process.env.GOOGLE_CLIENT_SECRET);
-  auth.setCredentials({ access_token: accessToken });
+  const auth = createResilientAuthClient(accessToken);
   return google.sheets({ version: "v4", auth });
 }
 
 export async function getDocsClient(connectionId: string) {
   const accessToken = await resolveAccessToken(connectionId);
-  const auth = new google.auth.OAuth2(process.env.GOOGLE_CLIENT_ID, process.env.GOOGLE_CLIENT_SECRET);
-  auth.setCredentials({ access_token: accessToken });
+  const auth = createResilientAuthClient(accessToken);
   return google.docs({ version: "v1", auth });
 }
 
 export async function getFormsClient(connectionId: string) {
   const accessToken = await resolveAccessToken(connectionId);
-  const auth = new google.auth.OAuth2(process.env.GOOGLE_CLIENT_ID, process.env.GOOGLE_CLIENT_SECRET);
-  auth.setCredentials({ access_token: accessToken });
+  const auth = createResilientAuthClient(accessToken);
   return google.forms({ version: "v1", auth });
 }
 

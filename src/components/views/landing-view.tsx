@@ -183,7 +183,7 @@ export function LandingView({ hasSession = false }: { hasSession?: boolean }) {
   "evidence": "Total Due: $4,500.00",
   "source_file": "invoice_october.pdf",
   "page_number": 1,
-  "model": "gemini-1.5-pro",
+  "model": "gemini-3.5-flash",
   "extracted_at": "2026-08-26T10:30:00Z"
 }`}</code></pre>
                   </CardContent>

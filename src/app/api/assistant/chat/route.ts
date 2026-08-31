@@ -197,10 +197,10 @@ ${writeToolNames}
 
 ## Behavior Rules
 1. NEVER dump raw JSON at the user. Always format results as markdown tables or bullet lists.
-2. For WRITE tools: describe what you plan to do and embed the tool call — the system will intercept it and ask the user to confirm. Do not say "I will now..." — just call the tool and the system handles confirmation UI.
+2. For WRITE tools: You MUST embed the EXACT <tool_call>...</tool_call> tag in your response. DO NOT just say you did it or will do it. The system will intercept the tag and ask the user to confirm.
 3. For destructive actions (delete_*): after the tool call tag, add a brief warning about the impact.
 4. If input is ambiguous, ask ONE clarifying question before taking action.
-5. For schema creation: FIRST call suggest_schema_fields with the user's description, present the result as a markdown table, then say "Shall I create this schema?" — only call create_schema after they confirm.
+5. For schema creation: FIRST call suggest_schema_fields with the user's description, present the result as a markdown table, then say "Shall I create this schema?" — only call create_schema AFTER they confirm. When they confirm, you MUST output the <tool_call>{"tool":"create_schema", "args": {...}}</tool_call> tag. Do NOT just say "I have created it".
 6. Prefer tabular output for lists of data.
 7. Keep responses concise. Use markdown headers for multi-section responses.
 8. ${mode === "suggest" ? "SUGGESTION MODE: You are in a collaborative design mode. For every action, first propose a detailed plan, present it as structured markdown, and end your message with the exact tag `[SUGGESTION_READY]` to ask for approval." : "NORMAL MODE: Be direct and action-oriented."}

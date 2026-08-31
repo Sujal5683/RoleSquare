@@ -12,11 +12,11 @@
 //   4. 503 MODEL_CAPACITY_EXHAUSTED is treated the same as 429 (retryable).
 //
 // Model chain:
-//   1. gemini-3.7-flash          Primary
-//   2. gemini-3.6-flash          Fallback 1
-//   3. gemini-3.5-flash          Fallback 2
-//   4. gemini-3.5-flash-lite     Fallback 3
-//   5. gemini-3.1-flash-lite     Fallback 4
+//   1. gemini-3.5-flash          Primary
+//   2. gemini-3.1-flash-lite     Fallback 1
+//   3. gemini-3.7-flash          Fallback 2
+//   4. gemini-3.6-flash          Fallback 3
+//   5. gemini-3.5-flash-lite     Fallback 4
 
 import { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } from "@google/generative-ai";
 
@@ -30,11 +30,11 @@ interface ModelDef {
 }
 
 const MODEL_CHAIN: ModelDef[] = [
-  { id: "gemini-3.7-flash",      displayName: "Gemini 3.7 Flash",      role: "Primary",    rpmCooldownMs: 60_000 },
-  { id: "gemini-3.6-flash",      displayName: "Gemini 3.6 Flash",      role: "Fallback 1", rpmCooldownMs: 60_000 },
-  { id: "gemini-3.5-flash",      displayName: "Gemini 3.5 Flash",      role: "Fallback 2", rpmCooldownMs: 60_000 },
-  { id: "gemini-3.5-flash-lite", displayName: "Gemini 3.5 Flash Lite", role: "Fallback 3", rpmCooldownMs: 60_000 },
-  { id: "gemini-3.1-flash-lite", displayName: "Gemini 3.1 Flash Lite", role: "Fallback 4", rpmCooldownMs: 60_000 },
+  { id: "gemini-3.5-flash",      displayName: "Gemini 3.5 Flash",      role: "Primary",    rpmCooldownMs: 60_000 },
+  { id: "gemini-3.1-flash-lite", displayName: "Gemini 3.1 Flash Lite", role: "Fallback 1", rpmCooldownMs: 60_000 },
+  { id: "gemini-3.7-flash",      displayName: "Gemini 3.7 Flash",      role: "Fallback 2", rpmCooldownMs: 60_000 },
+  { id: "gemini-3.6-flash",      displayName: "Gemini 3.6 Flash",      role: "Fallback 3", rpmCooldownMs: 60_000 },
+  { id: "gemini-3.5-flash-lite", displayName: "Gemini 3.5 Flash Lite", role: "Fallback 4", rpmCooldownMs: 60_000 },
 ];
 
 // ── Rate-limit state (in-process, resets on server restart) ─────────────────
