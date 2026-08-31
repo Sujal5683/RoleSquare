@@ -275,7 +275,7 @@ export function SyncHistory({ sheetMappingId, datasetId, className }: SyncHistor
       return api.get(`/api/datasets/${datasetId}/import-history?limit=20&offset=0`);
     },
     enabled: !!sheetMappingId || !!datasetId,
-    refetchInterval: 30_000,
+    // No polling — sync-dashboard.syncNow invalidates this key after each sync
   });
 
   const events = data?.events ?? [];

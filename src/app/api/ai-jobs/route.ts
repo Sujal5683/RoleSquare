@@ -2,6 +2,7 @@
 //   Lists AI jobs for the org, optionally filtered by type/status.
 //   Supports pagination.
 
+export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { requireOrgContext, requireRole, AuthError, authErrorResponse } from "@/lib/auth";

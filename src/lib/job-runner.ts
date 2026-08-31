@@ -233,29 +233,39 @@ async function processAiExtractionMaster(
 
   // ── Mode B: Two-step pipeline ──
   if (sourceDatasetId && targetDatasetId && targetSchemaId) {
-    // Find records already processed in target dataset
-    const doneEmails = await db.datasetRecord.findMany({
+    // Find records already processed in target dataset.
+    // We use sourceEmailId as a generic "source record ID" column:
+    //   - For Mode A (email-origin): stores the email's DB id
+    //   - For Mode B (dataset-origin): stores the source DatasetRecord id
+    // This gives us a reliable dedup key regardless of origin.
+    const doneRecords = await db.datasetRecord.findMany({
       where: { datasetId: targetDatasetId, sourceEmailId: { not: null } },
       select: { sourceEmailId: true },
     });
-    const doneEmailIds = new Set(doneEmails.map((r) => r.sourceEmailId as string));
+    const doneSourceRecordIds = new Set(doneRecords.map((r) => r.sourceEmailId as string));
 
+    // Fetch the next batch of source records that haven't been extracted yet.
+    // We over-fetch by 1 (FAN_OUT_BATCH_SIZE + 1) to know if there are more pages.
     const sourceRecords = await db.datasetRecord.findMany({
-      where: { datasetId: sourceDatasetId },
+      where: {
+        datasetId: sourceDatasetId,
+        // Skip records already present in target (using sourceRecordId stored in sourceEmailId)
+        id: { notIn: Array.from(doneSourceRecordIds) },
+      },
       select: { id: true, sourceEmailId: true },
-      take: FAN_OUT_BATCH_SIZE,
+      take: FAN_OUT_BATCH_SIZE + 1,
       orderBy: { createdAt: "asc" },
     });
-    const unprocessed = sourceRecords.filter(
-      (r) => !r.sourceEmailId || !doneEmailIds.has(r.sourceEmailId)
-    );
 
-    if (unprocessed.length === 0) {
+    const hasMore = sourceRecords.length > FAN_OUT_BATCH_SIZE;
+    const batch = sourceRecords.slice(0, FAN_OUT_BATCH_SIZE);
+
+    if (batch.length === 0) {
       return { fanOut: 0, note: "All records already processed" };
     }
 
     // Create one child job per unprocessed record via BullMQ
-    for (const record of unprocessed) {
+    for (const record of batch) {
       await enqueueJob({
         organizationId: job.organizationId,
         type: "EXTRACT_SINGLE_ROW",
@@ -272,7 +282,9 @@ async function processAiExtractionMaster(
       });
     }
 
-    if (sourceRecords.length === FAN_OUT_BATCH_SIZE) {
+    // If there are more records beyond this batch, enqueue another master job
+    // to fan-out the next batch (pagination through all source records).
+    if (hasMore) {
       await enqueueJob({
         organizationId: job.organizationId,
         type: "AI_EXTRACTION",
@@ -281,9 +293,10 @@ async function processAiExtractionMaster(
     }
 
     await agentInfo(job.id, job.organizationId, "extractor",
-      `Fan-out: queued ${unprocessed.length} EXTRACT_SINGLE_ROW jobs`, { total: unprocessed.length });
+      `Fan-out: queued ${batch.length} EXTRACT_SINGLE_ROW jobs (hasMore=${hasMore})`,
+      { total: batch.length, hasMore });
 
-    return { fanOut: unprocessed.length, hasMore: sourceRecords.length === FAN_OUT_BATCH_SIZE };
+    return { fanOut: batch.length, hasMore, deferred: true };
   }
 
   // ── Mode A: Legacy (sourceId-based) ──
@@ -317,7 +330,7 @@ async function processAiExtractionMaster(
     });
   }
 
-  return { fanOut: emails.length };
+  return { fanOut: emails.length, deferred: true };
 }
 
 // ── EXTRACT_SINGLE_ROW: Worker ────────────────────────────────────────────────
@@ -381,13 +394,15 @@ async function processSingleRowModeB(
   });
   if (!sourceRecord) throw new Error(`Source record ${sourceRecordId} not found`);
 
-  // Check if already processed (idempotency)
-  if (sourceRecord.sourceEmailId) {
-    const existing = await db.datasetRecord.findFirst({
-      where: { datasetId: targetDatasetId, sourceEmailId: sourceRecord.sourceEmailId },
-    });
-    if (existing) return { skipped: true, reason: "already_processed" };
-  }
+  // Check if already processed (idempotency).
+  // For Mode B, we use the sourceRecordId itself as the dedup key, stored in
+  // the target record's sourceEmailId column. This works even when the source
+  // record has no sourceEmailId (i.e. it came from a dataset, not an email).
+  const dedupKey = sourceRecord.sourceEmailId ?? sourceRecordId;
+  const existing = await db.datasetRecord.findFirst({
+    where: { datasetId: targetDatasetId, sourceEmailId: dedupKey },
+  });
+  if (existing) return { skipped: true, reason: "already_processed", dedupKey };
 
   // Build field name → value map
   const fieldIds = sourceRecord.values.map((v) => v.fieldId);
@@ -428,12 +443,12 @@ async function processSingleRowModeB(
           organizationId:  job.organizationId,
           maxBytes:        maxContentBytes,
         });
-        await agentInfo(job.id, job.organizationId, "extractor",
+        await agentInfo((payload.masterJobId as string) || job.id, job.organizationId, "extractor",
           `Record ${sourceRecordId}: Drive explored ${driveContent.filesRead.length} files (${driveContent.fileParts.length} uploaded to File API)`,
           { filesRead: driveContent.filesRead, failed: driveContent.failedFiles }
         );
       } catch (err) {
-        await agentWarn(job.id, job.organizationId, "extractor",
+        await agentWarn((payload.masterJobId as string) || job.id, job.organizationId, "extractor",
           `Record ${sourceRecordId}: Drive exploration failed — proceeding with text-only extraction`,
           { error: err instanceof Error ? err.message : String(err) }
         );
@@ -468,7 +483,8 @@ async function processSingleRowModeB(
   const record = await db.datasetRecord.create({
     data: {
       datasetId:     targetDatasetId,
-      sourceEmailId: sourceRecord.sourceEmailId,
+      // Store dedupKey (sourceRecordId or sourceEmailId) so re-runs skip this row.
+      sourceEmailId: dedupKey,
       status:        extractionResult.overallConfidence >= 0.7 ? "valid" : "needs_review",
       confidence:    extractionResult.overallConfidence,
     },
@@ -508,7 +524,7 @@ async function processSingleRowModeB(
   // Write AiOutput for cost tracking
   await db.aiOutput.create({
     data: {
-      jobId:            job.id,
+      jobId:            (payload.masterJobId as string) || job.id,
       modelUsed:        extractionResult.modelUsed,
       promptHash:       crypto.createHash("md5").update(sourceText.slice(0, 200)).digest("hex"),
       rawResponse:      JSON.stringify(extractionResult.fields),
@@ -521,10 +537,28 @@ async function processSingleRowModeB(
 
   if (tokens > 0) await bumpUsageMetric(job.organizationId, "ai_tokens", tokens);
 
-  await agentInfo(job.id, job.organizationId, "extractor",
+  await agentInfo((payload.masterJobId as string) || job.id, job.organizationId, "extractor",
     `Record ${sourceRecordId}: extracted ${valuesWritten} fields via ${extractionResult.modelUsed}`,
     { confidence: extractionResult.overallConfidence, tokens, costUsd, fileParts: driveContent?.fileParts.length ?? 0 }
   );
+
+  // Update master job progress.
+  // We count done vs. total in the source dataset to compute a progress %.
+  // NOTE: we do NOT auto-mark the master as 'success' here — the BullMQ worker
+  // event handler in worker.ts handles that when the master job itself finishes.
+  // Auto-marking here creates a race condition where the master appears done
+  // before all child jobs have completed.
+  if (payload.masterJobId) {
+    const totalSource = await db.datasetRecord.count({ where: { datasetId: sourceRecord.datasetId } });
+    const doneSource  = await db.datasetRecord.count({ where: { datasetId: targetDatasetId, sourceEmailId: { not: null } } });
+    if (totalSource > 0) {
+      const prog = Math.min(99, Math.round((doneSource / totalSource) * 100)); // cap at 99 — worker sets 100 on completion
+      await db.aiJob.updateMany({
+        where: { id: payload.masterJobId as string, status: { in: ["running", "queued"] } },
+        data:  { progress: prog },
+      });
+    }
+  }
 
   return { sourceRecordId, valuesWritten, tokens, modelUsed: extractionResult.modelUsed };
 }
@@ -600,7 +634,7 @@ async function processSingleRowModeA(
 
   await db.aiOutput.create({
     data: {
-      jobId:            job.id,
+      jobId:            (payload.masterJobId as string) || job.id,
       modelUsed:        extractionResult.modelUsed,
       promptHash:       crypto.createHash("md5").update(sourceText.slice(0, 200)).digest("hex"),
       rawResponse:      JSON.stringify(extractionResult.fields),

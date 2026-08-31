@@ -1,9 +1,12 @@
-// GET /api/usage — usage metrics + real AI cost breakdown for this org.
+﻿// GET /api/usage — usage metrics + real AI cost breakdown for this org.
 //
 // Returns:
 //   metrics    — UsageMetric rows (emails_scanned, ai_tokens, etc.)
 //   aiCost     — per-model cost aggregated from real AiOutput rows
 //   totalCostUsd — sum of all AiOutput.costUsd in the period
+
+
+export const dynamic = "force-dynamic";
 
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";

@@ -36,6 +36,8 @@ interface AgentLogListResponse {
 interface AgentLogsTabProps {
   /** Pre-selected job ID (from extraction runs tab context) */
   jobId?: string | null;
+  /** Set to true once the job reaches a terminal state (success/failed/dlq) to stop auto-polling */
+  isJobDone?: boolean;
 }
 
 // ── Constants ────────────────────────────────────────────────────────────────
@@ -93,7 +95,7 @@ function formatTime(iso: string) {
 
 // ── Component ────────────────────────────────────────────────────────────────
 
-export function AgentLogsTab({ jobId }: AgentLogsTabProps) {
+export function AgentLogsTab({ jobId, isJobDone = false }: AgentLogsTabProps) {
   const [agentKey, setAgentKey] = useState("all");
   const [level, setLevel] = useState("all");
   const [page, setPage] = useState(1);
@@ -111,6 +113,8 @@ export function AgentLogsTab({ jobId }: AgentLogsTabProps) {
   const { data, isLoading, refetch } = useQuery<AgentLogListResponse>({
     queryKey: ["agent-logs", agentKey, level, jobId, page],
     queryFn: () => api.get<AgentLogListResponse>(`/api/agent-logs?${params.toString()}`),
+    // Auto-refresh every 2s while a job is running; stop when it reaches a terminal state
+    refetchInterval: (jobId && !isJobDone) ? 2000 : false,
   });
 
   const logs = data?.data ?? [];

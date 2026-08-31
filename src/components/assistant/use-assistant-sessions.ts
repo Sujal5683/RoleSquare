@@ -6,51 +6,50 @@
  * Fetches the list of sessions from /api/assistant/sessions and
  * provides methods to:
  *   - Load a session's full message history for display
- *   - Delete a session (soft-delete)
- *   - Create a new session
+ *   - Delete a session (soft-delete) — optimistic update
  *
- * Sessions are refreshed on mount and whenever `refetch()` is called.
+ * Migrated to TanStack Query for:
+ *   - Automatic refetch on window focus
+ *   - Shared cache (session-sidebar + panel read the same entry)
+ *   - Optimistic delete with rollback on failure
  */
 
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useCallback } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import type { AssistantSession, AssistantSessionDetail } from "./types";
 
-// ── Hook ──────────────────────────────────────────────────────────────────
+// -- Hook --------------------------------------------------------------------
 
 export function useAssistantSessions() {
-  const [sessions, setSessions] = useState<AssistantSession[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
+  const queryClient = useQueryClient();
   const [selectedSession, setSelectedSession] = useState<AssistantSessionDetail | null>(null);
   const [isLoadingDetail, setIsLoadingDetail] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // ── List sessions ──────────────────────────────────────────────────────
+  // -- List sessions ---------------------------------------------------------
 
-  const fetchSessions = useCallback(async () => {
-    setIsLoading(true);
-    setError(null);
-    try {
+  const {
+    data: sessions = [],
+    isLoading,
+    refetch: fetchSessions,
+  } = useQuery<AssistantSession[]>({
+    queryKey: ["assistant-sessions"],
+    queryFn: async () => {
       const res = await fetch("/api/assistant/sessions");
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data: AssistantSession[] = await res.json();
-      setSessions(data);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load sessions");
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
+      return res.json();
+    },
+    // Sessions rarely change — refetch-on-focus is sufficient, no need for staleTime: 0
+    staleTime: 30_000,
+  });
 
-  useEffect(() => {
-    fetchSessions();
-  }, [fetchSessions]);
-
-  // ── Load session detail (with decrypted messages) ─────────────────────
+  // -- Load session detail (with decrypted messages) ------------------------
 
   const loadSession = useCallback(async (sessionId: string) => {
     setIsLoadingDetail(true);
+    setError(null);
     try {
       const res = await fetch(`/api/assistant/sessions/${sessionId}`);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -65,23 +64,40 @@ export function useAssistantSessions() {
     }
   }, []);
 
-  // ── Delete session ─────────────────────────────────────────────────────
+  // -- Delete session — optimistic removal ----------------------------------
 
-  const deleteSession = useCallback(async (sessionId: string) => {
-    try {
+  const { mutate: deleteSessionMutate } = useMutation({
+    mutationFn: async (sessionId: string) => {
       const res = await fetch(`/api/assistant/sessions/${sessionId}`, { method: "DELETE" });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      // Remove from local list immediately (optimistic update)
-      setSessions((prev) => prev.filter((s) => s.id !== sessionId));
-      if (selectedSession?.id === sessionId) {
-        setSelectedSession(null);
+    },
+    onMutate: async (sessionId: string) => {
+      await queryClient.cancelQueries({ queryKey: ["assistant-sessions"] });
+      const previous = queryClient.getQueryData<AssistantSession[]>(["assistant-sessions"]);
+      // Optimistically remove from list
+      queryClient.setQueryData<AssistantSession[]>(["assistant-sessions"], (old = []) =>
+        old.filter((s) => s.id !== sessionId)
+      );
+      if (selectedSession?.id === sessionId) setSelectedSession(null);
+      return { previous };
+    },
+    onError: (_err: unknown, _id: string, context: any) => {
+      if (context?.previous) {
+        queryClient.setQueryData(["assistant-sessions"], context.previous);
       }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to delete session");
-    }
-  }, [selectedSession]);
+      setError("Failed to delete session");
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ["assistant-sessions"] });
+    },
+  });
 
-  // ── Clear selected session ────────────────────────────────────────────
+  const deleteSession = useCallback(
+    (sessionId: string) => deleteSessionMutate(sessionId),
+    [deleteSessionMutate]
+  );
+
+  // -- Clear selected session -----------------------------------------------
 
   const clearSelectedSession = useCallback(() => {
     setSelectedSession(null);
@@ -99,3 +115,4 @@ export function useAssistantSessions() {
     clearSelectedSession,
   };
 }
+

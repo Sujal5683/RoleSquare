@@ -1,7 +1,10 @@
-// GET /api/organizations — list organizations the current user belongs to
+﻿// GET /api/organizations — list organizations the current user belongs to
 //   with memberCount.
 // POST /api/organizations — create a new organization (current user becomes
 //   owner).
+
+
+export const dynamic = "force-dynamic";
 
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";

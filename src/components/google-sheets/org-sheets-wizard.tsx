@@ -131,7 +131,8 @@ export function OrgSheetsWizard({
       }),
     onSuccess: (data: { spreadsheetUrl: string; tabsCreated: number }) => {
       setResultUrl(data.spreadsheetUrl);
-      queryClient.invalidateQueries({ queryKey: ["datasets"] });
+      queryClient.invalidateQueries({ queryKey: ["datasets", organizationId] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard"] });
     },
     onError: () => toast.error("Export failed — check your permissions and try again"),
   });

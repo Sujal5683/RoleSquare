@@ -1258,7 +1258,8 @@ function BillingSection() {
     refetch,
     isFetching,
   } = useQuery({
-    queryKey: ["usageTrends", activeOrgId],
+    // Unified key — must match ["usage-trends", orgId] in usage-view.tsx (was "usageTrends" camelCase typo)
+    queryKey: ["usage-trends", activeOrgId],
     queryFn: () => api.get<any>("/api/usage/trends"),
     enabled: !!activeOrgId,
   });

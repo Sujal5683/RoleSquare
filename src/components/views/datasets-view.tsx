@@ -194,6 +194,8 @@ export function DatasetsView() {
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ["datasets", activeOrgId] });
       queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+      // Schemas that reference this dataset for extraction config may need refresh
+      queryClient.invalidateQueries({ queryKey: ["schemas"] });
     },
   });
 

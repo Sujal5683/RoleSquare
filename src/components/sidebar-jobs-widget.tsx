@@ -1,12 +1,12 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api-client";
 import { useAppStore } from "@/lib/store";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import { ChevronLeft, ChevronRight, Eye, CheckCircle2, Square } from "lucide-react";
+import { ChevronLeft, ChevronRight, Eye, CheckCircle2, Square, RefreshCw, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { AnimatePresence, motion } from "framer-motion";
 import type { AiJobDTO, SourceDTO, DatasetDTO } from "@/lib/types";
@@ -17,64 +17,47 @@ interface JobListResponse {
 }
 
 export function SidebarJobsWidget() {
+  const queryClient = useQueryClient();
   const [currentIndex, setCurrentIndex] = useState(0);
   const setView = useAppStore((s) => s.setView);
   const setSidebarOpen = useAppStore((s) => s.setSidebarOpen);
+  // Use the same org ID used everywhere else so queries share the global cache
+  const orgId = useAppStore((s) => s.selectedOrganizationId);
 
-  // Fetch recent jobs and filter active ones on the client
+  // Scoped to orgId — matches extraction-runs-tab so Realtime hits the same cache entry.
   const { data, refetch } = useQuery<JobListResponse>({
-    queryKey: ["ai-jobs", "recent-widget"],
+    queryKey: ["ai-jobs", orgId],
     queryFn: () => api.get<JobListResponse>(`/api/ai-jobs?pageSize=20`),
+    enabled: !!orgId,
     refetchInterval: (query) => {
       const activeJobs = query.state.data?.data?.filter((j: any) => j.status === "running" || j.status === "queued") || [];
-      return activeJobs.length > 0 ? 2500 : false;
+      return activeJobs.length > 0 ? 1500 : false;
     },
   });
 
   const { data: sources } = useQuery({
-    queryKey: ["sources"],
+    queryKey: ["sources", orgId],
     queryFn: () => api.get<SourceDTO[]>("/api/sources"),
+    enabled: !!orgId,
   });
 
   const { data: datasets } = useQuery({
-    queryKey: ["datasets"],
+    queryKey: ["datasets", orgId],
     queryFn: () => api.get<DatasetDTO[]>("/api/datasets"),
+    enabled: !!orgId,
   });
 
-  const activeJobs = data?.data?.filter((j) => j.status === "running" || j.status === "queued") || [];
-  const hasActiveJobs = activeJobs.length > 0;
-  const processingRef = useRef(false);
-
-  useEffect(() => {
-    if (!hasActiveJobs) return;
-    
-    let isMounted = true;
-    const pokeProcessor = async () => {
-      if (!isMounted || !hasActiveJobs) return;
-      if (processingRef.current) {
-        setTimeout(pokeProcessor, 5000);
-        return;
-      }
-      
-      processingRef.current = true;
-      try {
-        await api.post("/api/jobs/process");
-      } catch (err) {
-        // ignore
-      } finally {
-        processingRef.current = false;
-        if (isMounted) {
-          setTimeout(pokeProcessor, 2000);
-        }
-      }
-    };
-
-    pokeProcessor();
-
-    return () => {
-      isMounted = false;
-    };
-  }, [hasActiveJobs]);
+  // Show running, queued, AND recently-failed jobs (last 30 min) so users can retry
+  const activeJobs = (data?.data ?? []).filter((j) => {
+    if (j.status === "running" || j.status === "queued") return true;
+    if (j.status === "failed" || j.status === "dlq") {
+      // Only show failed jobs that are recent (last 30 minutes)
+      const age = Date.now() - new Date(j.createdAt).getTime();
+      return age < 30 * 60 * 1000;
+    }
+    return false;
+  });
+  const hasActiveJobs = activeJobs.some((j) => j.status === "running" || j.status === "queued");
 
   // Ensure index is within bounds if jobs complete
   const index = Math.min(currentIndex, Math.max(0, activeJobs.length - 1));
@@ -85,10 +68,21 @@ export function SidebarJobsWidget() {
       await api.post(`/api/ai-jobs/${jobId}/cancel`);
       toast.success("Job cancelled");
       refetch();
+      queryClient.invalidateQueries({ queryKey: ["ai-jobs"] });
     } catch (err: any) {
       toast.error("Failed to cancel job", { description: err.message });
     }
   };
+
+  const retryMutation = useMutation({
+    mutationFn: (jobId: string) => api.post<AiJobDTO>(`/api/ai-jobs/${jobId}/retry`),
+    onSuccess: () => {
+      toast.success("Retrying — will continue from where it stopped");
+      refetch();
+      queryClient.invalidateQueries({ queryKey: ["ai-jobs"] });
+    },
+    onError: (err: any) => toast.error("Retry failed", { description: err.message }),
+  });
 
   const handleView = (job: AiJobDTO) => {
     if (job.type === "GMAIL_SCAN") {
@@ -158,7 +152,10 @@ export function SidebarJobsWidget() {
               )}
 
               <div className="flex items-center gap-2 mb-2 pr-12">
-                <div className="h-4 w-4 shrink-0 rounded-full border-2 border-primary border-t-transparent animate-spin" />
+                {(currentJob.status === "running" || currentJob.status === "queued")
+                  ? <div className="h-4 w-4 shrink-0 rounded-full border-2 border-primary border-t-transparent animate-spin" />
+                  : <div className="h-4 w-4 shrink-0 rounded-full border-2 border-red-400 bg-red-100 flex items-center justify-center text-red-600" style={{ fontSize: 8 }}>✕</div>
+                }
                 <div className="flex flex-col min-w-0">
                   <p className="text-xs font-semibold truncate" title={getJobName(currentJob)}>
                     {getJobName(currentJob)}
@@ -188,17 +185,35 @@ export function SidebarJobsWidget() {
                 >
                   <Eye className="h-3 w-3" /> View
                 </Button>
-                <Button 
-                  variant="destructive" 
-                  size="sm" 
-                  className="h-7 text-[10px] flex-1 gap-1.5 opacity-90 hover:opacity-100"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleStop(currentJob.id);
-                  }}
-                >
-                  <Square className="h-3 w-3 fill-current" /> Stop
-                </Button>
+                {(currentJob.status === "running" || currentJob.status === "queued") && (
+                  <Button 
+                    variant="destructive" 
+                    size="sm" 
+                    className="h-7 text-[10px] flex-1 gap-1.5 opacity-90 hover:opacity-100"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleStop(currentJob.id);
+                    }}
+                  >
+                    <Square className="h-3 w-3 fill-current" /> Stop
+                  </Button>
+                )}
+                {(currentJob.status === "failed" || currentJob.status === "dlq") && (
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="h-7 text-[10px] flex-1 gap-1.5 border-orange-300 text-orange-700 hover:bg-orange-50"
+                    disabled={retryMutation.isPending}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      retryMutation.mutate(currentJob.id);
+                    }}
+                  >
+                    {retryMutation.isPending
+                      ? <Loader2 className="h-3 w-3 animate-spin" />
+                      : <RefreshCw className="h-3 w-3" />} Retry
+                  </Button>
+                )}
               </div>
 
             </div>

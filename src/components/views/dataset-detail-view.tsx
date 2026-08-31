@@ -349,6 +349,7 @@ function FormattedFieldValue({
 export function DatasetDetailView() {
   const queryClient = useQueryClient();
   const datasetId = useAppStore((s) => s.selectedDatasetId);
+  const orgId = useAppStore((s) => s.selectedOrganizationId);
   const setView = useAppStore((s) => s.setView);
 
   const [page, setPage] = useState(1);
@@ -570,11 +571,11 @@ export function DatasetDetailView() {
     }
   });
 
-  // ── Schemas for AI extraction dialog ─────────────────────────────────
+  // -- Schemas for AI extraction dialog ------------------------------------
   const { data: schemas } = useQuery({
-    queryKey: ["schemas"],
+    queryKey: ["schemas", orgId],
     queryFn: () => api.get<SchemaDTO[]>("/api/schemas"),
-    enabled: !!dataset?.isDefault,
+    enabled: !!dataset?.isDefault && !!orgId,
   });
 
   // ── AI Extraction (Default Dataset → Custom Dataset) ─────────────────
@@ -588,8 +589,9 @@ export function DatasetDetailView() {
       toast.success("AI extraction queued", {
         description: `Job ${res.jobId.slice(0, 8)} created. Records will appear in the new dataset shortly.`,
       });
-      queryClient.invalidateQueries({ queryKey: ["datasets"] });
+      queryClient.invalidateQueries({ queryKey: ["datasets", orgId] });
       queryClient.invalidateQueries({ queryKey: ["ai-jobs"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard"] });
       setExtractDialog(false);
       setExtractSchemaId("");
       setExtractDatasetName("");
@@ -624,7 +626,7 @@ export function DatasetDetailView() {
     },
   });
 
-  // ── Record status mutation (Approve / Reject / Mark for review) ───────
+  // -- Record status mutation (Approve / Reject / Mark for review) -----------
   const statusMutation = useMutation({
     mutationFn: ({
       recordId,
@@ -637,39 +639,61 @@ export function DatasetDetailView() {
         `/api/datasets/${datasetId}/records/${recordId}`,
         { status }
       ),
-    onSuccess: (_data, vars) => {
-      const verb =
-        vars.status === "approved"
-          ? "approved"
-          : vars.status === "rejected"
-            ? "rejected"
-            : "marked for review";
-      toast.success(`Record ${verb}`);
-      queryClient.invalidateQueries({
-        queryKey: ["dataset-records", datasetId],
+    // Optimistic: flip status badge instantly in the table
+    onMutate: async ({ recordId, status }) => {
+      await queryClient.cancelQueries({ queryKey: ["dataset-records", datasetId] });
+      const previousRecords = queryClient.getQueryData(["dataset-records", datasetId]);
+      queryClient.setQueryData(["dataset-records", datasetId], (old: any) => {
+        if (!old) return old;
+        // Handle both paginated { data: [] } and flat array shapes
+        const updateRecord = (r: any) => r.id === recordId ? { ...r, status } : r;
+        if (Array.isArray(old)) return old.map(updateRecord);
+        if (old.data) return { ...old, data: old.data.map(updateRecord) };
+        return old;
       });
+      return { previousRecords };
+    },
+    onSuccess: (_data, vars) => {
+      const verb = vars.status === "approved" ? "approved" : vars.status === "rejected" ? "rejected" : "marked for review";
+      toast.success(`Record ${verb}`);
+      queryClient.invalidateQueries({ queryKey: ["dataset-records", datasetId] });
       queryClient.invalidateQueries({ queryKey: ["dashboard"] });
     },
-    onError: (err: unknown) => {
-      const msg = err instanceof Error ? err.message : "Failed to update status";
-      toast.error("Update failed", { description: msg });
+    onError: (err: unknown, _vars, context: any) => {
+      if (context?.previousRecords)
+        queryClient.setQueryData(["dataset-records", datasetId], context.previousRecords);
+      toast.error("Update failed", { description: err instanceof Error ? err.message : "Failed to update status" });
     },
   });
 
-  // ── Record deletion mutation (Bulk) ───────────────────────────────────
+  // -- Record deletion mutation (Bulk) ---------------------------------------
   const deleteMutation = useMutation({
     mutationFn: (recordIds: string[]) =>
       api.delete<{ deleted: number }>(`/api/datasets/${datasetId}/records/bulk`, { recordIds }),
+    // Optimistic: remove rows instantly from the table
+    onMutate: async (recordIds: string[]) => {
+      await queryClient.cancelQueries({ queryKey: ["dataset-records", datasetId] });
+      const previousRecords = queryClient.getQueryData(["dataset-records", datasetId]);
+      queryClient.setQueryData(["dataset-records", datasetId], (old: any) => {
+        if (!old) return old;
+        const filterRecord = (r: any) => !recordIds.includes(r.id);
+        if (Array.isArray(old)) return old.filter(filterRecord);
+        if (old.data) return { ...old, data: old.data.filter(filterRecord), total: (old.total ?? old.data.length) - recordIds.length };
+        return old;
+      });
+      setSelectedRecords(new Set());
+      return { previousRecords };
+    },
     onSuccess: (res) => {
       toast.success(`Deleted ${res.deleted} record(s)`);
-      setSelectedRecords(new Set());
       queryClient.invalidateQueries({ queryKey: ["dataset-records", datasetId] });
       queryClient.invalidateQueries({ queryKey: ["dataset", datasetId] });
       queryClient.invalidateQueries({ queryKey: ["dashboard"] });
     },
-    onError: (err: unknown) => {
-      const msg = err instanceof Error ? err.message : "Failed to delete records";
-      toast.error("Delete failed", { description: msg });
+    onError: (err: unknown, _ids, context: any) => {
+      if (context?.previousRecords)
+        queryClient.setQueryData(["dataset-records", datasetId], context.previousRecords);
+      toast.error("Delete failed", { description: err instanceof Error ? err.message : "Failed to delete records" });
     },
   });
 

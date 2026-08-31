@@ -6,9 +6,10 @@
 //   - Payload display with record IDs toggle
 
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { api } from "@/lib/api-client";
+import { useAppStore } from "@/lib/store";
 import { sanitizeSensitiveIds } from "@/lib/serialize";
 import type { AiJobDTO, AiOutputDTO, DatasetDTO, SchemaDTO } from "@/lib/types";
 import { LoadingState, EmptyState } from "@/components/ui/page-elements";
@@ -27,6 +28,8 @@ import {
   Hash,
   RefreshCw,
   Zap,
+  AlertTriangle,
+  Loader2,
 } from "lucide-react";
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -69,18 +72,21 @@ function formatTokens(n: number) {
 // ── Component ────────────────────────────────────────────────────────────────
 
 export function ExtractionRunsTab() {
+  const queryClient = useQueryClient();
+  const orgId = useAppStore((s) => s.selectedOrganizationId);
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
   const [showPayloadIds, setShowPayloadIds] = useState(false);
   const [expandedOutputId, setExpandedOutputId] = useState<string | null>(null);
   const [page] = useState(1);
 
   const { data: jobsResp, isLoading: jobsLoading, refetch: refetchJobs } = useQuery<JobListResponse>({
-    queryKey: ["ai-jobs", "AI_EXTRACTION", page],
+    queryKey: ["ai-jobs", orgId, "AI_EXTRACTION", page],
     queryFn: () =>
       api.get<JobListResponse>(`/api/ai-jobs?type=AI_EXTRACTION&page=${page}&pageSize=50`),
+    enabled: !!orgId,
     refetchInterval: (query) => {
       const active = query.state.data?.data?.filter((j: any) => j.status === "running" || j.status === "queued") || [];
-      return active.length > 0 ? 2000 : false;
+      return active.length > 0 ? 1500 : false;
     },
   });
 
@@ -92,18 +98,32 @@ export function ExtractionRunsTab() {
       api.get<OutputListResponse>(`/api/ai-jobs/${selectedJobId}/outputs`),
     enabled: !!selectedJobId,
     refetchInterval: () => {
-      return (selectedJob?.status === "running" || selectedJob?.status === "queued") ? 2000 : false;
+      return (selectedJob?.status === "running" || selectedJob?.status === "queued") ? 1500 : false;
     },
   });
 
+  // Scoped to orgId — shares the global cache with AI Studio wizard and other views
   const { data: datasets } = useQuery({
-    queryKey: ["datasets"],
+    queryKey: ["datasets", orgId],
     queryFn: () => api.get<DatasetDTO[]>("/api/datasets"),
+    enabled: !!orgId,
   });
   
   const { data: schemas } = useQuery({
-    queryKey: ["schemas"],
+    queryKey: ["schemas", orgId],
     queryFn: () => api.get<SchemaDTO[]>("/api/schemas"),
+    enabled: !!orgId,
+  });
+
+  // Retry mutation — re-queues job to BullMQ
+  const retryMutation = useMutation({
+    mutationFn: (jobId: string) => api.post<AiJobDTO>(`/api/ai-jobs/${jobId}/retry`),
+    onSuccess: () => {
+      toast.success("Extraction retrying — remaining rows will be processed");
+      refetchJobs();
+      queryClient.invalidateQueries({ queryKey: ["ai-outputs", selectedJobId] });
+    },
+    onError: (err: any) => toast.error("Retry failed", { description: err.message }),
   });
 
   const outputs = outputsResp?.data ?? [];
@@ -222,12 +242,25 @@ export function ExtractionRunsTab() {
                             await api.post(`/api/ai-jobs/${selectedJob.id}/cancel`);
                             toast.success("Job cancellation requested");
                             refetchJobs();
+                            queryClient.invalidateQueries({ queryKey: ["ai-jobs"] });
                           } catch (err: any) {
                             toast.error("Failed to cancel job", { description: err.message });
                           }
                         }}
                       >
                         Cancel Job
+                      </Button>
+                    )}
+                    {(selectedJob.status === "failed" || selectedJob.status === "dlq") && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-6 text-[10px] px-2 border-orange-300 text-orange-700 hover:bg-orange-50"
+                        disabled={retryMutation.isPending}
+                        onClick={() => retryMutation.mutate(selectedJob.id)}
+                      >
+                        {retryMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <RefreshCw className="h-3 w-3 mr-1" />}
+                        Retry
                       </Button>
                     )}
                     <span className={`text-[10px] px-2 py-0.5 rounded border ${statusColor(selectedJob.status)}`}>
@@ -253,8 +286,8 @@ export function ExtractionRunsTab() {
                   </div>
                 </div>
 
-                {/* Progress bar */}
-                {selectedJob.status === "running" && (
+                {/* Progress bar — show for running AND queued (child jobs may be in flight) */}
+                {(selectedJob.status === "running" || selectedJob.status === "queued") && (
                   <div className="space-y-1">
                     <div className="flex justify-between text-[10px] text-muted-foreground">
                       <span>Progress</span>
@@ -266,6 +299,9 @@ export function ExtractionRunsTab() {
                         style={{ width: `${selectedJob.progress}%` }}
                       />
                     </div>
+                    {selectedJob.status === "queued" && (
+                      <p className="text-[10px] text-muted-foreground">Waiting in queue…</p>
+                    )}
                   </div>
                 )}
 
@@ -409,12 +445,30 @@ export function ExtractionRunsTab() {
               </CardContent>
             </Card>
 
-            {/* Error message if failed */}
-            {selectedJob.status === "failed" && selectedJob.errorMessage && (
+            {/* Error message if failed — with retry CTA */}
+            {(selectedJob.status === "failed" || selectedJob.status === "dlq") && (
               <Card className="border-red-200 bg-red-50/50">
-                <CardContent className="pt-4">
-                  <p className="text-xs font-medium text-red-600 mb-1">Error</p>
-                  <pre className="text-[11px] font-mono text-red-700 whitespace-pre-wrap">{selectedJob.errorMessage}</pre>
+                <CardContent className="pt-4 space-y-3">
+                  <div className="flex items-start gap-2">
+                    <AlertTriangle className="h-4 w-4 text-red-500 mt-0.5 shrink-0" />
+                    <div className="flex-1">
+                      <p className="text-xs font-medium text-red-600 mb-1">Error</p>
+                      <pre className="text-[11px] font-mono text-red-700 whitespace-pre-wrap">{selectedJob.errorMessage}</pre>
+                      <p className="text-[11px] text-muted-foreground mt-2">
+                        ✓ Already-extracted rows are saved. Retry will skip them and continue from where it stopped.
+                      </p>
+                    </div>
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="border-orange-300 text-orange-700 hover:bg-orange-50 gap-1.5"
+                    disabled={retryMutation.isPending}
+                    onClick={() => retryMutation.mutate(selectedJob.id)}
+                  >
+                    {retryMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
+                    Retry — continue from where it stopped
+                  </Button>
                 </CardContent>
               </Card>
             )}

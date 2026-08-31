@@ -1,8 +1,11 @@
-// GET  /api/sharing/permissions?organizationId=... — list all DatasetAccess grants
+﻿// GET  /api/sharing/permissions?organizationId=... — list all DatasetAccess grants
 //   where this org is the owner (what we've shared out) OR the grantee (what's been shared in).
 // POST /api/sharing/permissions — directly grant access to a dataset (owner only).
 //   Body: { datasetId, granteeOrgId?, granteeUserId?, granteeEmail?, level? }
 // DELETE /api/sharing/permissions — revoke access. Body: { id }
+
+
+export const dynamic = "force-dynamic";
 
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";

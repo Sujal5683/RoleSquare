@@ -99,7 +99,7 @@ export function DashboardView() {
     queryKey: ["dashboard-activity", activeOrgId],
     queryFn: () => api.get<{ data: AuditLogDTO[] }>(`/api/audit?limit=8&organizationId=${activeOrgId}`),
     enabled: !!activeOrgId,
-    staleTime: 30_000,
+    // No staleTime override — uses global staleTime: 0 (always revalidate)
   });
 
   return (

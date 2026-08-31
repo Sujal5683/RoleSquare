@@ -8,6 +8,7 @@ import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { api } from "@/lib/api-client";
+import { useAppStore } from "@/lib/store";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
@@ -109,14 +110,19 @@ export function SyncDashboard({
   className,
 }: SyncDashboardProps) {
   const queryClient = useQueryClient();
+  const orgId = useAppStore((s) => s.selectedOrganizationId);
   const [showConflicts, setShowConflicts] = useState(false);
   const [unlinkOpen, setUnlinkOpen] = useState(false);
 
-  // Load mapping
+  // Load mapping — poll only during an active sync to avoid unnecessary Supabase/Render load
   const { data: mapping, isLoading } = useQuery<SheetMappingDTO>({
     queryKey: ["sheet-mapping", sheetMappingId],
     queryFn: () => api.get(`/api/google-sheets/mappings/${sheetMappingId}`),
-    refetchInterval: 15_000, // poll every 15 s
+    refetchInterval: (query) => {
+      const lastStatus = query.state.data?.syncState?.lastSyncStatus;
+      // Poll at 3s during an active sync; stop when idle/completed/error
+      return lastStatus === "running" ? 3000 : false;
+    },
   });
 
   // Load conflicts
@@ -134,6 +140,8 @@ export function SyncDashboard({
     onSuccess: () => {
       toast.success("Sync started");
       queryClient.invalidateQueries({ queryKey: ["sheet-mapping", sheetMappingId] });
+      // Invalidate history so the new sync event appears immediately
+      queryClient.invalidateQueries({ queryKey: ["sync-history", sheetMappingId] });
     },
     onError: () => toast.error("Failed to start sync"),
   });
@@ -167,7 +175,9 @@ export function SyncDashboard({
       api.delete(`/api/google-sheets/mappings/${sheetMappingId}`),
     onSuccess: () => {
       toast.success("Dataset unlinked from Google Sheets");
-      queryClient.invalidateQueries({ queryKey: ["datasets"] });
+      // Scope to orgId so it hits the same cache entry as datasets-view
+      queryClient.invalidateQueries({ queryKey: ["datasets", orgId] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard"] });
       onUnlinked?.();
     },
     onError: () => toast.error("Failed to unlink"),

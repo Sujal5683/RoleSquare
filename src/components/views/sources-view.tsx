@@ -152,8 +152,9 @@ export function SourcesView() {
     queryFn: () => api.get<SourceDTO[]>("/api/sources"),
     enabled: !!activeOrgId,
     refetchInterval: (query) => {
+      // Fast polling while any source has an active scan
       const activeScans = query.state.data?.filter((s: any) => s.runState !== "idle") || [];
-      return activeScans.length > 0 ? 3000 : false;
+      return activeScans.length > 0 ? 1500 : false;
     },
   });
 
@@ -165,37 +166,54 @@ export function SourcesView() {
     enabled: !!runsDialogSource,
     refetchInterval: (query) => {
       const activeRuns = query.state.data?.filter((r: any) => r.status === "running") || [];
-      return activeRuns.length > 0 ? 2000 : false;
+      return activeRuns.length > 0 ? 1500 : false;
     },
   });
 
   const scanMutation = useMutation({
     mutationFn: (id: string) =>
       api.post<SourceRunDTO>(`/api/sources/${id}/scan`, { mode: "incremental" }),
+    // Optimistic: immediately show scanning spinner on the source card
+    onMutate: async (id: string) => {
+      await queryClient.cancelQueries({ queryKey: ["sources", activeOrgId] });
+      const previousSources = queryClient.getQueryData(["sources", activeOrgId]);
+      queryClient.setQueryData(["sources", activeOrgId], (old: any) =>
+        (old || []).map((s: any) => (s.id === id ? { ...s, runState: "scanning" } : s))
+      );
+      return { previousSources };
+    },
     onSuccess: (_data, id) => {
-      toast.success("Scan triggered", {
-        description: `Incremental scan queued for source.`,
-      });
-      queryClient.invalidateQueries({ queryKey: ["sources"] });
+      toast.success("Scan triggered", { description: "Incremental scan queued for source." });
+      queryClient.invalidateQueries({ queryKey: ["sources", activeOrgId] });
       queryClient.invalidateQueries({ queryKey: ["source-runs", id] });
       queryClient.invalidateQueries({ queryKey: ["dashboard"] });
     },
-    onError: (err: unknown) => {
-      const msg = err instanceof Error ? err.message : "Failed to trigger scan";
-      toast.error("Scan failed", { description: msg });
+    onError: (err: unknown, _id, context: any) => {
+      if (context?.previousSources)
+        queryClient.setQueryData(["sources", activeOrgId], context.previousSources);
+      toast.error("Scan failed", { description: err instanceof Error ? err.message : "Failed to trigger scan" });
     },
   });
 
   const cancelScanMutation = useMutation({
-    mutationFn: (id: string) =>
-      api.post(`/api/sources/${id}/cancel-scan`),
+    mutationFn: (id: string) => api.post(`/api/sources/${id}/cancel-scan`),
+    // Optimistic: immediately show idle state
+    onMutate: async (id: string) => {
+      await queryClient.cancelQueries({ queryKey: ["sources", activeOrgId] });
+      const previousSources = queryClient.getQueryData(["sources", activeOrgId]);
+      queryClient.setQueryData(["sources", activeOrgId], (old: any) =>
+        (old || []).map((s: any) => (s.id === id ? { ...s, runState: "idle" } : s))
+      );
+      return { previousSources };
+    },
     onSuccess: () => {
       toast.success("Scan cancellation requested");
-      queryClient.invalidateQueries({ queryKey: ["sources"] });
+      queryClient.invalidateQueries({ queryKey: ["sources", activeOrgId] });
     },
-    onError: (err: unknown) => {
-      const msg = err instanceof Error ? err.message : "Failed to cancel scan";
-      toast.error("Cancellation failed", { description: msg });
+    onError: (err: unknown, _id, context: any) => {
+      if (context?.previousSources)
+        queryClient.setQueryData(["sources", activeOrgId], context.previousSources);
+      toast.error("Cancellation failed", { description: err instanceof Error ? err.message : "Failed to cancel scan" });
     },
   });
 
@@ -245,6 +263,8 @@ export function SourcesView() {
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ["sources", activeOrgId] });
       queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+      // Source-linked datasets may change (e.g. source count on dataset cards)
+      queryClient.invalidateQueries({ queryKey: ["datasets"] });
     },
   });
 
@@ -300,21 +320,29 @@ export function SourcesView() {
       if (succeeded === 0) throw new Error("All scans failed");
       return { succeeded, failed };
     },
+    // Optimistic: immediately show scanning state on selected source cards
+    onMutate: async (ids: string[]) => {
+      await queryClient.cancelQueries({ queryKey: ["sources", activeOrgId] });
+      const previousSources = queryClient.getQueryData(["sources", activeOrgId]);
+      queryClient.setQueryData(["sources", activeOrgId], (old: any) =>
+        (old || []).map((s: any) => (ids.includes(s.id) ? { ...s, runState: "scanning" } : s))
+      );
+      return { previousSources };
+    },
     onSuccess: ({ succeeded, failed }) => {
       if (failed > 0) {
-        toast.warning("Bulk scan partial", {
-          description: `${succeeded} scans queued, ${failed} failed.`,
-        });
+        toast.warning("Bulk scan partial", { description: `${succeeded} scans queued, ${failed} failed.` });
       } else {
         toast.success(`${succeeded} scans queued`);
       }
-      queryClient.invalidateQueries({ queryKey: ["sources"] });
+      queryClient.invalidateQueries({ queryKey: ["sources", activeOrgId] });
       queryClient.invalidateQueries({ queryKey: ["dashboard"] });
       setSelectedIds(new Set());
     },
-    onError: (err: unknown) => {
-      const msg = err instanceof Error ? err.message : "Bulk scan failed";
-      toast.error("Bulk scan failed", { description: msg });
+    onError: (err: unknown, _ids, context: any) => {
+      if (context?.previousSources)
+        queryClient.setQueryData(["sources", activeOrgId], context.previousSources);
+      toast.error("Bulk scan failed", { description: err instanceof Error ? err.message : "Bulk scan failed" });
     },
   });
 

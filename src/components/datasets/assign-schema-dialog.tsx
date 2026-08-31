@@ -36,14 +36,15 @@ interface AssignSchemaDialogProps {
 export function AssignSchemaDialog({ dataset, open, onOpenChange }: AssignSchemaDialogProps) {
   const queryClient = useQueryClient();
   const openSchema = useAppStore((s) => s.openSchema);
+  const orgId = useAppStore((s) => s.selectedOrganizationId);
   const [selectedSchemaId, setSelectedSchemaId] = useState<string>("");
   const [newSchemaName, setNewSchemaName] = useState<string>("");
   const [activeTab, setActiveTab] = useState<"existing" | "new">("existing");
 
   const { data: schemas, isLoading } = useQuery({
-    queryKey: ["schemas"],
+    queryKey: ["schemas", orgId],
     queryFn: () => api.get<SchemaDTO[]>("/api/schemas"),
-    enabled: open,
+    enabled: open && !!orgId,
   });
 
   const assignMutation = useMutation({

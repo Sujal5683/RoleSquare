@@ -1,10 +1,13 @@
-// GET /api/usage/trends — returns detailed usage analytics for charts:
+﻿// GET /api/usage/trends — returns detailed usage analytics for charts:
 //   - daily AI token consumption for the last 30 days
 //   - job type distribution (counts by type)
 //   - job status distribution (counts by status)
 //   - per-source extraction counts
 //   - cost breakdown by metric type
 //   - monthly summary (current vs previous month)
+
+
+export const dynamic = "force-dynamic";
 
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";

@@ -13,6 +13,7 @@ import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { api } from "@/lib/api-client";
+import { useAppStore } from "@/lib/store";
 import type { SharingRequestDTO } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -61,12 +62,15 @@ function levelBadge(level: string) {
 
 export function CrossOrgPanel() {
   const queryClient = useQueryClient();
+  const orgId = useAppStore((s) => s.selectedOrganizationId);
   const [tab, setTab] = useState<"incoming" | "outgoing">("incoming");
 
+  // No polling — cross-org share state rarely changes in real-time.
+  // The mutation onSuccess invalidates the key after each action.
   const { data, isLoading } = useQuery<CrossOrgResponse>({
-    queryKey: ["cross-org-shares"],
+    queryKey: ["cross-org-shares", orgId],
     queryFn: () => api.get<CrossOrgResponse>("/api/sharing/cross-org"),
-    refetchInterval: 15000,
+    enabled: !!orgId,
   });
 
   const actionMutation = useMutation({
@@ -79,7 +83,7 @@ export function CrossOrgPanel() {
         revoke: "Access revoked",
       };
       toast.success(labels[action] ?? "Done");
-      queryClient.invalidateQueries({ queryKey: ["cross-org-shares"] });
+      queryClient.invalidateQueries({ queryKey: ["cross-org-shares", orgId] });
     },
     onError: (err: unknown) => {
       const msg = err instanceof Error ? err.message : "Action failed";

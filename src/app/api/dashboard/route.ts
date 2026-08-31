@@ -9,6 +9,9 @@
 //   - connectionAlerts (connections with status != active OR watchExpiresAt
 //     within 2 days)
 
+// Always fetch fresh — dashboard KPIs change frequently and must not be edge-cached
+export const dynamic = "force-dynamic";
+
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { requireOrgContext, AuthError, authErrorResponse } from "@/lib/auth";

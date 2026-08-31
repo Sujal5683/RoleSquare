@@ -256,13 +256,15 @@ export function SourceBuilderView() {
   });
 
   const { data: schemas } = useQuery({
-    queryKey: ["schemas"],
+    queryKey: ["schemas", activeOrgId],
     queryFn: () => api.get<SchemaDTO[]>("/api/schemas"),
+    enabled: !!activeOrgId,
   });
 
   const { data: datasets } = useQuery({
-    queryKey: ["datasets"],
+    queryKey: ["datasets", activeOrgId],
     queryFn: () => api.get<DatasetDTO[]>("/api/datasets"),
+    enabled: !!activeOrgId,
   });
 
   const { data: existingSource, isLoading: sourceLoading } = useQuery({
@@ -346,9 +348,7 @@ export function SourceBuilderView() {
       return { previousSources };
     },
     onSuccess: () => {
-      toast.success("Source created", {
-        description: "Your new source is now active.",
-      });
+      toast.success("Source created", { description: "Your new source is now active." });
     },
     onError: (err: unknown, variables, context: any) => {
       queryClient.setQueryData(["sources", activeOrgId], context?.previousSources);
@@ -358,6 +358,8 @@ export function SourceBuilderView() {
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ["sources", activeOrgId] });
       queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+      // New source may link to a dataset — keep datasets list in sync
+      queryClient.invalidateQueries({ queryKey: ["datasets", activeOrgId] });
     }
   });
 

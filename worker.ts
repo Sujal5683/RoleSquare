@@ -110,13 +110,15 @@ async function processBullJob(bullJob: Job): Promise<void> {
     });
 
     // 3. Success → update Postgres
+    const isDeferred = result && typeof result === "object" && (result as any).deferred === true;
+
     await db.aiJob.update({
       where: { id: dbJobId },
       data: {
-        status:       "success",
-        progress:     100,
+        status:       isDeferred ? "running" : "success",
+        progress:     isDeferred ? undefined : 100,
         result:       JSON.stringify(result),
-        finishedAt:   new Date(),
+        finishedAt:   isDeferred ? null : new Date(),
         errorMessage: null,
       },
     });

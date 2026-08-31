@@ -90,10 +90,13 @@ interface UsageTrends {
 
 export function UsageView() {
   const setView = useAppStore((s) => s.setView);
+  const orgId = useAppStore((s) => s.selectedOrganizationId);
 
   const { data, isLoading, refetch, isFetching } = useQuery({
-    queryKey: ["usage-trends"],
+    // Unified key — must match ["usage-trends", orgId] used in settings-view.tsx
+    queryKey: ["usage-trends", orgId],
     queryFn: () => api.get<UsageTrends>("/api/usage/trends"),
+    enabled: !!orgId,
   });
 
   if (isLoading) {

@@ -86,6 +86,11 @@ export function InvitationsView() {
       queryClient.invalidateQueries({ queryKey: ["invitations"] });
       queryClient.invalidateQueries({ queryKey: ["organizations"] });
       queryClient.invalidateQueries({ queryKey: ["session"] });
+      // Flush entity caches — joining an org grants access to its sources/datasets/schemas
+      queryClient.invalidateQueries({ queryKey: ["sources"] });
+      queryClient.invalidateQueries({ queryKey: ["datasets"] });
+      queryClient.invalidateQueries({ queryKey: ["schemas"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard"] });
       setSelectedInvite(null);
       setTimeout(() => window.location.reload(), 800);
     },
@@ -212,6 +217,11 @@ function IncomingInvites({ onSelect, viewMode = "card" }: { onSelect: (inv: Invi
       queryClient.invalidateQueries({ queryKey: ["invitations"] });
       queryClient.invalidateQueries({ queryKey: ["organizations"] });
       queryClient.invalidateQueries({ queryKey: ["session"] });
+      // Flush entity caches — joining an org grants access to its sources/datasets/schemas
+      queryClient.invalidateQueries({ queryKey: ["sources"] });
+      queryClient.invalidateQueries({ queryKey: ["datasets"] });
+      queryClient.invalidateQueries({ queryKey: ["schemas"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard"] });
       setTimeout(() => window.location.reload(), 800);
     },
     onError: (err: unknown) => {

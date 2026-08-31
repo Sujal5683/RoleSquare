@@ -1,7 +1,10 @@
-// GET /api/sharing/requests?organizationId=... — list sharing requests
+﻿// GET /api/sharing/requests?organizationId=... — list sharing requests
 //   for org (include dataset name, requester name).
 // POST /api/sharing/requests — create a sharing request.
 //   Body: { datasetId?, level?, reason?, fieldScope?, rowFilter? }
+
+
+export const dynamic = "force-dynamic";
 
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";

@@ -53,7 +53,7 @@ export function NotificationsDropdown() {
   const { data, refetch, isFetching } = useQuery({
     queryKey: ["dashboard", activeOrgId],
     queryFn: () => api.get<DashboardData>(activeOrgId ? `/api/dashboard?organizationId=${activeOrgId}` : "/api/dashboard"),
-    staleTime: 30_000,
+    // No staleTime override \u2014 Realtime in app-shell.tsx invalidates ["dashboard"] on Source/Dataset changes
   });
 
   const notifications: Notification[] = [];

@@ -3,6 +3,7 @@
 //   Body: { name, description?, promptTemplate?, fields: [{ name, type,
 //     description?, instructions?, required?, options?, position? }] }
 
+export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { requireOrgContext, requireRole, AuthError, authErrorResponse } from "@/lib/auth";

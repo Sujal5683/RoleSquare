@@ -1,5 +1,8 @@
-// GET /api/audit?organizationId=...&entity=...&action=...&limit=...&page=...
+﻿// GET /api/audit?organizationId=...&entity=...&action=...&limit=...&page=...
 //   Lists audit logs for the org (include actor name). Paginated.
+
+
+export const dynamic = "force-dynamic";
 
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";

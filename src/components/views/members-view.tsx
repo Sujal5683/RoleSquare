@@ -347,6 +347,8 @@ export function MembersView() {
       queryClient.invalidateQueries({
         queryKey: ["organizations", activeOrgId, "members"],
       });
+      // Role changes affect accessLevel on shared datasets — refresh them
+      queryClient.invalidateQueries({ queryKey: ["datasets"] });
     }
   });
 
@@ -381,6 +383,12 @@ export function MembersView() {
       queryClient.invalidateQueries({
         queryKey: ["organizations", activeOrgId, "members"],
       });
+      // Member removal changes what sources/datasets/schemas are accessible
+      queryClient.invalidateQueries({ queryKey: ["sources"] });
+      queryClient.invalidateQueries({ queryKey: ["datasets"] });
+      queryClient.invalidateQueries({ queryKey: ["schemas"] });
+      queryClient.invalidateQueries({ queryKey: ["session"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard"] });
     }
   });
 

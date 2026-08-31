@@ -9,10 +9,33 @@ function makeQueryClient() {
   return new QueryClient({
     defaultOptions: {
       queries: {
-        staleTime: 5 * 60 * 1000, // 5 minutes stale time
-        gcTime: 24 * 60 * 60 * 1000, // 24 hours gc time
-        retry: 1,
-        refetchOnWindowFocus: false,
+        // staleTime=0 → stale-while-revalidate: cached data shows instantly,
+        // background refetch always runs. This is the correct setting for a
+        // real-time app — data is shown from cache immediately but never
+        // considered "fresh" (always revalidated in the background).
+        staleTime: 0,
+
+        // Keep unused data for 10 minutes before garbage collecting.
+        // Reduced from 24h to avoid stale records accumulating in memory.
+        gcTime: 10 * 60 * 1000,
+
+        // Always refetch when the browser window regains focus.
+        // This means switching tabs and coming back always refreshes stale data.
+        refetchOnWindowFocus: true,
+
+        // Always refetch when a component mounts (navigating to a view).
+        refetchOnMount: true,
+
+        // Reconnect refetch — useful when going offline/online
+        refetchOnReconnect: true,
+
+        // Retry failed requests up to 2 times with exponential backoff
+        retry: 2,
+        retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 10_000),
+      },
+      mutations: {
+        // Surface errors by default unless the mutation has its own onError
+        retry: 0,
       },
     },
   });

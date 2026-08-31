@@ -1,5 +1,8 @@
-// GET  /api/sharing/cross-org — returns outgoing + incoming sharing requests
+﻿// GET  /api/sharing/cross-org — returns outgoing + incoming sharing requests
 // POST /api/sharing/cross-org — create a share request or immediate grant
+
+export const dynamic = "force-dynamic";
+
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { requireOrgContext, requireRole, AuthError, authErrorResponse } from '@/lib/auth'

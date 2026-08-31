@@ -5,6 +5,7 @@
 //     { name, description?, sourceType, googleConnectionId, schemaId?,
 //       datasetId?, scheduleMode?, scheduleExpr?, config?, rules?: [{filterType, operator, value, position?}] }
 
+export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { requireOrgContext, requireRole, AuthError, authErrorResponse } from "@/lib/auth";

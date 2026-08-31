@@ -1,7 +1,10 @@
-// GET /api/google-connections?organizationId=... — list connections for org.
+﻿// GET /api/google-connections?organizationId=... — list connections for org.
 // POST /api/google-connections — returns the OAuth authorization URL.
 //   The client should navigate to the returned `authorizeUrl` to start the
 //   real Google OAuth flow (consent screen → /api/google/callback).
+
+
+export const dynamic = "force-dynamic";
 
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";

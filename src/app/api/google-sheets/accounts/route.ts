@@ -1,8 +1,11 @@
-// GET /api/google-sheets/accounts — list Sheets accounts for this org
+﻿// GET /api/google-sheets/accounts — list Sheets accounts for this org
 // Tokens are NEVER returned in the response.
 //
 // GET ?organizationId=<id>
 // Returns: GoogleSheetsAccountDTO[]
+
+
+export const dynamic = "force-dynamic";
 
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";

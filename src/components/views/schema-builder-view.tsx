@@ -503,6 +503,8 @@ export function SchemaBuilderView() {
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ["schemas", activeOrgId] });
+      // Datasets reference schemas by ID — refresh so Datasets view shows updated state
+      queryClient.invalidateQueries({ queryKey: ["datasets"] });
     },
   });
 
@@ -537,6 +539,8 @@ export function SchemaBuilderView() {
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ["schemas", activeOrgId] });
       queryClient.invalidateQueries({ queryKey: ["schema", activeSchemaId] });
+      // Dataset detail views embed schema field names inline — refresh them too
+      queryClient.invalidateQueries({ queryKey: ["datasets"] });
     },
   });
 

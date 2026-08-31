@@ -13,8 +13,47 @@
 "use client";
 
 import { useState, useCallback, useRef, useEffect } from "react";
+import { useQueryClient, type QueryClient } from "@tanstack/react-query";
 import { useAppStore } from "@/lib/store";
 import type { Message, PendingAction, ActivityEntry } from "./types";
+
+// ── Cache invalidation map ─────────────────────────────────────────────────
+// Maps assistant write tool names → TanStack Query keys that need invalidating.
+// Using broad prefix-only keys (e.g. ["schemas"]) so all scoped variants get hit.
+function invalidateAssistantCaches(
+  tool: string,
+  qc: QueryClient,
+) {
+  const schemaTools = [
+    "create_schema", "update_schema", "add_schema_field",
+    "update_schema_field", "delete_schema_field", "delete_schema",
+  ];
+  const datasetTools = ["create_dataset", "update_dataset", "delete_dataset"];
+  const sourceTools  = ["trigger_scan", "pause_source", "resume_source", "create_source"];
+  const jobTools     = ["retry_job", "cancel_job"];
+  const memberTools  = ["invite_member"];
+
+  if (schemaTools.includes(tool)) {
+    qc.invalidateQueries({ queryKey: ["schemas"] });
+    qc.invalidateQueries({ queryKey: ["dashboard"] });
+  }
+  if (datasetTools.includes(tool)) {
+    qc.invalidateQueries({ queryKey: ["datasets"] });
+    qc.invalidateQueries({ queryKey: ["dashboard"] });
+  }
+  if (sourceTools.includes(tool)) {
+    qc.invalidateQueries({ queryKey: ["sources"] });
+    qc.invalidateQueries({ queryKey: ["ai-jobs"] });
+    qc.invalidateQueries({ queryKey: ["dashboard"] });
+  }
+  if (jobTools.includes(tool)) {
+    qc.invalidateQueries({ queryKey: ["ai-jobs"] });
+  }
+  if (memberTools.includes(tool)) {
+    qc.invalidateQueries({ queryKey: ["organizations"] });
+    qc.invalidateQueries({ queryKey: ["session"] });
+  }
+}
 
 // ── Welcome message ───────────────────────────────────────────────────────
 
@@ -54,6 +93,7 @@ export const STARTER_PROMPTS = [
 // ── Hook ──────────────────────────────────────────────────────────────────
 
 export function useAssistantChat(initialSessionId?: string) {
+  const queryClient = useQueryClient();
   // Start with an empty message list — the panel renders the welcome card separately
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -320,6 +360,9 @@ export function useAssistantChat(initialSessionId?: string) {
           };
           setActivityLog((prev) => [entry, ...prev].slice(0, 50));
         }
+
+        // Bust TanStack Query cache so other tabs see the change immediately
+        invalidateAssistantCaches(action.tool, queryClient);
       } catch (err) {
         setMessages((prev) => [
           ...prev,
@@ -410,6 +453,19 @@ export function useAssistantChat(initialSessionId?: string) {
             timestamp: Date.now(),
           },
         ]);
+
+        // Bust cache so reverted state is visible immediately in other tabs
+        // The undo token encodes the original tool name — parse it for targeted invalidation
+        try {
+          const payload = JSON.parse(atob(undoToken));
+          if (payload?.tool) invalidateAssistantCaches(payload.tool, queryClient);
+        } catch {
+          // If parsing fails, do a broad flush of the most common entities
+          queryClient.invalidateQueries({ queryKey: ["schemas"] });
+          queryClient.invalidateQueries({ queryKey: ["datasets"] });
+          queryClient.invalidateQueries({ queryKey: ["sources"] });
+          queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+        }
       } catch (err) {
         setMessages((prev) => [
           ...prev,

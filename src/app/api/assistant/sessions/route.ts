@@ -1,4 +1,4 @@
-/**
+﻿/**
  * GET  /api/assistant/sessions
  *   Returns the current user's assistant sessions from the last 7 days,
  *   ordered by most recently updated. Expired and deleted sessions are excluded.
@@ -11,6 +11,9 @@
  * SECURITY: All queries are filtered by both userId AND organizationId.
  * A user can never see sessions from another user or another org.
  */
+
+
+export const dynamic = "force-dynamic";
 
 import { NextRequest, NextResponse } from "next/server";
 import { requireRole, AuthError, authErrorResponse } from "@/lib/auth";

@@ -14,6 +14,7 @@ import {
   CartesianGrid,
 } from "recharts";
 import { api } from "@/lib/api-client";
+import { useAppStore } from "@/lib/store";
 import type {
   AiJobDTO,
   AiOutputDTO,
@@ -139,6 +140,7 @@ const SAMPLE_TEXT =
 
 export function AiStudioView() {
   const [tab, setTab] = useState("wizard");
+  const orgId = useAppStore((s) => s.selectedOrganizationId);
 
   return (
     <div className="space-y-4">
@@ -168,7 +170,7 @@ export function AiStudioView() {
           <ExtractionWizard />
         </TabsContent>
         <TabsContent value="sandbox" className="mt-4">
-          <TestSandboxTab />
+          <TestSandboxTab orgId={orgId} />
         </TabsContent>
         <TabsContent value="insights" className="mt-4">
           <InsightsTab />
@@ -213,17 +215,18 @@ function InsightsTab() {
   );
 }
 
-// ── Test Sandbox tab ─────────────────────────────────────────────────────
+// -- Test Sandbox tab ---------------------------------------------------------
 
-function TestSandboxTab() {
+function TestSandboxTab({ orgId }: { orgId: string | null }) {
   const [schemaId, setSchemaId] = useState<string>("");
   const [sourceText, setSourceText] = useState<string>(SAMPLE_TEXT);
   const [hoveredEvidence, setHoveredEvidence] = useState<string | null>(null);
 
-  // Schemas list
+  // Scoped to orgId — shares the global cache with Schema Builder and other views
   const { data: schemas } = useQuery({
-    queryKey: ["schemas"],
+    queryKey: ["schemas", orgId],
     queryFn: () => api.get<SchemaDTO[]>("/api/schemas"),
+    enabled: !!orgId,
   });
 
   // Default to the first schema when none selected.

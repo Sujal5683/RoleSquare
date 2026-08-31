@@ -103,7 +103,8 @@ export function GoogleSheetsAccountSelector({
       api.delete(`/api/google-sheets/accounts/${accountId}`),
     onSuccess: () => {
       toast.success("Google Sheets account disconnected");
-      queryClient.invalidateQueries({ queryKey: ["sheets-accounts"] });
+      // Match the query key on line 85 — must include selectedOrganizationId
+      queryClient.invalidateQueries({ queryKey: ["sheets-accounts", selectedOrganizationId] });
     },
     onError: () => toast.error("Failed to disconnect account"),
   });

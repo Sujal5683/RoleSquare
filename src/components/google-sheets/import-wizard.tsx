@@ -236,7 +236,8 @@ export function ImportWizard({
     setStep(0);
     setImportJobId(null);
     if (isDone) {
-      queryClient.invalidateQueries({ queryKey: ["datasets"] });
+      queryClient.invalidateQueries({ queryKey: ["datasets", selectedOrganizationId] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard"] });
       onSuccess?.(importJobId!);
     }
   };

@@ -157,6 +157,106 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       .finally(() => setSessionLoading(false));
   }, [setActiveOrgId]);
 
+  // ── Supabase Realtime: push-based cache invalidation for ALL major tables ────
+  //
+  // When ANY row in these tables changes (from the UI, a BullMQ worker, or a
+  // background API call), Supabase pushes the change to the browser via WebSocket.
+  // We immediately invalidate the relevant React Query caches so every component
+  // re-fetches fresh data without waiting for the next poll cycle.
+  //
+  // Table → Query keys invalidated (bare prefix keys bust all org-scoped variants):
+  //   AiJob        → ["ai-jobs"] prefix → hits ["ai-jobs", orgId], ["ai-job", id]
+  //   Source       → ["sources", orgId]
+  //   SourceRun    → ["source-runs", sourceId], ["sources", orgId]
+  //   Dataset      → ["datasets", orgId], ["dashboard", orgId]
+  //   DatasetRecord→ ["dataset-records", datasetId]  (debounced 300ms)
+  //   Schema       → ["schemas", orgId]
+  useEffect(() => {
+    if (!activeOrgId) return;
+
+    // Debounce timer for DatasetRecord batch writes (extraction writes 500+ rows)
+    let recordsDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const channel = supabase
+      .channel(`realtime-all-${activeOrgId}`)
+
+      // ── AiJob changes ───────────────────────────────────────────────────────
+      .on("postgres_changes", {
+        event: "*", schema: "public", table: "AiJob",
+        filter: `organizationId=eq.${activeOrgId}`,
+      }, (payload) => {
+        queryClient.invalidateQueries({ queryKey: ["ai-jobs"] });
+        const id = (payload.new as any)?.id ?? (payload.old as any)?.id;
+        if (id) queryClient.invalidateQueries({ queryKey: ["ai-job", id] });
+      })
+
+      // ── Source changes ──────────────────────────────────────────────────────
+      .on("postgres_changes", {
+        event: "*", schema: "public", table: "Source",
+        filter: `organizationId=eq.${activeOrgId}`,
+      }, () => {
+        queryClient.invalidateQueries({ queryKey: ["sources", activeOrgId] });
+      })
+
+      // ── SourceRun changes ───────────────────────────────────────────────────
+      .on("postgres_changes", {
+        event: "*", schema: "public", table: "SourceRun",
+      }, (payload) => {
+        const sourceId = (payload.new as any)?.sourceId ?? (payload.old as any)?.sourceId;
+        if (sourceId) queryClient.invalidateQueries({ queryKey: ["source-runs", sourceId] });
+        // Also refresh source cards (they show lastRunAt, runState)
+        queryClient.invalidateQueries({ queryKey: ["sources", activeOrgId] });
+      })
+
+      // ── Dataset changes ─────────────────────────────────────────────────────
+      .on("postgres_changes", {
+        event: "*", schema: "public", table: "Dataset",
+        filter: `organizationId=eq.${activeOrgId}`,
+      }, (payload) => {
+        queryClient.invalidateQueries({ queryKey: ["datasets", activeOrgId] });
+        const id = (payload.new as any)?.id ?? (payload.old as any)?.id;
+        if (id) queryClient.invalidateQueries({ queryKey: ["dataset", id] });
+        queryClient.invalidateQueries({ queryKey: ["dashboard", activeOrgId] });
+      })
+
+      // ── DatasetRecord changes (debounced) ───────────────────────────────────
+      // Extraction writes 500+ records — debounce to avoid flooding React Query
+      // with 500 invalidations; we coalesce them into one refetch after 300ms.
+      .on("postgres_changes", {
+        event: "*", schema: "public", table: "DatasetRecord",
+      }, (payload) => {
+        const datasetId = (payload.new as any)?.datasetId ?? (payload.old as any)?.datasetId;
+        if (!datasetId) return;
+
+        if (recordsDebounceTimer) clearTimeout(recordsDebounceTimer);
+        recordsDebounceTimer = setTimeout(() => {
+          queryClient.invalidateQueries({ queryKey: ["dataset-records", datasetId] });
+          // Dataset metadata (record count, lastUpdated) also changes
+          queryClient.invalidateQueries({ queryKey: ["dataset", datasetId] });
+          recordsDebounceTimer = null;
+        }, 300);
+      })
+
+      // ── Schema changes ──────────────────────────────────────────────────────
+      .on("postgres_changes", {
+        event: "*", schema: "public", table: "Schema",
+        filter: `organizationId=eq.${activeOrgId}`,
+      }, (payload) => {
+        queryClient.invalidateQueries({ queryKey: ["schemas", activeOrgId] });
+        const id = (payload.new as any)?.id ?? (payload.old as any)?.id;
+        if (id) queryClient.invalidateQueries({ queryKey: ["schema", id] });
+      })
+
+      .subscribe();
+
+    return () => {
+      if (recordsDebounceTimer) clearTimeout(recordsDebounceTimer);
+      supabase.removeChannel(channel);
+    };
+  }, [activeOrgId, queryClient, supabase]);
+
+
+
   async function handleSignOut() {
     // 1. Wipe the in-memory React Query cache so no sensitive data lingers
     queryClient.clear();

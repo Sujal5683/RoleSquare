@@ -1,11 +1,15 @@
-// POST /api/ai-jobs/[id]/retry — reset job status to queued, increment
-//   attempts, clear errorMessage.
+// POST /api/ai-jobs/[id]/retry — reset job to queued AND re-push to BullMQ/Redis.
+//
+// CRITICAL: The BullMQ worker only picks up jobs from Redis, NOT from Postgres.
+// Simply setting status="queued" in Postgres is not enough — we must also call
+// jobQueue.add() so the worker actually processes the job again.
 
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { requireOrgContext, AuthError, authErrorResponse , requireRole} from "@/lib/auth";
+import { requireOrgContext, AuthError, authErrorResponse, requireRole } from "@/lib/auth";
 import { logAudit } from "@/lib/audit";
 import { serializeAiJob } from "@/lib/serialize";
+import { jobQueue } from "@/lib/queue";
 
 export async function POST(
   req: NextRequest,
@@ -34,26 +38,53 @@ export async function POST(
       );
     }
 
+    // Parse original payload
+    let payload: Record<string, unknown> = {};
+    try { payload = JSON.parse(existing.payload as string || "{}"); } catch { /* ignore */ }
+
+    // 1. Update DB row back to queued state
     const job = await db.aiJob.update({
       where: { id },
       data: {
-        status: "queued",
-        attempts: { increment: 1 },
+        status:       "queued",
+        attempts:     { increment: 1 },
         errorMessage: null,
-        progress: 0,
-        startedAt: null,
-        finishedAt: null,
+        progress:     0,
+        startedAt:    null,
+        finishedAt:   null,
       },
     });
+
+    // 2. Re-push to BullMQ/Redis so the worker actually picks it up.
+    //    Use the existing job's DB id as the BullMQ job id (same convention as enqueueJob).
+    try {
+      await jobQueue.add(
+        existing.type,
+        {
+          ...payload,
+          _dbJobId:        id,
+          _organizationId: organizationId,
+          _userId:         user.id,
+        },
+        {
+          jobId:    id,    // reuse same id so BullMQ deduplicates if already queued
+          attempts: 5,
+          backoff:  { type: "exponential", delay: 2000 },
+        }
+      );
+    } catch (redisErr) {
+      // Redis unavailable — the job is queued in Postgres but won't run until Redis recovers.
+      console.warn(`[retry] Redis unavailable for job ${id}:`, redisErr instanceof Error ? redisErr.message : redisErr);
+    }
 
     await logAudit({
       organizationId,
       actorId: user.id,
-      action: "update",
-      entity: "job",
+      action:  "update",
+      entity:  "job",
       entityId: id,
       before: { status: existing.status, attempts: existing.attempts },
-      after: { status: "queued", attempts: job.attempts },
+      after:  { status: "queued", attempts: job.attempts },
       reason: "retry",
     });
 

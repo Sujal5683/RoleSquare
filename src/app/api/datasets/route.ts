@@ -3,6 +3,7 @@
 // POST /api/datasets — create a dataset.
 //   Body: { name, description?, schemaId? }
 
+export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { requireOrgContext, requireRole, AuthError, authErrorResponse } from "@/lib/auth";

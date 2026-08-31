@@ -17,7 +17,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Progress } from "@/components/ui/progress";
 import { LoadingState, EmptyState, ErrorState } from "@/components/ui/page-elements";
 import { StatusBadge } from "@/components/ui/status-badge";
-import { ArrowRight, CheckCircle2, Database, FileJson, Sparkles, Workflow, Layers, Loader2, Play, Link2, Info, Bot } from "lucide-react";
+import { ArrowRight, CheckCircle2, Database, FileJson, Sparkles, Workflow, Layers, Loader2, Play, Link2, Info, Bot, RefreshCw, AlertTriangle } from "lucide-react";
 import { useAppStore } from "@/lib/store";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { AiStudioSkeleton } from "@/components/ui/skeletons/ai-studio-skeleton";
@@ -35,6 +35,7 @@ export function ExtractionWizard() {
   const queryClient = useQueryClient();
   const setView = useAppStore((s) => s.setView);
   const openDataset = useAppStore((s) => s.openDataset);
+  const orgId = useAppStore((s) => s.selectedOrganizationId);
 
   const [step, setStep] = useState<number>(1);
   const [sourceDatasetId, setSourceDatasetId] = useState("");
@@ -47,24 +48,40 @@ export function ExtractionWizard() {
   const [exploreDriveLinks, setExploreDriveLinks] = useState(true);
   const [jobId, setJobId] = useState<string | null>(null);
 
-  // Queries
+  // Queries — scoped to orgId so they share the global cache with other views
   const { data: datasets, isLoading: datasetsLoading } = useQuery({
-    queryKey: ["datasets"],
+    queryKey: ["datasets", orgId],
     queryFn: () => api.get<DatasetDTO[]>("/api/datasets"),
+    enabled: !!orgId,
   });
   
   const { data: schemas, isLoading: schemasLoading } = useQuery({
-    queryKey: ["schemas"],
+    queryKey: ["schemas", orgId],
     queryFn: () => api.get<SchemaDTO[]>("/api/schemas"),
+    enabled: !!orgId,
   });
 
-  const { data: jobStatus } = useQuery({
+  const { data: jobStatus, refetch: refetchJob } = useQuery({
     queryKey: ["ai-job", jobId],
     queryFn: () => api.get<AiJobDTO>(`/api/ai-jobs/${jobId}`),
     enabled: !!jobId && step === 5,
     refetchInterval: (query) => {
       const status = query.state.data?.status;
-      return (status === "success" || status === "failed") ? false : 3000;
+      // Fast polling (1.5s) while active; stop on terminal states
+      return (status === "success" || status === "failed" || status === "dlq") ? false : 1500;
+    },
+  });
+
+  // Retry failed job — re-queues to BullMQ and resets poll
+  const retryMutation = useMutation({
+    mutationFn: (jId: string) => api.post<AiJobDTO>(`/api/ai-jobs/${jId}/retry`),
+    onSuccess: () => {
+      toast.success("Extraction retrying — remaining rows will be processed");
+      refetchJob();
+      queryClient.invalidateQueries({ queryKey: ["ai-jobs"] });
+    },
+    onError: (err: any) => {
+      toast.error("Retry failed", { description: err.message });
     },
   });
 
@@ -428,30 +445,85 @@ export function ExtractionWizard() {
             </div>
           </CardHeader>
           <CardContent className="p-6 space-y-6">
-            <div className="space-y-2">
-              <div className="flex justify-between text-sm font-medium">
-                <span>Overall Progress</span>
-                <span className="tabular-nums">{jobStatus?.progress ?? 0}%</span>
-              </div>
-              <Progress value={jobStatus?.progress ?? 0} className="h-2" />
-              {jobStatus?.status === "running" && (
-                <p className="text-xs text-muted-foreground animate-pulse flex items-center gap-1.5">
-                  <Loader2 className="h-3 w-3 animate-spin" /> Agents are analyzing records...
-                </p>
-              )}
-            </div>
 
-            <div className="rounded-md border bg-muted text-foreground font-mono text-[11px] p-3 h-48 overflow-y-auto">
-              <LiveLogs jobId={jobId} isJobFinished={jobStatus?.status === "success" || jobStatus?.status === "failed"} />
-            </div>
-
-            {(jobStatus?.status === "success" || jobStatus?.status === "failed") && (
-              <div className="flex justify-end pt-4">
-                <Button onClick={handleFinish}>
-                  View Output Dataset <ArrowRight className="ml-2 h-4 w-4" />
+            {/* Failed state */}
+            {(jobStatus?.status === "failed" || jobStatus?.status === "dlq") && (
+              <div className="rounded-lg border border-red-200 bg-red-50/60 dark:bg-red-950/20 p-4 space-y-3">
+                <div className="flex items-start gap-2">
+                  <AlertTriangle className="h-4 w-4 text-red-500 mt-0.5 shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-red-700 dark:text-red-400">Extraction stopped</p>
+                    <p className="text-xs text-red-600/80 dark:text-red-400/70 mt-0.5">
+                      {jobStatus?.errorMessage || "An error occurred during extraction."}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      ✓ Already-extracted rows are saved. Retry will skip them and continue from where it stopped.
+                    </p>
+                  </div>
+                </div>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="border-red-300 hover:bg-red-100 text-red-700 gap-1.5"
+                  disabled={retryMutation.isPending}
+                  onClick={() => jobId && retryMutation.mutate(jobId)}
+                >
+                  {retryMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
+                  Retry from where it stopped
                 </Button>
               </div>
             )}
+
+            {/* Progress bar (shown for running and queued) */}
+            {(jobStatus?.status === "running" || jobStatus?.status === "queued" || jobStatus?.status === "success") && (
+              <div className="space-y-2">
+                <div className="flex justify-between text-sm font-medium">
+                  <span>Overall Progress</span>
+                  <span className="tabular-nums">{jobStatus?.progress ?? 0}%</span>
+                </div>
+                <Progress value={jobStatus?.progress ?? 0} className="h-2" />
+                {jobStatus?.status === "running" && (
+                  <p className="text-xs text-muted-foreground animate-pulse flex items-center gap-1.5">
+                    <Loader2 className="h-3 w-3 animate-spin" /> Agents are analyzing records...
+                  </p>
+                )}
+                {jobStatus?.status === "queued" && (
+                  <p className="text-xs text-muted-foreground flex items-center gap-1.5">
+                    <Loader2 className="h-3 w-3 animate-spin" /> Waiting in queue...
+                  </p>
+                )}
+              </div>
+            )}
+
+            <div className="rounded-md border bg-muted text-foreground font-mono text-[11px] p-3 h-48 overflow-y-auto">
+              <LiveLogs jobId={jobId} isJobFinished={jobStatus?.status === "success" || jobStatus?.status === "failed" || jobStatus?.status === "dlq"} />
+            </div>
+
+            {/* Bottom actions */}
+            <div className="flex items-center justify-between pt-2">
+              {/* Left: Retry button (always visible when failed) */}
+              <div>
+                {(jobStatus?.status === "failed" || jobStatus?.status === "dlq") && (
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    className="gap-1.5"
+                    disabled={retryMutation.isPending}
+                    onClick={() => jobId && retryMutation.mutate(jobId)}
+                  >
+                    {retryMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
+                    Retry
+                  </Button>
+                )}
+              </div>
+              {/* Right: View dataset when done */}
+              {(jobStatus?.status === "success" || jobStatus?.status === "failed") && (
+                <Button onClick={handleFinish}>
+                  View Output Dataset <ArrowRight className="ml-2 h-4 w-4" />
+                </Button>
+              )}
+            </div>
+
           </CardContent>
         </Card>
       )}
@@ -464,7 +536,8 @@ function LiveLogs({ jobId, isJobFinished }: { jobId: string | null, isJobFinishe
     queryKey: ["agent-logs", jobId],
     queryFn: () => api.get<{ data: AgentLogDTO[] }>(`/api/agent-logs?jobId=${jobId}&pageSize=50`),
     enabled: !!jobId,
-    refetchInterval: isJobFinished ? false : 3000,
+    // 1500ms matches the rest of the app — was 3000ms before
+    refetchInterval: isJobFinished ? false : 1500,
   });
 
   if (!data?.data?.length) return <span className="text-muted-foreground/50">Waiting for logs...</span>;

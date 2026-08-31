@@ -9,13 +9,15 @@ const globalForPrisma = globalThis as unknown as {
 let databaseUrl = process.env.DATABASE_URL;
 if (databaseUrl && databaseUrl.includes("pooler.supabase.com") && !databaseUrl.includes("pgbouncer=true")) {
   databaseUrl += databaseUrl.includes("?") ? "&pgbouncer=true" : "?pgbouncer=true";
+  // Mutate process.env directly so the Prisma engine picks up the flag on init.
+  // Passing it via `datasources: { db: { url } }` ignores engine-level flags like pgbouncer.
+  process.env.DATABASE_URL = databaseUrl;
 }
 
 export const db =
   globalForPrisma.prisma ??
   new PrismaClient({
     log: ["error", "warn"],
-    ...(databaseUrl ? { datasources: { db: { url: databaseUrl } } } : {}),
   });
 
 if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = db;

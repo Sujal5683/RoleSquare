@@ -64,7 +64,9 @@ export function ModelCostTab() {
   const { data, isLoading } = useQuery<UsageResponse>({
     queryKey: ["usage-detailed"],
     queryFn: () => api.get<UsageResponse>("/api/usage"),
-    refetchInterval: 30000,
+    // Usage data only changes after job completion — Realtime handles those invalidations.
+    // 5-min safety-net poll as a fallback; no unconditional 30s hammering.
+    refetchInterval: 5 * 60 * 1000,
   });
 
   if (isLoading) return <LoadingState rows={6} />;

@@ -245,6 +245,10 @@ export function OrganizationsView() {
       queryClient.invalidateQueries({ queryKey: ["organizations"] });
       queryClient.invalidateQueries({ queryKey: ["session"] });
       queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+      // Deleting an org makes all its sources/datasets/schemas inaccessible—flush them
+      queryClient.invalidateQueries({ queryKey: ["sources"] });
+      queryClient.invalidateQueries({ queryKey: ["datasets"] });
+      queryClient.invalidateQueries({ queryKey: ["schemas"] });
     },
   });
 

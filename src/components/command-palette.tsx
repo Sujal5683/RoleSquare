@@ -113,7 +113,7 @@ export function CommandPalette() {
     queryFn: () =>
       api.get<SearchResults>(`/api/search?q=${encodeURIComponent(debouncedQuery)}&limit=5`),
     enabled: debouncedQuery.length >= 2,
-    staleTime: 10_000,
+    // No staleTime override — global staleTime: 0 is appropriate for search results
   });
 
   // Global keyboard shortcut: Cmd+K / Ctrl+K

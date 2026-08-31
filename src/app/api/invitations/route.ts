@@ -1,5 +1,8 @@
-// GET /api/invitations — list pending invitations for the current user's email.
+﻿// GET /api/invitations — list pending invitations for the current user's email.
 // Also accepts ?organizationId=... to list invitations for a specific org (manager+ only).
+
+
+export const dynamic = "force-dynamic";
 
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";

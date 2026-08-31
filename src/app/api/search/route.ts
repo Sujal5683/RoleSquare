@@ -1,6 +1,9 @@
-// GET /api/search?q=<query> — global search across sources, datasets,
+﻿// GET /api/search?q=<query> — global search across sources, datasets,
 // schemas, and records. Returns a grouped result set so the frontend
 // can render them by category in the command palette or a search page.
+
+
+export const dynamic = "force-dynamic";
 
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";

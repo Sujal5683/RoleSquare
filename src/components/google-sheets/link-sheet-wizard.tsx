@@ -164,8 +164,9 @@ export function LinkSheetWizard({
       }),
     onSuccess: (data: { sheetMappingId: string }) => {
       toast.success(`"${dataset.name}" linked to Google Sheets`);
-      queryClient.invalidateQueries({ queryKey: ["datasets"] });
+      queryClient.invalidateQueries({ queryKey: ["datasets", selectedOrganizationId] });
       queryClient.invalidateQueries({ queryKey: ["sheet-mappings"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard"] });
       onSuccess?.(data.sheetMappingId);
       onOpenChange(false);
       setStep(0);
