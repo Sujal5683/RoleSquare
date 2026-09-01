@@ -17,6 +17,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { createClient } from "@/lib/supabase/server";
 import { cookies } from "next/headers";
+import { cache } from "react";
 
 export type Role = "owner" | "admin" | "manager" | "member" | "viewer";
 
@@ -67,10 +68,19 @@ export interface SessionUser {
  * Returns the mock session user (alice@acme.io) with all organization
  * memberships. Only memberships with status="active" are included in the
  * `organizations` convenience array.
+ *
+ * Wrapped with React's `cache()` so this is called AT MOST ONCE per
+ * server request/edge invocation — all downstream helpers (requireOrgContext,
+ * requireRole, etc.) share the same resolved value within a single request.
  */
-export async function getCurrentUser(skip2FA = false): Promise<SessionUser> {
+export const getCurrentUser = cache(async function _getCurrentUser(
+  skip2FA = false
+): Promise<SessionUser> {
   const supabase = await createClient();
-  const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
+  const {
+    data: { user: authUser },
+    error: authError,
+  } = await supabase.auth.getUser();
 
   if (authError || !authUser?.email) {
     throw new AuthError("Unauthorized", 401);
@@ -94,6 +104,11 @@ export async function getCurrentUser(skip2FA = false): Promise<SessionUser> {
     status: m.status,
   }));
 
+  // Build a map once — O(N) — instead of calling .find() O(N) times per membership
+  const orgMap = new Map(
+    user.organizations.map((m) => [m.organizationId, m.organization])
+  );
+
   return {
     id: user.id,
     email: user.email,
@@ -106,27 +121,23 @@ export async function getCurrentUser(skip2FA = false): Promise<SessionUser> {
     memberships,
     organizations: memberships
       .filter((m) => m.status === "active")
-      .map((m) => ({
-        id: m.organizationId,
-        name: user.organizations.find((om) => om.organizationId === m.organizationId)!
-          .organization.name,
-        slug: user.organizations.find((om) => om.organizationId === m.organizationId)!
-          .organization.slug,
-        plan: user.organizations.find((om) => om.organizationId === m.organizationId)!
-          .organization.plan,
-        retentionEmails: user.organizations.find((om) => om.organizationId === m.organizationId)!
-          .organization.retentionEmails,
-        retentionDocs: user.organizations.find((om) => om.organizationId === m.organizationId)!
-          .organization.retentionDocs,
-        retentionAuditLogs: user.organizations.find((om) => om.organizationId === m.organizationId)!
-          .organization.retentionAuditLogs,
-        exportFileExpiry: user.organizations.find((om) => om.organizationId === m.organizationId)!
-          .organization.exportFileExpiry,
-        role: m.role,
-        status: m.status,
-      })),
+      .map((m) => {
+        const org = orgMap.get(m.organizationId)!;
+        return {
+          id: m.organizationId,
+          name: org.name,
+          slug: org.slug,
+          plan: org.plan,
+          retentionEmails: org.retentionEmails,
+          retentionDocs: org.retentionDocs,
+          retentionAuditLogs: org.retentionAuditLogs,
+          exportFileExpiry: org.exportFileExpiry,
+          role: m.role,
+          status: m.status,
+        };
+      }),
   };
-}
+});
 
 /**
  * Finds the User row for a given email. If it doesn't exist (first login),
@@ -141,24 +152,37 @@ async function getOrCreateUser(
   email: string,
   metadata: Record<string, unknown> = {}
 ) {
-  const existing = await db.user.findFirst({
+  // Use findUnique (not findFirst) — email has a unique index, so Postgres
+  // can use the index directly without a sequential scan.
+  const existing = await db.user.findUnique({
     where: { email },
     include: { organizations: { include: { organization: true } } },
   });
   if (existing) return existing;
 
   // --- First login: provision user + org ---
-  const name = (metadata.full_name as string) || (metadata.name as string) || email.split("@")[0];
+  const name =
+    (metadata.full_name as string) ||
+    (metadata.name as string) ||
+    email.split("@")[0];
   const avatarUrl = (metadata.avatar_url as string) || null;
 
   // Derive org slug from the email domain (or username if personal)
   const [localPart, domain] = email.split("@");
-  const orgName = domain && !["gmail.com", "outlook.com", "yahoo.com", "hotmail.com"].includes(domain)
-    ? domain.split(".")[0].charAt(0).toUpperCase() + domain.split(".")[0].slice(1)
-    : `${localPart}'s Workspace`;
-  const baseSlug = orgName.toLowerCase().replace(/[^a-z0-9]/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "");
+  const orgName =
+    domain &&
+    !["gmail.com", "outlook.com", "yahoo.com", "hotmail.com"].includes(domain)
+      ? domain.split(".")[0].charAt(0).toUpperCase() +
+        domain.split(".")[0].slice(1)
+      : `${localPart}'s Workspace`;
+  const baseSlug = orgName
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "");
 
-  // Ensure slug uniqueness
+  // Ensure slug uniqueness — single import, reused below
+  const { randomUUID } = await import("crypto");
   let slug = baseSlug;
   let attempt = 0;
   while (await db.organization.findUnique({ where: { slug } })) {
@@ -167,16 +191,22 @@ async function getOrCreateUser(
   }
 
   // Transactionally create user + org + member
-  const userId = (await import("crypto")).randomUUID();
-  const orgId = (await import("crypto")).randomUUID();
-  const memberId = (await import("crypto")).randomUUID();
+  const userId = randomUUID();
+  const orgId = randomUUID();
+  const memberId = randomUUID();
 
   const newUser = await db.$transaction(async (tx) => {
     const user = await tx.user.create({
       data: { id: userId, email, name, avatarUrl, role: "user" },
     });
     const org = await tx.organization.create({
-      data: { id: orgId, name: orgName, slug, createdBy: userId, billingUserId: userId },
+      data: {
+        id: orgId,
+        name: orgName,
+        slug,
+        createdBy: userId,
+        billingUserId: userId,
+      },
     });
     await tx.organizationMember.create({
       data: {
@@ -216,7 +246,9 @@ export async function getCurrentOrgId(
 ): Promise<{ organizationId: string; error?: NextResponse }> {
   const user = await getCurrentUser();
   const url = new URL(req.url);
-  const explicit = url.searchParams.get("organizationId") || req.headers.get("x-organization-id");
+  const explicit =
+    url.searchParams.get("organizationId") ||
+    req.headers.get("x-organization-id");
 
   if (explicit) {
     const membership = user.memberships.find(
@@ -476,17 +508,15 @@ export async function verifyDatasetAccess(
     return LEVEL_WEIGHT[orgLevel] >= LEVEL_WEIGHT[requiredLevel];
   }
 
-  // Otherwise, check for an active DatasetAccess grant
+  // Otherwise, check for an active DatasetAccess grant.
+  // Run both org-level and user-level checks in parallel.
   const access = await db.datasetAccess.findFirst({
     where: {
       datasetId: dataset.id,
       status: "active",
       isPaused: false,
-      OR: [
-        { granteeOrgId: organizationId },
-        { granteeUserId: userId }
-      ]
-    }
+      OR: [{ granteeOrgId: organizationId }, { granteeUserId: userId }],
+    },
   });
 
   if (!access) return false;

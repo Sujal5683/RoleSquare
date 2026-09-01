@@ -65,28 +65,23 @@ const Legend = RechartsLegend as any;
 
 
 import { AuditTimeline } from "./audit-timeline";
+import { useActiveOrg } from "@/hooks/use-active-org";
 
 type ExtendedDashboardData = DashboardData & {
   chartData: Array<{ date: string; records: number; jobs: number }>;
 };
 
 export function DashboardView() {
-  const selectedOrgId = useAppStore((s) => s.selectedOrganizationId);
   const setView = useAppStore((s) => s.setView);
   const openDataset = useAppStore((s) => s.openDataset);
   const openSource = useAppStore((s) => s.openSource);
   const openSchema = useAppStore((s) => s.openSchema);
   const recentItems = useAppStore((s) => s.recentItems);
-  
+
+  // Reads from Zustand store — no extra API call needed.
+  const activeOrgId = useActiveOrg();
+
   const [dateRange, setDateRange] = useState("7d");
-
-  const { data: session } = useQuery({
-    queryKey: ["session"],
-    queryFn: () => api.get<{ organizations: Array<{ id: string }> }>("/api/session"),
-  });
-
-  const isValidSelectedOrg = session?.organizations?.some(o => o.id === selectedOrgId);
-  const activeOrgId = (selectedOrgId && isValidSelectedOrg) ? selectedOrgId : session?.organizations?.[0]?.id ?? null;
 
   const { data, isLoading, refetch, isFetching } = useQuery({
     queryKey: ["dashboard", activeOrgId, dateRange],

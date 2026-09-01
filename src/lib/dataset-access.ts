@@ -43,17 +43,29 @@ export async function resolveDatasetAccess(
     return { allowed: true, level: "owner", isOwner: true };
   }
 
-  // 2. Check org-level DatasetAccess grant
-  const orgAccess = await db.datasetAccess.findFirst({
-    where: {
-      datasetId,
-      granteeOrgId: orgId,
-      status: "active",
-      isPaused: false,
-    },
-    select: { id: true, level: true },
-  });
+  // 2 & 3. Check org-level and user-level grants in parallel
+  const [orgAccess, userAccess] = await Promise.all([
+    db.datasetAccess.findFirst({
+      where: {
+        datasetId,
+        granteeOrgId: orgId,
+        status: "active",
+        isPaused: false,
+      },
+      select: { id: true, level: true },
+    }),
+    db.datasetAccess.findFirst({
+      where: {
+        datasetId,
+        granteeUserId: userId,
+        status: "active",
+        isPaused: false,
+      },
+      select: { id: true, level: true },
+    }),
+  ]);
 
+  // Org grant takes precedence over user grant
   if (orgAccess) {
     return {
       allowed: true,
@@ -62,17 +74,6 @@ export async function resolveDatasetAccess(
       accessId: orgAccess.id,
     };
   }
-
-  // 3. Check user-level DatasetAccess grant
-  const userAccess = await db.datasetAccess.findFirst({
-    where: {
-      datasetId,
-      granteeUserId: userId,
-      status: "active",
-      isPaused: false,
-    },
-    select: { id: true, level: true },
-  });
 
   if (userAccess) {
     return {
@@ -102,24 +103,23 @@ export async function getAccessibleDatasetIds(
     ownerOrgId: string;
   }>;
 }> {
-  // Owned datasets
-  const ownedDatasets = await db.dataset.findMany({
-    where: { organizationId: orgId },
-    select: { id: true },
-  });
+  // Run all three queries in parallel — they are independent
+  const [ownedDatasets, orgGrants, userGrants] = await Promise.all([
+    db.dataset.findMany({
+      where: { organizationId: orgId },
+      select: { id: true },
+    }),
+    db.datasetAccess.findMany({
+      where: { granteeOrgId: orgId, status: "active", isPaused: false },
+      select: { id: true, datasetId: true, level: true, ownerOrgId: true },
+    }),
+    db.datasetAccess.findMany({
+      where: { granteeUserId: userId, status: "active", isPaused: false },
+      select: { id: true, datasetId: true, level: true, ownerOrgId: true },
+    }),
+  ]);
+
   const ownedIds = ownedDatasets.map((d) => d.id);
-
-  // Granted via org
-  const orgGrants = await db.datasetAccess.findMany({
-    where: { granteeOrgId: orgId, status: "active", isPaused: false },
-    select: { id: true, datasetId: true, level: true, ownerOrgId: true },
-  });
-
-  // Granted via user
-  const userGrants = await db.datasetAccess.findMany({
-    where: { granteeUserId: userId, status: "active", isPaused: false },
-    select: { id: true, datasetId: true, level: true, ownerOrgId: true },
-  });
 
   // Merge, deduplicate (org grant takes precedence if both exist)
   const sharedMap = new Map<
@@ -143,4 +143,40 @@ export async function getAccessibleDatasetIds(
     sharedAccesses: Array.from(sharedMap.values()),
   };
 }
-export async function verifyDatasetWriteAccess(datasetId: string, userId: string, orgId: string): Promise<boolean> { const dataset = await db.dataset.findUnique({ where: { id: datasetId }, select: { organizationId: true } }); if (!dataset) return false; if (dataset.organizationId === orgId) { const member = await db.organizationMember.findFirst({ where: { organizationId: orgId, userId, status: 'active' } }); if (!member) return false; return ['owner', 'admin', 'manager', 'member'].includes(member.role); } const access = await db.datasetAccess.findFirst({ where: { datasetId, status: 'active', isPaused: false, OR: [{ granteeOrgId: orgId }, { granteeUserId: userId }] } }); if (!access) return false; return ['edit', 'owner'].includes(access.level); }
+
+/**
+ * Verifies that a user has write access to a dataset.
+ * Uses parallel queries to minimize latency.
+ */
+export async function verifyDatasetWriteAccess(
+  datasetId: string,
+  userId: string,
+  orgId: string
+): Promise<boolean> {
+  const dataset = await db.dataset.findUnique({
+    where: { id: datasetId },
+    select: { organizationId: true },
+  });
+  if (!dataset) return false;
+
+  if (dataset.organizationId === orgId) {
+    const member = await db.organizationMember.findFirst({
+      where: { organizationId: orgId, userId, status: "active" },
+      select: { role: true },
+    });
+    if (!member) return false;
+    return ["owner", "admin", "manager", "member"].includes(member.role);
+  }
+
+  const access = await db.datasetAccess.findFirst({
+    where: {
+      datasetId,
+      status: "active",
+      isPaused: false,
+      OR: [{ granteeOrgId: orgId }, { granteeUserId: userId }],
+    },
+    select: { level: true },
+  });
+  if (!access) return false;
+  return ["edit", "owner"].includes(access.level);
+}

@@ -106,9 +106,12 @@ export async function processJob(job: {
 
   if (job.userId) {
     const { checkUserLimits } = await import("@/lib/usage");
-    await checkUserLimits(job.userId, "jobs");
-    await checkUserLimits(job.userId, "tokens");
-    await checkUserLimits(job.userId, "records");
+    // Run all three limit checks in parallel — they are independent DB queries.
+    await Promise.all([
+      checkUserLimits(job.userId, "jobs"),
+      checkUserLimits(job.userId, "tokens"),
+      checkUserLimits(job.userId, "records"),
+    ]);
   }
 
   const payload = JSON.parse(job.payload || "{}");

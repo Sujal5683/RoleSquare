@@ -1,13 +1,13 @@
-import { useQuery } from "@tanstack/react-query";
-import { api } from "@/lib/api-client";
 import { useAppStore } from "@/lib/store";
 
-export function useActiveOrg() {
-  const selectedOrgId = useAppStore((s) => s.selectedOrganizationId);
-  const { data: session } = useQuery({
-    queryKey: ["session"],
-    queryFn: () => api.get<{ organizations: Array<{ id: string }> }>("/api/session"),
-  });
-  const isValidSelectedOrg = session?.organizations?.some((o) => o.id === selectedOrgId);
-  return (selectedOrgId && isValidSelectedOrg) ? selectedOrgId : session?.organizations?.[0]?.id ?? null;
+/**
+ * Returns the active organization ID for the current user.
+ *
+ * Reads directly from the Zustand in-memory store — no useQuery(["session"])
+ * needed here. The session is loaded once in app-shell.tsx which sets
+ * selectedOrganizationId via setActiveOrgId. All views that depend on the
+ * org ID should use this hook, which is zero-cost after app-shell initializes.
+ */
+export function useActiveOrg(): string | null {
+  return useAppStore((s) => s.selectedOrganizationId);
 }

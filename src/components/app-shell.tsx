@@ -7,6 +7,10 @@ import { useAppStore, type SessionUser } from "@/lib/store";
 import { api } from "@/lib/api-client";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
+
+// Module-level Supabase client singleton — avoids creating a new instance
+// on every render of AppShell.
+const supabase = createClient();
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
@@ -108,7 +112,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const setDesktopSidebarOpen = useAppStore((s) => s.setDesktopSidebarOpen);
 
   const router = useRouter();
-  const supabase = createClient();
 
   const [session, setSession] = useState<SessionUser | null>(null);
   const [sessionLoading, setSessionLoading] = useState(true);

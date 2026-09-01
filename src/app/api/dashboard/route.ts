@@ -24,6 +24,7 @@ import {
   serializeGoogleConnection,
   serializeSourceRun,
   serializeUsageMetric,
+  serializeSharingRequest,
 } from "@/lib/serialize";
 import type { DashboardData } from "@/lib/types";
 
@@ -53,19 +54,27 @@ export async function GET(req: NextRequest) {
       recordsExtracted,
       schemaFields,
       recentRecords,
-      recentJobs
+      recentJobs,
     ] = await Promise.all([
       db.googleConnection.count({ where: { organizationId } }),
       db.source.count({ where: { organizationId, status: "active" } }),
-      db.datasetRecord.count({ where: { dataset: { organizationId }, status: "needs_review" } }),
-      db.aiJob.count({ where: { organizationId, status: { in: ["queued", "running"] } } }),
-      db.aiJob.count({ where: { organizationId, status: { in: ["failed", "dlq"] } } }),
+      db.datasetRecord.count({
+        where: { dataset: { organizationId }, status: "needs_review" },
+      }),
+      db.aiJob.count({
+        where: { organizationId, status: { in: ["queued", "running"] } },
+      }),
+      db.aiJob.count({
+        where: { organizationId, status: { in: ["failed", "dlq"] } },
+      }),
       db.sourceRun.findMany({
         take: 6,
         orderBy: { startedAt: "desc" },
         where: { source: { organizationId } },
         include: { source: { select: { id: true, name: true } } },
       }),
+      // Include schema fields inline (via schemaFields global fetch) so we can
+      // enrich review queue records without a separate per-record query.
       db.datasetRecord.findMany({
         take: 10,
         orderBy: { updatedAt: "desc" },
@@ -102,24 +111,31 @@ export async function GET(req: NextRequest) {
           OR: [
             { targetOrganizationId: organizationId },
             { targetUserId: user.id },
-            { targetEmail: user.email }
-          ]
+            { targetEmail: user.email },
+          ],
         },
-        include: { dataset: { select: { id: true, name: true } }, requester: { select: { id: true, name: true, email: true } } }
+        include: {
+          dataset: { select: { id: true, name: true } },
+          requester: { select: { id: true, name: true, email: true } },
+        },
       }),
       db.auditLog.findMany({
         where: {
           entity: "member",
           entityId: { in: user.memberships.map((m: any) => m.id) },
           action: "update",
-          createdAt: { gte: new Date(Date.now() - 30 * 86400_000) }
+          createdAt: { gte: new Date(Date.now() - 30 * 86400_000) },
         },
         orderBy: { createdAt: "desc" },
         take: 20,
-        include: { actor: { select: { id: true, name: true, email: true } }, organization: { select: { id: true, name: true } } }
+        include: {
+          actor: { select: { id: true, name: true, email: true } },
+          organization: { select: { id: true, name: true } },
+        },
       }),
       db.datasetRecord.count({ where: { dataset: { organizationId } } }),
       db.schemaField.findMany({ where: { schema: { organizationId } } }),
+      // Only select createdAt — we only need the date for chart grouping.
       db.datasetRecord.findMany({
         where: { dataset: { organizationId }, createdAt: { gte: rangeAgo } },
         select: { createdAt: true },
@@ -127,16 +143,18 @@ export async function GET(req: NextRequest) {
       db.aiJob.findMany({
         where: { organizationId, createdAt: { gte: rangeAgo } },
         select: { createdAt: true },
-      })
+      }),
     ]);
+
     const fieldsMap = fieldsByIdMap(schemaFields);
     const reviewQueueEnriched = attachFieldsToRecords(reviewQueueRaw, fieldsMap);
 
-    const { serializeSharingRequest } = await import("@/lib/serialize");
-
     // Group by date string (YYYY-MM-DD)
-    const chartDataMap = new Map<string, { date: string, records: number, jobs: number }>();
-    
+    const chartDataMap = new Map<
+      string,
+      { date: string; records: number; jobs: number }
+    >();
+
     // Initialize map with range days
     for (let i = rangeDays - 1; i >= 0; i--) {
       const d = new Date(Date.now() - i * 24 * 60 * 60 * 1000);
@@ -187,7 +205,7 @@ export async function GET(req: NextRequest) {
       connectionAlerts: connectionAlertsRaw.map(serializeGoogleConnection),
       pendingSharingRequests: pendingRequestsRaw.map(serializeSharingRequest),
       roleChangeAlerts: roleChangeAlertsRaw
-        .map(log => {
+        .map((log) => {
           try {
             const before = log.before ? JSON.parse(log.before) : {};
             const after = log.after ? JSON.parse(log.after) : {};
@@ -196,10 +214,11 @@ export async function GET(req: NextRequest) {
                 id: log.id,
                 organizationId: log.organizationId,
                 organizationName: log.organization.name,
-                actorName: log.actor?.name || log.actor?.email || "System",
+                actorName:
+                  log.actor?.name || log.actor?.email || "System",
                 oldRole: before.role,
                 newRole: after.role,
-                createdAt: log.createdAt.toISOString()
+                createdAt: log.createdAt.toISOString(),
               };
             }
           } catch (e) {}

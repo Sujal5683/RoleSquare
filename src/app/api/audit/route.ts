@@ -1,4 +1,4 @@
-﻿// GET /api/audit?organizationId=...&entity=...&action=...&limit=...&page=...
+// GET /api/audit?organizationId=...&entity=...&action=...&limit=...&page=...
 //   Lists audit logs for the org (include actor name). Paginated.
 
 
@@ -34,7 +34,7 @@ export async function GET(req: NextRequest) {
       db.auditLog.count({ where }),
       db.auditLog.findMany({
         where,
-        include: { actor: true },
+        include: { actor: { select: { id: true, name: true, email: true } } },
         orderBy: { createdAt: "desc" },
         skip: (page - 1) * pageSize,
         take: pageSize,

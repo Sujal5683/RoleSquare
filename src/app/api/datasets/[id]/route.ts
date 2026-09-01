@@ -10,13 +10,27 @@ import { serializeDataset } from "@/lib/serialize";
 
 import { verifyDatasetAccess } from "@/lib/auth";
 
-async function requireDataset(id: string, organizationId: string, userId: string, requiredLevel: "read" | "comment" | "edit" | "owner" = "read") {
+async function requireDataset(
+  id: string,
+  organizationId: string,
+  userId: string,
+  requiredLevel: "read" | "comment" | "edit" | "owner" = "read"
+) {
   const d = await db.dataset.findUnique({
     where: { id },
     include: {
       schema: { include: { fields: { orderBy: { position: "asc" } } } },
       columnDefs: { orderBy: { position: "asc" } },
       sources: { select: { id: true } },
+      // Include owner org name and active access grants so GET doesn't need
+      // extra round-trips to fetch them.
+      organization: { select: { name: true } },
+      datasetAccesses: {
+        where: { status: "active", isPaused: false },
+        select: { level: true, granteeOrgId: true, granteeUserId: true },
+        orderBy: { level: "desc" },
+        take: 5,
+      },
     },
   });
   if (!d) return null;
@@ -45,7 +59,6 @@ export async function GET(
 
     if (dataset.organizationId === organizationId) {
       // If they belong to the org, map their org role to an access level.
-      // Owner/Admin/Manager -> owner or edit. Let's just say owner.
       if (["owner", "admin", "manager"].includes(membership.role)) {
         accessLevel = "owner";
       } else if (membership.role === "member") {
@@ -54,23 +67,15 @@ export async function GET(
         accessLevel = "read"; // viewer
       }
     } else {
-      // It's a shared dataset
+      // It's a shared dataset — use pre-fetched org name and access grants
+      // (no extra DB queries needed)
       isShared = true;
-      const ownerOrg = await db.organization.findUnique({ where: { id: dataset.organizationId }});
-      ownerOrgName = ownerOrg?.name;
-      
-      const access = await db.datasetAccess.findFirst({
-        where: {
-          datasetId: dataset.id,
-          status: "active",
-          isPaused: false,
-          OR: [
-            { granteeOrgId: organizationId },
-            { granteeUserId: user.id }
-          ]
-        },
-        orderBy: { level: 'desc' }
-      });
+      ownerOrgName = (dataset as any).organization?.name;
+
+      const access = (dataset as any).datasetAccesses?.find(
+        (a: any) =>
+          a.granteeOrgId === organizationId || a.granteeUserId === user.id
+      );
       if (access) {
         accessLevel = access.level;
       }

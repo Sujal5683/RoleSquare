@@ -152,9 +152,10 @@ export function SourcesView() {
     queryFn: () => api.get<SourceDTO[]>("/api/sources"),
     enabled: !!activeOrgId,
     refetchInterval: (query) => {
-      // Fast polling while any source has an active scan
+      // Supabase Realtime already pushes Source/SourceRun changes; poll as a
+      // safety net at 5s rather than 1.5s to avoid unnecessary server load.
       const activeScans = query.state.data?.filter((s: any) => s.runState !== "idle") || [];
-      return activeScans.length > 0 ? 1500 : false;
+      return activeScans.length > 0 ? 5000 : false;
     },
   });
 
@@ -166,7 +167,7 @@ export function SourcesView() {
     enabled: !!runsDialogSource,
     refetchInterval: (query) => {
       const activeRuns = query.state.data?.filter((r: any) => r.status === "running") || [];
-      return activeRuns.length > 0 ? 1500 : false;
+      return activeRuns.length > 0 ? 5000 : false;
     },
   });
 

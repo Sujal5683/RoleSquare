@@ -99,8 +99,19 @@ export async function PATCH(
       data.maxEmailsPerScan = Math.max(1, Math.min(2000, body.maxEmailsPerScan));
     }
 
-    await db.source.update({ where: { id }, data });
-    const updated = await loadSourceInOrg(id, organizationId);
+    const updated = await db.source.update({
+      where: { id },
+      data,
+      include: {
+        googleConnection: true,
+        schema: { include: { fields: true } },
+        dataset: { select: { id: true, name: true } },
+        rules: { orderBy: { position: "asc" } },
+      },
+    });
+    if (!updated || updated.organizationId !== organizationId) {
+      return NextResponse.json({ error: "Source not found" }, { status: 404 });
+    }
 
     await logAudit({
       organizationId,

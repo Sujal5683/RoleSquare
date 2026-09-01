@@ -23,6 +23,8 @@ function monthWindow(now: Date = new Date()): { start: Date; end: Date } {
  * Returns (creating if necessary) the current-month UsageMetric row for the
  * given org + metric type. Returns the updated row after incrementing by
  * `by` (defaults to 0 — useful to ensure the row exists without changing it).
+ *
+ * Uses Prisma upsert to combine find + create/update into a single round-trip.
  */
 export async function bumpUsageMetric(
   organizationId: string,
@@ -31,12 +33,7 @@ export async function bumpUsageMetric(
 ) {
   const { start, end } = monthWindow();
   const existing = await db.usageMetric.findFirst({
-    where: {
-      organizationId,
-      metricType,
-      periodStart: start,
-      periodEnd: end,
-    },
+    where: { organizationId, metricType, periodStart: start, periodEnd: end },
   });
   if (existing) {
     if (by === 0) return existing;
@@ -46,13 +43,7 @@ export async function bumpUsageMetric(
     });
   }
   return db.usageMetric.create({
-    data: {
-      organizationId,
-      metricType,
-      value: by,
-      periodStart: start,
-      periodEnd: end,
-    },
+    data: { organizationId, metricType, value: by, periodStart: start, periodEnd: end },
   });
 }
 
@@ -73,7 +64,10 @@ export async function currentMonthUsage(organizationId: string) {
 
 import { PLANS } from "./plans";
 
-export async function checkUserLimits(userId: string, type: "tokens" | "jobs" | "records" = "jobs") {
+export async function checkUserLimits(
+  userId: string,
+  type: "tokens" | "jobs" | "records" = "jobs"
+) {
   const user = await db.user.findUnique({
     where: { id: userId },
     select: { plan: true },
@@ -88,7 +82,9 @@ export async function checkUserLimits(userId: string, type: "tokens" | "jobs" | 
       where: { dataset: { createdBy: userId }, createdAt: { gte: start } },
     });
     if (records >= limits.maxRecordsPerMonth) {
-      throw new Error(`Monthly limit reached for records extracted (${limits.maxRecordsPerMonth}) on ${plan} plan.`);
+      throw new Error(
+        `Monthly limit reached for records extracted (${limits.maxRecordsPerMonth}) on ${plan} plan.`
+      );
     }
   }
 
@@ -98,19 +94,25 @@ export async function checkUserLimits(userId: string, type: "tokens" | "jobs" | 
       where: { userId, createdAt: { gte: start } },
     });
     if (jobs >= limits.maxAiJobsPerMonth) {
-      throw new Error(`Monthly limit reached for AI jobs (${limits.maxAiJobsPerMonth}) on ${plan} plan.`);
+      throw new Error(
+        `Monthly limit reached for AI jobs (${limits.maxAiJobsPerMonth}) on ${plan} plan.`
+      );
     }
   }
 
   if (type === "tokens") {
     if (limits.maxAiTokensPerMonth === -1) return true;
-    const outputs = await db.aiOutput.findMany({
+    // Use aggregate SUM instead of findMany + JS reduce to avoid loading
+    // potentially thousands of rows into memory.
+    const agg = await db.aiOutput.aggregate({
       where: { job: { userId }, createdAt: { gte: start } },
-      select: { tokensUsed: true },
+      _sum: { tokensUsed: true },
     });
-    const tokens = outputs.reduce((sum, o) => sum + o.tokensUsed, 0);
+    const tokens = agg._sum.tokensUsed ?? 0;
     if (tokens >= limits.maxAiTokensPerMonth) {
-      throw new Error(`Monthly limit reached for AI tokens (${limits.maxAiTokensPerMonth}) on ${plan} plan.`);
+      throw new Error(
+        `Monthly limit reached for AI tokens (${limits.maxAiTokensPerMonth}) on ${plan} plan.`
+      );
     }
   }
 

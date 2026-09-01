@@ -64,9 +64,12 @@ export async function POST(req: NextRequest) {
 
     try {
       const { checkUserLimits } = await import("@/lib/usage");
-      await checkUserLimits(user.id, "jobs");
-      await checkUserLimits(user.id, "tokens");
-      await checkUserLimits(user.id, "records");
+      // Run all three limit checks in parallel — they are independent queries.
+      await Promise.all([
+        checkUserLimits(user.id, "jobs"),
+        checkUserLimits(user.id, "tokens"),
+        checkUserLimits(user.id, "records"),
+      ]);
     } catch (limitErr) {
       return NextResponse.json(
         { error: limitErr instanceof Error ? limitErr.message : "Usage limit exceeded" },

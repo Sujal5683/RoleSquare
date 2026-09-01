@@ -1,6 +1,5 @@
 // API client helpers — all calls go through Next.js API routes (no direct
-// access to backend services from the browser, per the plan's guardrails).
-//
+// access to backend services from the browser, per the plan's guardrails).\n//
 // On 401 Unauthorized responses, the client automatically redirects to /login
 // to prompt re-authentication.
 //
@@ -9,6 +8,8 @@
 //     indefinitely on institutional/public Wi-Fi that drops long-lived TCP connections.
 //   - Automatic retry (up to 3 times) for TypeError network failures (ECONNRESET,
 //     "Failed to fetch", iOS "Load failed") with exponential backoff.
+//   - Non-idempotent mutations (POST/PATCH/PUT/DELETE) are NOT retried to prevent
+//     duplicate side effects.
 
 import { withRetry } from "@/lib/with-retry";
 
@@ -36,19 +37,36 @@ interface RequestOptions extends Omit<RequestInit, "signal"> {
   timeoutMs?: number;
 }
 
+/**
+ * Returns the active organization ID from Zustand's in-memory store.
+ * Avoids the previous approach of `localStorage.getItem + JSON.parse` on every
+ * request, which triggered a full parse of the serialized store each time.
+ */
+function getStoredOrgId(): string | null {
+  if (typeof window === "undefined") return null;
+  try {
+    // Import inline to avoid circular dependencies — this module is loaded before
+    // the store module in some bundler orderings.
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const { useAppStore } = require("@/lib/store");
+    return useAppStore.getState().selectedOrganizationId ?? null;
+  } catch {
+    // Final fallback: parse localStorage (same as before, only reached on error)
+    try {
+      const storeStr = localStorage.getItem("wip-app-store");
+      if (storeStr) {
+        return JSON.parse(storeStr)?.state?.selectedOrganizationId ?? null;
+      }
+    } catch {}
+    return null;
+  }
+}
+
 async function request<T>(
   url: string,
   options?: RequestOptions
 ): Promise<T> {
-  let orgId = null;
-  if (typeof window !== "undefined") {
-    try {
-      const storeStr = localStorage.getItem("wip-app-store");
-      if (storeStr) {
-        orgId = JSON.parse(storeStr)?.state?.selectedOrganizationId;
-      }
-    } catch {}
-  }
+  const orgId = getStoredOrgId();
 
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
@@ -60,63 +78,90 @@ async function request<T>(
   }
 
   const { timeoutMs = DEFAULT_TIMEOUT_MS, ...fetchOptions } = options ?? {};
+  const method = (fetchOptions.method ?? "GET").toUpperCase();
+  // Only retry idempotent methods (GET, HEAD) — retrying mutations can cause
+  // duplicate side effects (double-creation, double-billing, etc.).
+  const isIdempotent = method === "GET" || method === "HEAD";
 
-  // Wrap in withRetry so network-level drops (TCP reset, firewall kill, etc.)
-  // are retried automatically with exponential backoff before surfacing an error.
-  return withRetry(
-    async () => {
-      const controller = new AbortController();
-      const timerId = setTimeout(() => controller.abort(new Error(`Request timed out after ${timeoutMs}ms`)), timeoutMs);
+  const doFetch = async (): Promise<T> => {
+    const controller = new AbortController();
+    const timerId = setTimeout(
+      () => controller.abort(new Error(`Request timed out after ${timeoutMs}ms`)),
+      timeoutMs
+    );
 
-      try {
-        const res = await fetch(url, {
-          ...fetchOptions,
-          headers,
-          signal: controller.signal,
-        });
-        const text = await res.text();
-        const data = text ? JSON.parse(text) : null;
+    try {
+      const res = await fetch(url, {
+        ...fetchOptions,
+        headers,
+        signal: controller.signal,
+      });
+      const text = await res.text();
+      const data = text ? JSON.parse(text) : null;
 
-        if (!res.ok) {
-          // On 401, the session has expired or is missing — redirect to login
-          // On 403 with 2FA_REQUIRED, the user needs to complete 2FA — redirect to login
-          const isUnauthorized = res.status === 401;
-          const is2FaRequired = res.status === 403 && data?.error === "2FA_REQUIRED";
+      if (!res.ok) {
+        // On 401, the session has expired or is missing — redirect to login.
+        // On 403 with 2FA_REQUIRED, the user needs to complete 2FA.
+        const isUnauthorized = res.status === 401;
+        const is2FaRequired =
+          res.status === 403 && data?.error === "2FA_REQUIRED";
 
-          if ((isUnauthorized || is2FaRequired) && typeof window !== "undefined") {
-            const loginUrl = new URL("/login", window.location.origin);
-            loginUrl.searchParams.set("next", window.location.pathname);
-            window.location.href = loginUrl.toString();
-            // Reject the promise so the component doesn't process stale state
-            return Promise.reject(new ApiError("Redirecting to login...", res.status));
-          }
-          throw new ApiError(
-            data?.error || `Request failed (${res.status})`,
-            res.status,
-            data
-          );
+        if ((isUnauthorized || is2FaRequired) && typeof window !== "undefined") {
+          const loginUrl = new URL("/login", window.location.origin);
+          loginUrl.searchParams.set("next", window.location.pathname);
+          window.location.href = loginUrl.toString();
+          // Reject so components don't process stale state
+          return Promise.reject(new ApiError("Redirecting to login...", res.status));
         }
-        return data as T;
-      } finally {
-        clearTimeout(timerId);
+        throw new ApiError(
+          data?.error || `Request failed (${res.status})`,
+          res.status,
+          data
+        );
       }
-    },
-    {
+      return data as T;
+    } finally {
+      clearTimeout(timerId);
+    }
+  };
+
+  if (isIdempotent) {
+    // Wrap GETs in withRetry so network-level drops are retried automatically.
+    return withRetry(doFetch, {
       maxAttempts: 4,
       baseDelayMs: 300,
       label: url,
-    }
-  );
+    });
+  }
+
+  // Non-idempotent methods: single attempt, no retry.
+  return doFetch();
 }
 
 export const api = {
   get: <T>(url: string, opts?: RequestOptions) => request<T>(url, opts),
   post: <T>(url: string, body?: unknown, opts?: RequestOptions) =>
-    request<T>(url, { method: "POST", body: body ? JSON.stringify(body) : undefined, ...opts }),
+    request<T>(url, {
+      method: "POST",
+      body: body ? JSON.stringify(body) : undefined,
+      ...opts,
+    }),
   patch: <T>(url: string, body?: unknown, opts?: RequestOptions) =>
-    request<T>(url, { method: "PATCH", body: body ? JSON.stringify(body) : undefined, ...opts }),
+    request<T>(url, {
+      method: "PATCH",
+      body: body ? JSON.stringify(body) : undefined,
+      ...opts,
+    }),
   put: <T>(url: string, body?: unknown, opts?: RequestOptions) =>
-    request<T>(url, { method: "PUT", body: body ? JSON.stringify(body) : undefined, ...opts }),
+    request<T>(url, {
+      method: "PUT",
+      body: body ? JSON.stringify(body) : undefined,
+      ...opts,
+    }),
   delete: <T>(url: string, body?: unknown, opts?: RequestOptions) =>
-    request<T>(url, { method: "DELETE", body: body ? JSON.stringify(body) : undefined, ...opts }),
+    request<T>(url, {
+      method: "DELETE",
+      body: body ? JSON.stringify(body) : undefined,
+      ...opts,
+    }),
 };

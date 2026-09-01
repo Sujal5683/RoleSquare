@@ -31,7 +31,9 @@ export function SidebarJobsWidget() {
     enabled: !!orgId,
     refetchInterval: (query) => {
       const activeJobs = query.state.data?.data?.filter((j: any) => j.status === "running" || j.status === "queued") || [];
-      return activeJobs.length > 0 ? 1500 : false;
+      // Supabase Realtime already pushes AiJob changes; poll as a safety net
+      // at 5s rather than 1.5s to avoid unnecessary server load.
+      return activeJobs.length > 0 ? 5000 : false;
     },
   });
 
