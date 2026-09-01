@@ -18,11 +18,11 @@
 //   }>
 // }
 
-import { NextRequest, NextResponse, after } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { requireOrgContext, AuthError, authErrorResponse , requireRole} from "@/lib/auth";
 import { logAudit } from "@/lib/audit";
-import { processImport } from "@/lib/services/import-service";
+import { enqueueJob } from "@/lib/job-queue";
 
 const VALID_MODES = ["append", "update_existing", "append_update", "replace"];
 
@@ -130,11 +130,12 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    // Start processing asynchronously in Next.js 15 'after' lifecycle
-    after(() => {
-      processImport({ importJobId: importJob.id, organizationId, userId: user.id }).catch((err) =>
-        console.error(`[import] Job ${importJob.id} failed:`, err)
-      );
+    // Start processing asynchronously using BullMQ for reliable long-running execution
+    await enqueueJob({
+      organizationId,
+      userId: user.id,
+      type: "SHEETS_IMPORT",
+      payload: { importJobId: importJob.id },
     });
 
     return NextResponse.json(

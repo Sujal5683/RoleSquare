@@ -8,6 +8,7 @@
 // doesn't wait for the HTTP request to complete.
 
 import { db } from "@/lib/db";
+import { enqueueJob } from "@/lib/job-queue";
 
 export interface WebhookEvent {
   event: string;
@@ -27,13 +28,18 @@ export interface WebhookEvent {
  *   });
  */
 export function dispatchWebhookEvent(evt: WebhookEvent): void {
-  // Fire and forget — don't await
-  doDispatch(evt).catch((err) => {
-    console.error("[webhook] dispatch failed:", err);
+  // Enqueue to BullMQ instead of using a dangling promise that Vercel might kill
+  enqueueJob({
+    organizationId: evt.organizationId,
+    userId: "system", // Webhooks are system-triggered
+    type: "WEBHOOK_DISPATCH",
+    payload: evt as unknown as Record<string, unknown>,
+  }).catch((err) => {
+    console.error("[webhook] enqueue failed:", err);
   });
 }
 
-async function doDispatch(evt: WebhookEvent): Promise<void> {
+export async function doDispatch(evt: WebhookEvent): Promise<void> {
   // Find all active webhooks for this org that subscribe to this event
   const webhooks = await db.webhook.findMany({
     where: {

@@ -51,7 +51,7 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    const { organizationId, user } = await requireOrgContext(req);
+    const { organizationId, user } = await requireRole(req, "member");
     const body = await req.json();
 
     if (!body.type) {

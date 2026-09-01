@@ -86,7 +86,7 @@ export async function GET(
 
     return NextResponse.json({
       id: session.id,
-      title: session.title,
+      title: session.title === "New conversation" ? session.title : (safeDecryptContent(session.title) ?? "New conversation"),
       suggestionMode: session.suggestionMode,
       createdAt: session.createdAt,
       updatedAt: session.updatedAt,

@@ -351,8 +351,14 @@ export async function requireOrgContext(
     // If stale/invalid header, fall through to step 3 (no error)
   }
 
-  // 3. Fallback to first active org
+  // 3. Fallback to first active org (only allowed for GET requests for backward compat)
   if (!membership) {
+    if (req.method !== "GET") {
+      throw new AuthError(
+        "Mutation requests must explicitly specify an organization context (x-organization-id header or organizationId query param).",
+        403
+      );
+    }
     membership = user.memberships.find((m) => m.status === "active");
   }
 
@@ -386,15 +392,10 @@ export async function requireExplicitOrg(
     req.headers.get("x-organization-id");
 
   if (!explicit) {
-    // No explicit org — fall back to first active org (same as requireOrgContext)
-    const membership = user.memberships.find((m) => m.status === "active");
-    if (!membership) {
-      throw new AuthError(
-        "You are not an active member of any organization.",
-        403
-      );
-    }
-    return { user, organizationId: membership.organizationId, membership };
+    throw new AuthError(
+      "Explicit organization context is required.",
+      400
+    );
   }
 
   const membership = user.memberships.find(

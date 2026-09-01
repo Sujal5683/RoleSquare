@@ -122,11 +122,11 @@ async function saveMessage(params: {
 }
 
 /**
- * Updates the session title from the first user message (plain truncated text,
- * not the encrypted blob — safe to store since it's just a display label).
+ * Updates the session title from the first user message (encrypted to prevent PII leakage).
  */
 async function maybeUpdateTitle(sessionId: string, firstUserMessage: string) {
-  const title = firstUserMessage.slice(0, 80).trim() || "New conversation";
+  const titleText = firstUserMessage.slice(0, 80).trim() || "New conversation";
+  const title = encryptContent(titleText);
   await db.assistantSession.update({
     where: { id: sessionId },
     data: { title },

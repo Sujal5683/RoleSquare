@@ -92,7 +92,14 @@ async function processBullJob(bullJob: Job): Promise<void> {
 
   console.log(`[worker] processing ${jobType} job ${dbJobId} (attempt ${bullJob.attemptsMade + 1})`);
 
-  // 1. Mark as running in Postgres
+  // 1. Check if already cancelled
+  const existingJob = await db.aiJob.findUnique({ select: { status: true }, where: { id: dbJobId } });
+  if (existingJob?.status === "cancelled") {
+    console.log(`[worker] Job ${dbJobId} was cancelled, skipping execution`);
+    return;
+  }
+
+  // Mark as running
   await db.aiJob.update({
     where: { id: dbJobId },
     data:  { status: "running", startedAt: new Date(), attempts: { increment: 1 } },
@@ -109,11 +116,11 @@ async function processBullJob(bullJob: Job): Promise<void> {
       attempts:       bullJob.attemptsMade + 1,
     });
 
-    // 3. Success → update Postgres
+    // 3. Success -> check if it was cancelled during execution before updating
     const isDeferred = result && typeof result === "object" && (result as any).deferred === true;
-
-    await db.aiJob.update({
-      where: { id: dbJobId },
+    
+    await db.aiJob.updateMany({
+      where: { id: dbJobId, status: "running" },
       data: {
         status:       isDeferred ? "running" : "success",
         progress:     isDeferred ? undefined : 100,
@@ -123,7 +130,7 @@ async function processBullJob(bullJob: Job): Promise<void> {
       },
     });
 
-    console.log(`[worker] ✓ ${jobType} job ${dbJobId} completed`);
+    console.log(`[worker] ✔ ${jobType} job ${dbJobId} completed`);
 
   } catch (err) {
     const errorMessage = err instanceof Error ? err.message : "Unknown error";
@@ -133,9 +140,9 @@ async function processBullJob(bullJob: Job): Promise<void> {
 
     const finalStatus = isDlq ? "dlq" : retryable ? "queued" : "failed";
 
-    // Update Postgres — if retryable, BullMQ will retry via its own backoff
-    await db.aiJob.update({
-      where: { id: dbJobId },
+    // Update Postgres — only if it wasn't cancelled
+    await db.aiJob.updateMany({
+      where: { id: dbJobId, status: "running" },
       data: {
         status:       finalStatus,
         errorMessage: isDlq
@@ -185,10 +192,44 @@ const worker = new Worker(QUEUE_NAME, processBullJob, {
   lockDuration:     STALE_LOCK_MS,   // how long worker holds the lock per job
 });
 
-worker.on("active",    (job) => console.log(`[worker] → active: ${job.name} ${job.id}`));
-worker.on("completed", (job) => console.log(`[worker] ✓ done:   ${job.name} ${job.id}`));
-worker.on("failed",    (job, err) => console.error(`[worker] ✗ failed: ${job?.name} ${job?.id} — ${err.message}`));
-worker.on("error",     (err)      => console.error(`[worker] ✗ error:  ${err.message}`));
+worker.on("active",    (job) => console.log(`[worker] ▶ active: ${job.name} ${job.id}`));
+worker.on("completed", (job) => console.log(`[worker] ✔ done:   ${job.name} ${job.id}`));
+worker.on("failed",    async (job, err) => {
+  console.error(`[worker] ✖ failed: ${job?.name} ${job?.id} — ${err.message}`);
+  
+  // Safety net: if job stalled and was failed by BullMQ's watcher, processBullJob's
+  // try/catch never ran. We must clean up the stuck "running" state in Postgres.
+  if (job?.id) {
+    try {
+      const dbJob = await db.aiJob.findUnique({ where: { id: job.id } });
+      if (dbJob?.status === "running") {
+        await db.aiJob.update({
+          where: { id: job.id },
+          data: { status: "failed", errorMessage: `Worker crash/stall: ${err.message}`, finishedAt: new Date() }
+        });
+        
+        if (dbJob.payload) {
+          const parsed = typeof dbJob.payload === "string" ? JSON.parse(dbJob.payload) : dbJob.payload;
+          if (parsed.runId) {
+            await db.sourceRun.updateMany({
+              where: { id: parsed.runId as string, status: "running" },
+              data: { status: "failed", errorMessage: `Worker crash/stall: ${err.message}`, finishedAt: new Date() }
+            });
+          }
+          if (parsed.sourceId) {
+            await db.source.updateMany({
+              where: { id: parsed.sourceId as string },
+              data: { runState: "idle" }
+            });
+          }
+        }
+      }
+    } catch (cleanupErr) {
+      console.error(`[worker] Failed to cleanup stalled job ${job.id}:`, cleanupErr);
+    }
+  }
+});
+worker.on("error",     (err)      => console.error(`[worker] ✖ error:  ${err.message}`));
 
 console.log(`[worker] Started — queue="${QUEUE_NAME}", concurrency=${CONCURRENT_WORKERS}, redis=${REDIS_URL}`);
 

@@ -7,8 +7,8 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
   directUrl = env("DIRECT_URL")
 }
 
@@ -17,31 +17,32 @@ datasource db {
 // ────────────────────────────────────────────────────────────────────────────
 
 model User {
-  id          String   @id @default(cuid())
-  email       String   @unique
-  name        String?
-  avatarUrl   String?
+  id                String   @id @default(cuid())
+  email             String   @unique
+  name              String?
+  avatarUrl         String?
   role              String   @default("user") // global role: user | admin
   plan              String   @default("free") // user's billing plan
   notificationPrefs String   @default("{}") // JSON
-  twoFactorSecret String?
-  twoFactorEnabled Boolean @default(false)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  twoFactorSecret   String?
+  twoFactorEnabled  Boolean  @default(false)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
 
-  organizations      OrganizationMember[]
-  connections        GoogleConnection[]
-  sources            Source[]
-  schemas            Schema[]
-  datasets           Dataset[]
-  auditLogs          AuditLog[]       @relation("AuditActor")
-  sharingReqs        SharingRequest[] @relation("SharingRequester")
-  approvedShares     SharingRequest[] @relation("SharingDecider")
-  jobs               AiJob[]
-  sentInvitations    Invitation[]     @relation("SentInvitations")
-  datasetAccessGrants DatasetAccess[] @relation("GranteeUserAccess")
-  assistantSessions  AssistantSession[]
-  billedOrganizations Organization[] @relation("OrgBillingUser")
+  organizations       OrganizationMember[]
+  connections         GoogleConnection[]
+  sources             Source[]
+  schemas             Schema[]
+  datasets            Dataset[]
+  auditLogs           AuditLog[]           @relation("AuditActor")
+  sharingReqs         SharingRequest[]     @relation("SharingRequester")
+  approvedShares      SharingRequest[]     @relation("SharingDecider")
+  importJobs          ImportJob[]
+  jobs                AiJob[]
+  sentInvitations     Invitation[]         @relation("SentInvitations")
+  datasetAccessGrants DatasetAccess[]      @relation("GranteeUserAccess")
+  assistantSessions   AssistantSession[]
+  billedOrganizations Organization[]       @relation("OrgBillingUser")
 }
 
 model Organization {
@@ -52,48 +53,49 @@ model Organization {
   createdBy String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  
-  retentionEmails    String   @default("90")
-  retentionDocs      String   @default("365")
-  retentionAuditLogs String   @default("365")
-  exportFileExpiry   String   @default("7d")
 
-  members            OrganizationMember[]
-  connections        GoogleConnection[]
-  sources            Source[]
-  schemas            Schema[]
-  datasets           Dataset[]
-  jobs               AiJob[]
-  auditLogs          AuditLog[]
-  usageMetrics       UsageMetric[]
-  sharingReqs        SharingRequest[]
-  sharePerms         SharingPermission[]
+  retentionEmails    String @default("90")
+  retentionDocs      String @default("365")
+  retentionAuditLogs String @default("365")
+  exportFileExpiry   String @default("7d")
+
+  members                OrganizationMember[]
+  connections            GoogleConnection[]
+  sources                Source[]
+  schemas                Schema[]
+  datasets               Dataset[]
+  jobs                   AiJob[]
+  auditLogs              AuditLog[]
+  usageMetrics           UsageMetric[]
+  sharingReqs            SharingRequest[]
+  sharePerms             SharingPermission[]
   webhooks               Webhook[]
   apiKeys                ApiKey[]
-  crossOrgPerms          CrossOrgPermission[]   @relation("OwnedCrossOrgPerms")
+  crossOrgPerms          CrossOrgPermission[]    @relation("OwnedCrossOrgPerms")
   invitations            Invitation[]
-  ownedAccesses          DatasetAccess[]        @relation("OwnerOrgAccess")
-  granteeOrgAccesses     DatasetAccess[]        @relation("GranteeOrgAccess")
+  ownedAccesses          DatasetAccess[]         @relation("OwnerOrgAccess")
+  granteeOrgAccesses     DatasetAccess[]         @relation("GranteeOrgAccess")
   invoices               Invoice[]
+  importJobs             ImportJob[]
   // Google Sheets Integration
   googleSheetsAccounts   GoogleSheetsAccount[]
   spreadsheetConnections SpreadsheetConnection[]
   sheetMappings          SheetMapping[]
   assistantSessions      AssistantSession[]
   billingUserId          String?
-  billingUser            User?            @relation("OrgBillingUser", fields: [billingUserId], references: [id])
+  billingUser            User?                   @relation("OrgBillingUser", fields: [billingUserId], references: [id])
 }
 
 model ApiKey {
-  id             String       @id @default(cuid())
+  id             String    @id @default(cuid())
   organizationId String
   name           String
-  keyHash        String       @unique
+  keyHash        String    @unique
   lastUsedAt     DateTime?
   expiresAt      DateTime?
-  createdAt      DateTime     @default(now())
+  createdAt      DateTime  @default(now())
 
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   @@index([organizationId])
 }
@@ -121,22 +123,22 @@ model OrganizationMember {
 // ────────────────────────────────────────────────────────────────────────────
 
 model GoogleConnection {
-  id             String   @id @default(cuid())
-  userId         String
-  organizationId String?
-  googleEmail    String
-  scopes         String   @default("gmail.readonly,drive.metadata.readonly")
-  status         String   @default("active") // active | expired | revoked | degraded
-  accessToken    String?  // AES-256-GCM encrypted short-lived access token
-  refreshToken   String?  // AES-256-GCM encrypted long-lived refresh token
-  tokenExpiresAt DateTime? // when the access token expires
-  watchExpiresAt DateTime?
-  watchExpirePref String @default("yearly") // never | weekly | monthly | yearly
-  lastSyncAt     DateTime?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  id              String    @id @default(cuid())
+  userId          String
+  organizationId  String?
+  googleEmail     String
+  scopes          String    @default("gmail.readonly,drive.metadata.readonly")
+  status          String    @default("active") // active | expired | revoked | degraded
+  accessToken     String? // AES-256-GCM encrypted short-lived access token
+  refreshToken    String? // AES-256-GCM encrypted long-lived refresh token
+  tokenExpiresAt  DateTime? // when the access token expires
+  watchExpiresAt  DateTime?
+  watchExpirePref String    @default("yearly") // never | weekly | monthly | yearly
+  lastSyncAt      DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
-  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   organization Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
   sources      Source[]
 
@@ -149,7 +151,7 @@ model GoogleConnection {
 // ────────────────────────────────────────────────────────────────────────────
 
 model Source {
-  id                 String   @id @default(cuid())
+  id                 String    @id @default(cuid())
   organizationId     String
   ownerUserId        String
   googleConnectionId String
@@ -157,17 +159,17 @@ model Source {
   datasetId          String?
   name               String
   description        String?
-  sourceType         String   @default("gmail") // gmail | drive | docs | sheets | forms
-  status             String   @default("active") // active | paused | idle | error
-  runState           String   @default("idle") // idle | scanning | parsing | extracting | validating
-  scheduleMode       String   @default("interval") // interval | cron | manual
-  scheduleExpr       String   @default("6h")
-  maxEmailsPerScan   Int      @default(100) // max emails to fetch per Gmail scan run
-  config             String   @default("{}") // JSON: processing limits, depth, etc.
+  sourceType         String    @default("gmail") // gmail | drive | docs | sheets | forms
+  status             String    @default("active") // active | paused | idle | error
+  runState           String    @default("idle") // idle | scanning | parsing | extracting | validating
+  scheduleMode       String    @default("interval") // interval | cron | manual
+  scheduleExpr       String    @default("6h")
+  maxEmailsPerScan   Int       @default(100) // max emails to fetch per Gmail scan run
+  config             String    @default("{}") // JSON: processing limits, depth, etc.
   lastRunAt          DateTime?
   nextRunAt          DateTime?
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
 
   organization     Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   owner            User             @relation(fields: [ownerUserId], references: [id])
@@ -185,9 +187,9 @@ model Source {
 model SourceRule {
   id         String  @id @default(cuid())
   sourceId   String
-  filterType String  // sender | subject | body | date | attachment | link | drive_link
-  operator   String  // eq | contains | excludes | regex | domain | gt | lt | between | required
-  value      String  // JSON-encoded value (array, string, boolean, etc.)
+  filterType String // sender | subject | body | date | attachment | link | drive_link
+  operator   String // eq | contains | excludes | regex | domain | gt | lt | between | required
+  value      String // JSON-encoded value (array, string, boolean, etc.)
   metadata   String? // JSON: { preset?, startDate?, endDate? } for date rules
   position   Int     @default(0)
 
@@ -197,14 +199,14 @@ model SourceRule {
 }
 
 model SourceRun {
-  id         String    @id @default(cuid())
-  sourceId   String
-  startedAt  DateTime  @default(now())
-  finishedAt DateTime?
-  status     String    @default("running") // running | success | failed | partial
-  mode       String    @default("incremental") // historical | incremental
-  stats      String    @default("{}") // JSON: emailsMatched, attachmentsFound, etc.
-  progress   Int       @default(0)
+  id           String    @id @default(cuid())
+  sourceId     String
+  startedAt    DateTime  @default(now())
+  finishedAt   DateTime?
+  status       String    @default("running") // running | success | failed | partial
+  mode         String    @default("incremental") // historical | incremental
+  stats        String    @default("{}") // JSON: emailsMatched, attachmentsFound, etc.
+  progress     Int       @default(0)
   errorMessage String?
 
   source Source @relation(fields: [sourceId], references: [id], onDelete: Cascade)
@@ -218,23 +220,23 @@ model SourceRun {
 // ────────────────────────────────────────────────────────────────────────────
 
 model Email {
-  id                String   @id @default(cuid())
-  sourceId          String
-  googleMessageId   String
-  threadId          String?
-  fromAddress       String
-  toAddress         String
-  ccAddresses       String?
-  subject           String
-  snippet           String
-  bodyText          String?
-  bodyHtml          String?
-  receivedAt        DateTime
-  dedupHash         String
-  processingStatus  String   @default("pending") // pending | matched | parsed | extracted | rejected
-  createdAt         DateTime @default(now())
+  id               String   @id @default(cuid())
+  sourceId         String
+  googleMessageId  String
+  threadId         String?
+  fromAddress      String
+  toAddress        String
+  ccAddresses      String?
+  subject          String
+  snippet          String
+  bodyText         String?
+  bodyHtml         String?
+  receivedAt       DateTime
+  dedupHash        String
+  processingStatus String   @default("pending") // pending | matched | parsed | extracted | rejected
+  createdAt        DateTime @default(now())
 
-  source      Source             @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+  source      Source            @relation(fields: [sourceId], references: [id], onDelete: Cascade)
   attachments EmailAttachment[]
   links       EmailLink[]
 
@@ -244,13 +246,13 @@ model Email {
 }
 
 model EmailAttachment {
-  id         String  @id @default(cuid())
-  emailId    String
-  filename   String
-  mimeType   String
-  size       Int
+  id          String  @id @default(cuid())
+  emailId     String
+  filename    String
+  mimeType    String
+  size        Int
   storagePath String?
-  status     String  @default("discovered") // discovered | fetched | parsed | failed
+  status      String  @default("discovered") // discovered | fetched | parsed | failed
 
   email Email @relation(fields: [emailId], references: [id], onDelete: Cascade)
 
@@ -261,7 +263,7 @@ model EmailLink {
   id           String  @id @default(cuid())
   emailId      String
   url          String
-  resourceType String  // drive | docs | sheets | forms | external
+  resourceType String // drive | docs | sheets | forms | external
   resourceId   String?
   resolved     Boolean @default(false)
 
@@ -276,7 +278,7 @@ model EmailLink {
 
 model Document {
   id          String   @id @default(cuid())
-  sourceType  String   // email | attachment | drive | docs | sheets | forms
+  sourceType  String // email | attachment | drive | docs | sheets | forms
   sourceId    String
   name        String
   contentText String
@@ -290,12 +292,12 @@ model Document {
 }
 
 model DocumentChunk {
-  id          String  @id @default(cuid())
-  documentId  String
-  chunkIndex  Int
-  content     String
-  tokenCount  Int
-  pageNumber  Int     @default(1)
+  id         String @id @default(cuid())
+  documentId String
+  chunkIndex Int
+  content    String
+  tokenCount Int
+  pageNumber Int    @default(1)
 
   document Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
 
@@ -307,21 +309,21 @@ model DocumentChunk {
 // ────────────────────────────────────────────────────────────────────────────
 
 model Schema {
-  id          String   @id @default(cuid())
+  id             String   @id @default(cuid())
   organizationId String
-  createdBy   String
-  name        String
-  description String?
-  version     Int      @default(1)
+  createdBy      String
+  name           String
+  description    String?
+  version        Int      @default(1)
   promptTemplate String?
-  isDefault   Boolean  @default(false) // true = system-provisioned default email schema
-  datasetType String   @default("custom") // default | custom
-  tags        String[] @default([])
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  isDefault      Boolean  @default(false) // true = system-provisioned default email schema
+  datasetType    String   @default("custom") // default | custom
+  tags           String[] @default([])
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
-  organization Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  creator      User           @relation(fields: [createdBy], references: [id])
+  organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  creator      User          @relation(fields: [createdBy], references: [id])
   fields       SchemaField[]
   sources      Source[]
   datasets     Dataset[]
@@ -330,18 +332,18 @@ model Schema {
 }
 
 model SchemaField {
-  id                String  @id @default(cuid())
-  schemaId          String
-  name              String
-  type              String  // text | number | date | boolean | enum | array | multiselect
-  description       String?
-  instructions      String?
-  required          Boolean @default(false)
-  options           String? // JSON array for enum/multiselect
-  validation        String? // JSON: { min?: number, max?: number, regex?: string }
-  position          Int     @default(0)
-  confidenceThreshold Float  @default(0.7) // min confidence before routing to review (0..1)
-  isHidden          Boolean @default(false) // if true, skip this field in deterministic sync output
+  id                  String  @id @default(cuid())
+  schemaId            String
+  name                String
+  type                String // text | number | date | boolean | enum | array | multiselect
+  description         String?
+  instructions        String?
+  required            Boolean @default(false)
+  options             String? // JSON array for enum/multiselect
+  validation          String? // JSON: { min?: number, max?: number, regex?: string }
+  position            Int     @default(0)
+  confidenceThreshold Float   @default(0.7) // min confidence before routing to review (0..1)
+  isHidden            Boolean @default(false) // if true, skip this field in deterministic sync output
 
   schema Schema @relation(fields: [schemaId], references: [id], onDelete: Cascade)
 
@@ -365,32 +367,33 @@ model Dataset {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
-  organization    Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  schema          Schema?         @relation(fields: [schemaId], references: [id], onDelete: SetNull)
-  creator         User            @relation(fields: [createdBy], references: [id])
+  organization    Organization           @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  schema          Schema?                @relation(fields: [schemaId], references: [id], onDelete: SetNull)
+  creator         User                   @relation(fields: [createdBy], references: [id])
   sources         Source[]
   records         DatasetRecord[]
   sharePerms      SharingPermission[]
   sharingReqs     SharingRequest[]
   crossOrgPerms   CrossOrgPermission[]
+  importJobs      ImportJob[]
   datasetAccesses DatasetAccess[]
   // Google Sheets Integration
-  sheetMappings        SheetMapping[]
-  schemaVersions       DatasetSchemaVersion[]
-  columnDefs           DatasetColumnDef[]
-  rowExternalIds       DatasetRowExternalId[]
+  sheetMappings   SheetMapping[]
+  schemaVersions  DatasetSchemaVersion[]
+  columnDefs      DatasetColumnDef[]
+  rowExternalIds  DatasetRowExternalId[]
 
   @@index([organizationId])
 }
 
 model DatasetRecord {
-  id          String   @id @default(cuid())
-  datasetId   String
+  id            String   @id @default(cuid())
+  datasetId     String
   sourceEmailId String?
-  status      String   @default("valid") // valid | needs_review | rejected | approved | updated
-  confidence  Float    @default(0)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  status        String   @default("valid") // valid | needs_review | rejected | approved | updated
+  confidence    Float    @default(0)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
   dataset Dataset        @relation(fields: [datasetId], references: [id], onDelete: Cascade)
   values  DatasetValue[]
@@ -400,22 +403,22 @@ model DatasetRecord {
 }
 
 model DatasetValue {
-  id           String   @id @default(cuid())
-  recordId     String
-  fieldId      String
-  value        String   // JSON-encoded value
-  originalValue String? // Preserves the original AI-extracted value after human correction
+  id                 String    @id @default(cuid())
+  recordId           String
+  fieldId            String
+  value              String // JSON-encoded value
+  originalValue      String? // Preserves the original AI-extracted value after human correction
   originalConfidence Float?
-  confidence   Float    @default(0)
-  evidence     String   // evidence snippet text
-  sourceFile   String?
-  pageNumber   Int?
-  chunkId      String?
-  modelUsed    String   @default("gemini-1.5-pro")
-  promptVersion String  @default("v1")
-  extractedAt  DateTime @default(now())
-  correctedAt  DateTime?
-  correctedBy  String?
+  confidence         Float     @default(0)
+  evidence           String // evidence snippet text
+  sourceFile         String?
+  pageNumber         Int?
+  chunkId            String?
+  modelUsed          String    @default("gemini-1.5-pro")
+  promptVersion      String    @default("v1")
+  extractedAt        DateTime  @default(now())
+  correctedAt        DateTime?
+  correctedBy        String?
 
   record DatasetRecord @relation(fields: [recordId], references: [id], onDelete: Cascade)
 
@@ -428,19 +431,19 @@ model DatasetValue {
 // ────────────────────────────────────────────────────────────────────────────
 
 model AiJob {
-  id             String   @id @default(cuid())
+  id             String    @id @default(cuid())
   organizationId String
   userId         String?
-  type           String   // GMAIL_SCAN | DETERMINISTIC_SYNC | EMAIL_PARSE | ATTACHMENT_PROCESS | DRIVE_DISCOVERY | DOCUMENT_PARSE | AI_EXTRACTION | AI_VALIDATION | EXPORT
-  status         String   @default("queued") // queued | running | success | failed | retry | dlq
-  payload        String   @default("{}") // JSON
-  agentKey       String?  // extractor | analyst | validator | transformer | researcher | assistant
-  attempts       Int      @default(0)
-  progress       Int      @default(0)
+  type           String // GMAIL_SCAN | DETERMINISTIC_SYNC | EMAIL_PARSE | ATTACHMENT_PROCESS | DRIVE_DISCOVERY | DOCUMENT_PARSE | AI_EXTRACTION | AI_VALIDATION | EXPORT
+  status         String    @default("queued") // queued | running | success | failed | retry | dlq
+  payload        String    @default("{}") // JSON
+  agentKey       String? // extractor | analyst | validator | transformer | researcher | assistant
+  attempts       Int       @default(0)
+  progress       Int       @default(0)
   errorMessage   String?
-  result         String?  // JSON
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  result         String? // JSON
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
   startedAt      DateTime?
   finishedAt     DateTime?
 
@@ -459,7 +462,7 @@ model AiOutput {
   jobId            String
   modelUsed        String
   promptHash       String
-  rawResponse      String   // JSON
+  rawResponse      String // JSON
   tokensUsed       Int      @default(0)
   promptTokens     Int      @default(0)
   completionTokens Int      @default(0)
@@ -476,28 +479,28 @@ model AiOutput {
 // ────────────────────────────────────────────────────────────────────────────
 
 model SharingRequest {
-  id                   String   @id @default(cuid())
+  id                   String    @id @default(cuid())
   organizationId       String
   datasetId            String?
   requestedBy          String
-  status               String   @default("pending") // pending | approved | rejected | revoked
+  status               String    @default("pending") // pending | approved | rejected | revoked
   decidedBy            String?
   reason               String?
-  level                String   @default("read") // read | comment | edit | admin
-  fieldScope           String?  // JSON
-  rowFilter            String?  // JSON
-  targetOrganizationId String?  // org being asked / org receiving the share
-  targetUserId         String?  // specific user (optional)
-  targetEmail          String?  // email-based lookup for user-to-user sharing
-  direction            String   @default("outgoing") // outgoing | incoming
-  shareType            String   @default("request") // request | grant
-  createdAt            DateTime @default(now())
+  level                String    @default("read") // read | comment | edit | admin
+  fieldScope           String? // JSON
+  rowFilter            String? // JSON
+  targetOrganizationId String? // org being asked / org receiving the share
+  targetUserId         String? // specific user (optional)
+  targetEmail          String? // email-based lookup for user-to-user sharing
+  direction            String    @default("outgoing") // outgoing | incoming
+  shareType            String    @default("request") // request | grant
+  createdAt            DateTime  @default(now())
   decidedAt            DateTime?
 
-  organization       Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  dataset            Dataset?      @relation(fields: [datasetId], references: [id], onDelete: SetNull)
-  requester          User          @relation("SharingRequester", fields: [requestedBy], references: [id])
-  decider            User?         @relation("SharingDecider", fields: [decidedBy], references: [id])
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  dataset      Dataset?     @relation(fields: [datasetId], references: [id], onDelete: SetNull)
+  requester    User         @relation("SharingRequester", fields: [requestedBy], references: [id])
+  decider      User?        @relation("SharingDecider", fields: [decidedBy], references: [id])
 
   @@index([organizationId])
   @@index([targetOrganizationId])
@@ -510,8 +513,8 @@ model SharingPermission {
   datasetId      String
   organizationId String
   level          String   @default("read")
-  fieldScope     String?  // JSON
-  rowFilter      String?  // JSON
+  fieldScope     String? // JSON
+  rowFilter      String? // JSON
   createdAt      DateTime @default(now())
 
   dataset      Dataset      @relation(fields: [datasetId], references: [id], onDelete: Cascade)
@@ -526,16 +529,16 @@ model AuditLog {
   organizationId String
   actorType      String   @default("user") // user | system | ai
   actorId        String?
-  action         String   // create | update | delete | scan | extract | approve | share | export
-  entity         String   // source | dataset | schema | record | connection | member | job
+  action         String // create | update | delete | scan | extract | approve | share | export
+  entity         String // source | dataset | schema | record | connection | member | job
   entityId       String?
-  before         String?  // JSON
-  after          String?  // JSON
+  before         String? // JSON
+  after          String? // JSON
   reason         String?
   createdAt      DateTime @default(now())
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  actor       User?        @relation("AuditActor", fields: [actorId], references: [id])
+  actor        User?        @relation("AuditActor", fields: [actorId], references: [id])
 
   @@index([organizationId])
   @@index([entity, entityId])
@@ -545,7 +548,7 @@ model UsageMetric {
   id             String   @id @default(cuid())
   organizationId String
   userId         String?
-  metricType     String   // ai_tokens | emails_scanned | documents_parsed | exports | storage
+  metricType     String // ai_tokens | emails_scanned | documents_parsed | exports | storage
   value          Int      @default(0)
   periodStart    DateTime
   periodEnd      DateTime
@@ -557,17 +560,17 @@ model UsageMetric {
 }
 
 model Webhook {
-  id             String   @id @default(cuid())
-  organizationId String
-  url            String
-  secret         String?
-  events         String   @default("source.run_completed,extraction.completed,review.needed,job.failed") // comma-separated
-  status         String   @default("active") // active | paused | failing
-  lastTriggeredAt DateTime?
+  id               String    @id @default(cuid())
+  organizationId   String
+  url              String
+  secret           String?
+  events           String    @default("source.run_completed,extraction.completed,review.needed,job.failed") // comma-separated
+  status           String    @default("active") // active | paused | failing
+  lastTriggeredAt  DateTime?
   lastResponseCode Int?
-  failureCount   Int      @default(0)
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  failureCount     Int       @default(0)
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
@@ -582,11 +585,11 @@ model CrossOrgPermission {
   id                  String   @id @default(cuid())
   datasetId           String
   ownerOrganizationId String
-  granteeOrgId        String?  // target org receiving access
-  granteeUserId       String?  // or specific user
+  granteeOrgId        String? // target org receiving access
+  granteeUserId       String? // or specific user
   level               String   @default("read") // read | comment | edit
-  fieldScope          String?  // JSON
-  rowFilter           String?  // JSON
+  fieldScope          String? // JSON
+  rowFilter           String? // JSON
   status              String   @default("active") // active | revoked
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
@@ -605,28 +608,28 @@ model CrossOrgPermission {
 // ────────────────────────────────────────────────────────────────────────────
 
 model DatasetAccess {
-  id              String   @id @default(cuid())
-  datasetId       String
-  ownerOrgId      String   // The org that owns the dataset and granted this access
+  id         String @id @default(cuid())
+  datasetId  String
+  ownerOrgId String // The org that owns the dataset and granted this access
 
   // Exactly one of these must be set (or both null for a pending request)
-  granteeOrgId    String?  // grant to an entire organization
-  granteeUserId   String?  // grant to a specific user
+  granteeOrgId  String? // grant to an entire organization
+  granteeUserId String? // grant to a specific user
 
-  level           String   @default("read") // read | comment | edit
-  fieldScope      String?  // JSON: { include?: string[], exclude?: string[] }
-  rowFilter       String?  // JSON: arbitrary row-level filter
-  status          String   @default("active") // active | revoked
-  isPaused        Boolean  @default(false)
-  sourceRequestId String?  // back-ref to the SharingRequest that created this
+  level           String  @default("read") // read | comment | edit
+  fieldScope      String? // JSON: { include?: string[], exclude?: string[] }
+  rowFilter       String? // JSON: arbitrary row-level filter
+  status          String  @default("active") // active | revoked
+  isPaused        Boolean @default(false)
+  sourceRequestId String? // back-ref to the SharingRequest that created this
 
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  dataset    Dataset      @relation(fields: [datasetId], references: [id], onDelete: Cascade)
-  ownerOrg   Organization @relation("OwnerOrgAccess", fields: [ownerOrgId], references: [id], onDelete: Cascade)
-  granteeOrg Organization? @relation("GranteeOrgAccess", fields: [granteeOrgId], references: [id], onDelete: SetNull)
-  granteeUser User?        @relation("GranteeUserAccess", fields: [granteeUserId], references: [id], onDelete: SetNull)
+  dataset     Dataset       @relation(fields: [datasetId], references: [id], onDelete: Cascade)
+  ownerOrg    Organization  @relation("OwnerOrgAccess", fields: [ownerOrgId], references: [id], onDelete: Cascade)
+  granteeOrg  Organization? @relation("GranteeOrgAccess", fields: [granteeOrgId], references: [id], onDelete: Cascade)
+  granteeUser User?         @relation("GranteeUserAccess", fields: [granteeUserId], references: [id], onDelete: Cascade)
 
   @@index([datasetId])
   @@index([ownerOrgId])
@@ -640,17 +643,17 @@ model DatasetAccess {
 // ────────────────────────────────────────────────────────────────────────────
 
 model Invitation {
-  id             String   @id @default(cuid())
+  id             String    @id @default(cuid())
   organizationId String
-  email          String   // email of the invitee
-  role           String   @default("member") // owner | admin | manager | member | viewer
-  token          String   @unique @default(cuid()) // URL-safe accept token
+  email          String // email of the invitee
+  role           String    @default("member") // owner | admin | manager | member | viewer
+  token          String    @unique @default(cuid()) // URL-safe accept token
   invitedBy      String
-  status         String   @default("pending") // pending | accepted | expired | cancelled
+  status         String    @default("pending") // pending | accepted | expired | cancelled
   expiresAt      DateTime // default +7 days
   acceptedAt     DateTime?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   inviter      User         @relation("SentInvitations", fields: [invitedBy], references: [id])
@@ -669,10 +672,10 @@ model AgentLog {
   id             String   @id @default(cuid())
   jobId          String
   organizationId String
-  agentKey       String   // extractor | analyst | validator | transformer | researcher | assistant | system
+  agentKey       String // extractor | analyst | validator | transformer | researcher | assistant | system
   level          String   @default("info") // info | warn | error | debug
   message        String
-  metadata       String?  // JSON
+  metadata       String? // JSON
   createdAt      DateTime @default(now())
 
   job AiJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
@@ -695,14 +698,14 @@ model AgentLog {
 model GoogleSheetsAccount {
   id             String    @id @default(cuid())
   organizationId String
-  userId         String    // the app user who connected it
+  userId         String // the app user who connected it
   googleEmail    String
   displayName    String?
   avatarUrl      String?
   scopes         String    @default("spreadsheets,drive.readonly")
   status         String    @default("active") // active | expired | revoked | degraded
-  accessToken    String?   // AES-256-GCM encrypted short-lived token
-  refreshToken   String?   // AES-256-GCM encrypted long-lived token
+  accessToken    String? // AES-256-GCM encrypted short-lived token
+  refreshToken   String? // AES-256-GCM encrypted long-lived token
   tokenExpiresAt DateTime?
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
@@ -722,7 +725,7 @@ model SpreadsheetConnection {
   id              String   @id @default(cuid())
   organizationId  String
   sheetsAccountId String
-  spreadsheetId   String   // Google's unique spreadsheetId
+  spreadsheetId   String // Google's unique spreadsheetId
   spreadsheetName String
   spreadsheetUrl  String?
   createdAt       DateTime @default(now())
@@ -744,18 +747,18 @@ model SheetMapping {
   organizationId          String
   datasetId               String
   spreadsheetConnectionId String
-  sheetId                 Int      // Google's numeric sheetId for protected ranges
-  sheetName               String   // tab name
+  sheetId                 Int // Google's numeric sheetId for protected ranges
+  sheetName               String // tab name
   direction               String   @default("bidirectional") // to_sheet | from_sheet | bidirectional
-  schemaFingerprint       String?  // SHA256(columnId+name+order+type) — changes trigger mismatch
-  rowIdColumnIndex        Int?     // 0-based index of hidden row-ID column in sheet
+  schemaFingerprint       String? // SHA256(columnId+name+order+type) — changes trigger mismatch
+  rowIdColumnIndex        Int? // 0-based index of hidden row-ID column in sheet
   status                  String   @default("active") // active | paused | error | schema_mismatch | unlinked
   createdAt               DateTime @default(now())
   updatedAt               DateTime @updatedAt
 
-  organization          Organization          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  dataset               Dataset               @relation(fields: [datasetId], references: [id], onDelete: Cascade)
-  spreadsheetConnection SpreadsheetConnection @relation(fields: [spreadsheetConnectionId], references: [id], onDelete: Cascade)
+  organization          Organization           @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  dataset               Dataset                @relation(fields: [datasetId], references: [id], onDelete: Cascade)
+  spreadsheetConnection SpreadsheetConnection  @relation(fields: [spreadsheetConnectionId], references: [id], onDelete: Cascade)
   syncState             SyncState?
   syncEvents            SyncEvent[]
   syncConflicts         SyncConflict[]
@@ -771,11 +774,11 @@ model SheetMapping {
 model DatasetSchemaVersion {
   id           String   @id @default(cuid())
   datasetId    String
-  version      Int      // monotonically increasing
-  columns      String   // JSON: DatasetColumnDef[] snapshot
-  fingerprint  String   // SHA256 of the serialized column set
-  changedBy    String?  // userId who approved the change
-  changeSource String   // user | sync | import | rollback | initial
+  version      Int // monotonically increasing
+  columns      String // JSON: DatasetColumnDef[] snapshot
+  fingerprint  String // SHA256 of the serialized column set
+  changedBy    String? // userId who approved the change
+  changeSource String // user | sync | import | rollback | initial
   reason       String?
   createdAt    DateTime @default(now())
 
@@ -790,13 +793,13 @@ model DatasetSchemaVersion {
 model DatasetColumnDef {
   id         String   @id @default(cuid())
   datasetId  String
-  columnId   String   // permanent stable identifier, e.g. "col_8f91a3..."
-  name       String   // display name
-  dataType   String   // text | number | integer | decimal | boolean | date | datetime | email | url | currency | enum
-  position   Int      // display/column order
+  columnId   String // permanent stable identifier, e.g. "col_8f91a3..."
+  name       String // display name
+  dataType   String // text | number | integer | decimal | boolean | date | datetime | email | url | currency | enum
+  position   Int // display/column order
   required   Boolean  @default(false)
-  options    String?  // JSON array — for enum type
-  validation String?  // JSON: { min?, max?, regex? }
+  options    String? // JSON array — for enum type
+  validation String? // JSON: { min?, max?, regex? }
   isDeleted  Boolean  @default(false) // soft-delete
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
@@ -814,8 +817,8 @@ model DatasetRowExternalId {
   datasetId      String
   recordId       String    @unique // DatasetRecord.id
   sheetMappingId String
-  externalId     String    // stable UUID stored in the sheet's hidden column
-  sheetRowIndex  Int?      // last known row number — informational only
+  externalId     String // stable UUID stored in the sheet's hidden column
+  sheetRowIndex  Int? // last known row number — informational only
   lastSyncedAt   DateTime?
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
@@ -837,7 +840,7 @@ model SyncState {
   scheduleMode     String    @default("interval") // interval | manual
   scheduleExpr     String    @default("5m")
   lastSyncAt       DateTime?
-  lastSyncStatus   String?   // success | partial | failed | schema_change
+  lastSyncStatus   String? // success | partial | failed | schema_change
   lastSyncEventId  String?
   nextSyncAt       DateTime?
   syncedRows       Int       @default(0)
@@ -855,14 +858,14 @@ model SyncEvent {
   sheetMappingId String
   startedAt      DateTime  @default(now())
   finishedAt     DateTime?
-  status         String    // running | success | partial | failed | schema_change | conflict
+  status         String // running | success | partial | failed | schema_change | conflict
   direction      String    @default("bidirectional")
   rowsAdded      Int       @default(0)
   rowsUpdated    Int       @default(0)
   rowsDeleted    Int       @default(0)
   conflicts      Int       @default(0)
   errors         Int       @default(0)
-  schemaChanges  String?   // JSON array of detected schema changes
+  schemaChanges  String? // JSON array of detected schema changes
   errorDetail    String?
   triggeredBy    String    @default("scheduler") // scheduler | manual | webhook | reconcile
 
@@ -878,16 +881,16 @@ model SyncEvent {
 model SyncConflict {
   id              String    @id @default(cuid())
   sheetMappingId  String
-  recordId        String    // DatasetRecord.id
-  columnId        String    // DatasetColumnDef.columnId
-  columnName      String    // human-readable for display
-  appValue        String?   // JSON-encoded current app value
-  sheetValue      String?   // JSON-encoded current sheet value
-  lastSyncedValue String?   // JSON-encoded value at last successful sync
+  recordId        String // DatasetRecord.id
+  columnId        String // DatasetColumnDef.columnId
+  columnName      String // human-readable for display
+  appValue        String? // JSON-encoded current app value
+  sheetValue      String? // JSON-encoded current sheet value
+  lastSyncedValue String? // JSON-encoded value at last successful sync
   detectedAt      DateTime  @default(now())
   resolvedAt      DateTime?
-  resolvedBy      String?   // userId
-  resolution      String?   // keep_app | keep_sheet | manual
+  resolvedBy      String? // userId
+  resolution      String? // keep_app | keep_sheet | manual
   status          String    @default("pending") // pending | resolved | auto_resolved
 
   sheetMapping SheetMapping @relation(fields: [sheetMappingId], references: [id], onDelete: Cascade)
@@ -901,14 +904,14 @@ model ImportJob {
   id              String    @id @default(cuid())
   organizationId  String
   userId          String
-  datasetId       String?   // null if creating a new dataset during import
+  datasetId       String? // null if creating a new dataset during import
   newDatasetName  String?
   sheetsAccountId String
   spreadsheetId   String
   spreadsheetName String?
   sheetName       String
   importMode      String    @default("append") // append | update_existing | append_update | replace
-  matchField      String?   // columnId to match on for update_existing
+  matchField      String? // columnId to match on for update_existing
   status          String    @default("pending") // pending | running | success | partial | failed
   totalRows       Int       @default(0)
   processedRows   Int       @default(0)
@@ -916,12 +919,15 @@ model ImportJob {
   updatedRows     Int       @default(0)
   skippedRows     Int       @default(0)
   errorRows       Int       @default(0)
-  errors          String?   // JSON: { row, message }[]
+  errors          String? // JSON: { row, message }[]
   createdAt       DateTime  @default(now())
   startedAt       DateTime?
   finishedAt      DateTime?
 
-  sheetsAccount GoogleSheetsAccount @relation(fields: [sheetsAccountId], references: [id])
+  sheetsAccount GoogleSheetsAccount @relation(fields: [sheetsAccountId], references: [id], onDelete: Cascade)
+  organization  Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user          User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  dataset       Dataset?            @relation(fields: [datasetId], references: [id], onDelete: SetNull)
   mappings      ImportMapping[]
 
   @@index([organizationId])
@@ -930,14 +936,14 @@ model ImportJob {
 
 /// Column-to-column mapping for a specific ImportJob.
 model ImportMapping {
-  id           String  @id @default(cuid())
-  importJobId  String
-  sheetHeader  String  // Google Sheet column header
-  columnId     String? // DatasetColumnDef.columnId — null = skip
-  columnName   String? // resolved column name
-  dataType     String? // resolved data type
-  isNewColumn  Boolean @default(false) // true = create new column on import
-  confidence   Float   @default(0)    // AI mapping confidence 0..1
+  id          String  @id @default(cuid())
+  importJobId String
+  sheetHeader String // Google Sheet column header
+  columnId    String? // DatasetColumnDef.columnId — null = skip
+  columnName  String? // resolved column name
+  dataType    String? // resolved data type
+  isNewColumn Boolean @default(false) // true = create new column on import
+  confidence  Float   @default(0) // AI mapping confidence 0..1
 
   importJob ImportJob @relation(fields: [importJobId], references: [id], onDelete: Cascade)
 
@@ -949,16 +955,16 @@ model ImportMapping {
 // ----------------------------------------------------------------------------
 
 model Invoice {
-  id               String   @id @default(cuid())
-  organizationId   String
-  planId           String
-  amountUsd        Float
-  status           String   @default("paid") // paid | pending | failed
-  pdfUrl           String?
+  id                 String   @id @default(cuid())
+  organizationId     String
+  planId             String
+  amountUsd          Float
+  status             String   @default("paid") // paid | pending | failed
+  pdfUrl             String?
   billingPeriodStart DateTime
   billingPeriodEnd   DateTime
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
@@ -996,8 +1002,8 @@ model AssistantSession {
   /// Whether suggestion mode was active for this session
   suggestionMode Boolean   @default(false)
 
-  user         User             @relation(fields: [userId], references: [id], onDelete: Cascade)
-  organization Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   messages     AssistantMessage[]
 
   @@index([userId])
@@ -1010,26 +1016,27 @@ model AssistantSession {
 /// The `content` and `toolResult` fields hold AES-256-GCM ciphertext
 /// (format: "<base64-ciphertext>:<base64-iv>") — never stored in plaintext.
 model AssistantMessage {
-  id          String   @id @default(cuid())
-  sessionId   String
+  id         String   @id @default(cuid())
+  sessionId  String
   /// "user" | "assistant"
-  role        String
+  role       String
   /// AES-256-GCM encrypted message content (format: ciphertext:iv, both base64)
-  content     String
+  content    String
   /// Tool name that was called for this turn (if any); stored unencrypted for audit
-  toolName    String?
+  toolName   String?
   /// AES-256-GCM encrypted JSON tool result blob (if any)
-  toolResult  String?
+  toolResult String?
   /// Gemini model display name used for this assistant turn
-  modelUsed   String?
+  modelUsed  String?
   /// Undo token for reversing a completed write action (base64-JSON, time-limited)
-  undoToken   String?
+  undoToken  String?
   /// Sequential position within the session — used for stable ordering
-  position    Int
-  createdAt   DateTime @default(now())
+  position   Int
+  createdAt  DateTime @default(now())
 
   session AssistantSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
 
   @@index([sessionId])
   @@index([sessionId, position])
 }
+

@@ -117,19 +117,18 @@ export async function enqueueJob(opts: EnqueueJobOptions): Promise<string> {
 
   // 2. Push to Redis/BullMQ — worker picks this up immediately
   const redisOk = await isRedisAvailable();
-  if (redisOk) {
-    await jobQueue.add(
-      type,
-      { ...payload, _dbJobId: dbJob.id, _organizationId: organizationId, _userId: userId ?? null },
-      { ...bullOpts, jobId: dbJob.id }
-    );
-    console.log(`[queue] enqueued ${type} job ${dbJob.id} → Redis`);
-  } else {
-    // Redis unavailable — job stays as `queued` in Postgres.
-    // The legacy processNextJobCycle() stub in job-runner.ts will NOT pick it up
-    // since it's a no-op, but the job is safe and can be retried manually.
-    console.warn(`[queue] Redis unavailable — job ${dbJob.id} queued in DB only. Start the worker or check REDIS_URL.`);
+  if (!redisOk) {
+    // If Redis is unavailable, mark the AiJob as failed so it doesn't get stuck forever
+    await db.aiJob.update({ where: { id: dbJob.id }, data: { status: "failed", errorMessage: "Redis unavailable - queue system offline" } });
+    throw new Error("Job queue is temporarily offline. Please try again later.");
   }
+
+  await jobQueue.add(
+    type,
+    { ...payload, _dbJobId: dbJob.id, _organizationId: organizationId, _userId: userId ?? null },
+    { ...bullOpts, jobId: dbJob.id }
+  );
+  console.log(`[queue] enqueued ${type} job ${dbJob.id} → Redis`);
 
   return dbJob.id;
 }

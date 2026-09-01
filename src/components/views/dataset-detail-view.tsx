@@ -519,9 +519,6 @@ export function DatasetDetailView() {
       datasetId,
       page,
       statusFilter,
-      // We don't include `search` because it's client-side on the current
-      // page; but per the task we still list it to align cache shape.
-      search,
     ],
     queryFn: () =>
       api.get<{
@@ -663,6 +660,32 @@ export function DatasetDetailView() {
       if (context?.previousRecords)
         queryClient.setQueryData(["dataset-records", datasetId], context.previousRecords);
       toast.error("Update failed", { description: err instanceof Error ? err.message : "Failed to update status" });
+    },
+  });
+
+  const bulkStatusMutation = useMutation({
+    mutationFn: ({ recordIds, status }: { recordIds: string[]; status: RecordStatus }) =>
+      api.patch<{ ok: boolean; updated: number }>(`/api/datasets/${datasetId}/records/bulk`, { recordIds, status }),
+    onMutate: async ({ recordIds, status }) => {
+      await queryClient.cancelQueries({ queryKey: ["dataset-records", datasetId] });
+      const previousRecords = queryClient.getQueryData(["dataset-records", datasetId]);
+      queryClient.setQueryData(["dataset-records", datasetId], (old: any) => {
+        if (!old) return old;
+        const updateRecord = (r: any) => recordIds.includes(r.id) ? { ...r, status } : r;
+        if (Array.isArray(old)) return old.map(updateRecord);
+        if (old.data) return { ...old, data: old.data.map(updateRecord) };
+        return old;
+      });
+      return { previousRecords };
+    },
+    onError: (err, variables, context: any) => {
+      if (context?.previousRecords) {
+        queryClient.setQueryData(["dataset-records", datasetId], context.previousRecords);
+      }
+      toast.error("Failed to update records", { description: err instanceof Error ? err.message : undefined });
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ["dataset-records", datasetId] });
     },
   });
 
@@ -1356,16 +1379,13 @@ export function DatasetDetailView() {
               variant="outline" 
               size="sm" 
               className="h-7 px-2 text-xs bg-background"
-              disabled={statusMutation.isPending || cannotEdit}
+              disabled={bulkStatusMutation.isPending || cannotEdit}
               onClick={() => {
-                const promises = [...selectedRecords].map(id => statusMutation.mutateAsync({ recordId: id, status: "approved" }).catch(() => {}));
-                toast.promise(Promise.all(promises), {
-                  loading: "Approving records...",
-                  success: () => {
+                bulkStatusMutation.mutate({ recordIds: Array.from(selectedRecords), status: "approved" }, {
+                  onSuccess: () => {
                     setSelectedRecords(new Set());
-                    return `Approved ${selectedRecords.size} records`;
-                  },
-                  error: "Failed to approve some records"
+                    toast.success(`Approved ${selectedRecords.size} records`);
+                  }
                 });
               }}
             >
@@ -1376,18 +1396,8 @@ export function DatasetDetailView() {
               variant="outline" 
               size="sm" 
               className="h-7 px-2 text-xs bg-background"
-              disabled={statusMutation.isPending || cannotEdit}
-              onClick={() => {
-                const promises = [...selectedRecords].map(id => statusMutation.mutateAsync({ recordId: id, status: "rejected" }).catch(() => {}));
-                toast.promise(Promise.all(promises), {
-                  loading: "Rejecting records...",
-                  success: () => {
-                    setSelectedRecords(new Set());
-                    return `Rejected ${selectedRecords.size} records`;
-                  },
-                  error: "Failed to reject some records"
-                });
-              }}
+              disabled={bulkStatusMutation.isPending || cannotEdit}
+                onClick={() => { bulkStatusMutation.mutate({ recordIds: Array.from(selectedRecords), status: "rejected" }, { onSuccess: () => { setSelectedRecords(new Set()); toast.success(`Rejected ${selectedRecords.size} records`); } }); }}
             >
               <ThumbsDown className="mr-1.5 h-3.5 w-3.5 text-destructive" />
               Reject
@@ -2717,3 +2727,10 @@ function AiExtractDialog({
     </Dialog>
   );
 }
+
+
+
+
+
+
+

@@ -37,7 +37,7 @@ export async function GET(req: NextRequest) {
               id: true,
               status: true,
               syncState: { select: { lastSyncAt: true } },
-              _count: { select: { syncConflicts: true } },
+              _count: { select: { syncConflicts: { where: { status: "pending" } } } },
             },
           },
         },
@@ -155,6 +155,11 @@ export async function POST(req: NextRequest) {
         sources: { select: { id: true } },
       },
     });
+
+    if (dataset.schema?.fields?.length) {
+      const { seedColumnsFromSchema } = await import("@/lib/dataset-columns");
+      await seedColumnsFromSchema(dataset.id, dataset.schema.fields);
+    }
 
     await logAudit({
       organizationId,

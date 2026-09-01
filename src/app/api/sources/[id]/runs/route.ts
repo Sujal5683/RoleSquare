@@ -75,6 +75,13 @@ export async function POST(
     const body = await req.json().catch(() => ({}));
     const mode = body?.mode === "historical" ? "historical" : "incremental";
 
+    if (source.runState === "scanning") {
+      return NextResponse.json(
+        { error: "A scan is already in progress for this source." },
+        { status: 409 }
+      );
+    }
+
     const now = new Date();
     const run = await db.$transaction(async (tx) => {
       const r = await tx.sourceRun.create({
@@ -85,12 +92,23 @@ export async function POST(
     });
 
     // Enqueue via BullMQ — creates DB row + pushes to Redis atomically
-    const jobId = await enqueueJob({
-      organizationId,
-      userId: user.id,
-      type:   getJobTypeForSource(source.sourceType as any),
-      payload: { sourceId: id, runId: run.id, mode },
-    });
+    let jobId: string;
+    try {
+      jobId = await enqueueJob({
+        organizationId,
+        userId: user.id,
+        type:   getJobTypeForSource(source.sourceType as any),
+        payload: { sourceId: id, runId: run.id, mode },
+      });
+    } catch (enqueueErr) {
+      // Revert SourceRun and Source if queueing fails (avoids "stuck forever" spinner)
+      await db.sourceRun.update({
+        where: { id: run.id },
+        data: { status: "failed", errorMessage: enqueueErr instanceof Error ? enqueueErr.message : "Failed to queue job" },
+      });
+      await db.source.update({ where: { id }, data: { runState: "idle" } });
+      throw enqueueErr;
+    }
 
     await logAudit({
       organizationId,

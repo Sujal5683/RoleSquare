@@ -24,6 +24,8 @@
 //   - Drive file content is fetched ONCE per row; if LLM fails, only the LLM is retried
 //   - No cross-row data contamination: each EXTRACT_SINGLE_ROW call is a separate HTTP req
 
+import { processImport } from "@/lib/services/import-service";
+import { doDispatch } from "@/lib/webhook-dispatcher";
 import { processGmailScan }  from "@/lib/pipelines/gmail";
 import { processDriveScan }  from "@/lib/pipelines/drive";
 import { processDocsScan }   from "@/lib/pipelines/docs";
@@ -125,8 +127,10 @@ export async function processJob(job: {
     case "FORMS_SCAN":          result = await processFormsScan(job, payload);              break;
     case "DETERMINISTIC_SYNC":  result = await processDeterministicSync(job, payload);      break;
     case "EXPORT":              result = await processExport(job, payload);                 break;
+      case "SHEETS_IMPORT":       result = await processImport({ importJobId: payload.importJobId as string, organizationId: job.organizationId, userId: job.userId! }) as any; break;
     case "AI_EXTRACTION":       result = await processAiExtractionMaster(job, payload);     break;
     case "EXTRACT_SINGLE_ROW":  result = await processSingleRowExtraction(job, payload);    break;
+      case "WEBHOOK_DISPATCH":      await doDispatch(payload as any); result = { dispatched: true }; break;
     default:                    result = { skipped: true, reason: `Unknown type: ${job.type}` };
   }
 
@@ -162,6 +166,10 @@ function isRetryableError(err: unknown): boolean {
 // ── Progress helper ───────────────────────────────────────────────────────────
 
 export async function updateRunProgress(runId: string, progress: number, _stage: string) {
+  const run = await db.sourceRun.findUnique({ where: { id: runId }, select: { status: true } });
+  if (run?.status === "failed" || run?.status === "cancelled") {
+    throw new Error("Job was cancelled by user");
+  }
   await db.sourceRun.update({ where: { id: runId }, data: { progress } });
 }
 
@@ -778,3 +786,6 @@ async function processExport(
   const csv = [header, ...rows].map((r) => r.join(",")).join("\n");
   return { format, recordCount, csvLength: csv.length, generatedAt: new Date().toISOString() };
 }
+
+
+

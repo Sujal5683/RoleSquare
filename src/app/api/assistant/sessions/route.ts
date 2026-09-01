@@ -1,4 +1,4 @@
-﻿/**
+/**
  * GET  /api/assistant/sessions
  *   Returns the current user's assistant sessions from the last 7 days,
  *   ordered by most recently updated. Expired and deleted sessions are excluded.
@@ -18,6 +18,7 @@ export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import { requireRole, AuthError, authErrorResponse } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { safeDecryptContent } from "../crypto";
 
 // ── Session list ──────────────────────────────────────────────────────────
 
@@ -61,7 +62,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json(
       sessions.map((s) => ({
         id: s.id,
-        title: s.title,
+        title: s.title === "New conversation" ? s.title : (safeDecryptContent(s.title) ?? "New conversation"),
         suggestionMode: s.suggestionMode,
         messageCount: s._count.messages,
         createdAt: s.createdAt,

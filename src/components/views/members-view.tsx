@@ -333,6 +333,9 @@ export function MembersView() {
       toast.success("Role updated", {
         description: `${m.user.name ?? m.user.email} is now ${m.role}.`,
       });
+
+      queryClient.invalidateQueries({ queryKey: ["organizations", activeOrgId, "members"] });
+
       if (variables.role === "owner") {
          queryClient.invalidateQueries({ queryKey: ["session"] });
       }

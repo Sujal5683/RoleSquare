@@ -29,6 +29,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireRole, AuthError, authErrorResponse } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { logAudit } from "@/lib/audit";
+import { decryptContent } from "../crypto";
 
 // ── Token type ────────────────────────────────────────────────────────────
 
@@ -49,6 +50,11 @@ interface UndoPayload {
     /** recreate_schema */
     name?: string;
     description?: string | null;
+    /** recreate_schema_field */
+    type?: string;
+    required?: boolean;
+    position?: number;
+    options?: any;
     promptTemplate?: string | null;
     fields?: Array<{
       name: string; type: string; description?: string | null;
@@ -66,18 +72,18 @@ export async function POST(req: NextRequest) {
   try {
     const { user, organizationId } = await requireRole(req, "member");
     const body = await req.json().catch(() => ({}));
+    const rawToken = body.undoToken;
 
-    const rawToken: string = body.undoToken ?? "";
-    if (!rawToken) {
-      return NextResponse.json({ error: "undoToken is required" }, { status: 400 });
+    if (!rawToken || typeof rawToken !== "string") {
+      return NextResponse.json({ error: "Missing undoToken" }, { status: 400 });
     }
 
     // Decode and validate the undo token
     let payload: UndoPayload;
     try {
-      payload = JSON.parse(atob(rawToken)) as UndoPayload;
+      payload = JSON.parse(decryptContent(rawToken)) as UndoPayload;
     } catch {
-      return NextResponse.json({ error: "Invalid undo token" }, { status: 400 });
+      return NextResponse.json({ error: "Invalid or forged undo token" }, { status: 400 });
     }
 
     // TTL check — tokens expire after 1 hour
@@ -208,6 +214,16 @@ export async function POST(req: NextRequest) {
         if (!previousRole || !targetEmail) {
           return NextResponse.json({ error: "Undo data incomplete" }, { status: 400 });
         }
+        
+        // Security Check: Enforce role hierarchy for AI-driven undo role changes
+        const ROLE_LEVEL: Record<string, number> = { owner: 5, admin: 4, manager: 3, member: 2, viewer: 1 };
+        const actorMembership = await db.organizationMember.findUnique({
+          where: { organizationId_userId: { organizationId, userId: user.id } }
+        });
+        if (!actorMembership || actorMembership.status !== "active") return NextResponse.json({ error: "Access denied" }, { status: 403 });
+        const actorLevel = ROLE_LEVEL[actorMembership.role] ?? 0;
+        if (actorLevel < ROLE_LEVEL.manager) return NextResponse.json({ error: "Only managers and above can restore roles." }, { status: 403 });
+
         const targetUser = await db.user.findUnique({ where: { email: targetEmail } });
         if (!targetUser) {
           return NextResponse.json({ error: `User "${targetEmail}" not found` }, { status: 404 });
@@ -218,6 +234,17 @@ export async function POST(req: NextRequest) {
         if (!membership) {
           return NextResponse.json({ error: `"${targetEmail}" is no longer a member` }, { status: 404 });
         }
+
+        const targetLevel = ROLE_LEVEL[membership.role] ?? 0;
+        const newLevel = ROLE_LEVEL[previousRole] ?? 0;
+
+        if (user.id === targetUser.id) {
+          if (newLevel > targetLevel) return NextResponse.json({ error: "You cannot promote yourself." }, { status: 403 });
+        } else {
+          if (actorLevel <= targetLevel && membership.role !== "viewer") return NextResponse.json({ error: `You cannot modify the role of a ${membership.role}` }, { status: 403 });
+          if (actorLevel < newLevel) return NextResponse.json({ error: `You cannot grant a role higher than your own` }, { status: 403 });
+        }
+
         await db.organizationMember.update({ where: { id: membership.id }, data: { role: previousRole } });
         await logAudit({
           organizationId, actorId: user.id, actorType: "ai",

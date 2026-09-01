@@ -139,6 +139,41 @@ export async function executeTool(
   userId: string,
   appOrigin: string
 ): Promise<unknown> {
+    const def = getToolDef(toolName);
+  if (!def) {
+    throw new Error("Unknown tool: $" + "{toolName}". Check the available tools list.");
+  }
+
+  const actorMembership = await db.organizationMember.findUnique({
+    where: { organizationId_userId: { organizationId, userId } }
+  });
+  if (!actorMembership || actorMembership.status !== "active") {
+    throw new Error("Permission denied: Not an active member of this organization.");
+  }
+
+  const role = actorMembership.role;
+  const ROLE_LEVEL: Record<string, number> = { owner: 5, admin: 4, manager: 3, member: 2, viewer: 1 };
+  const level = ROLE_LEVEL[role] ?? 0;
+
+  // GLOBAL SECURITY CHECK
+  if (def.isWrite) {
+    if (level < ROLE_LEVEL.member) {
+      throw new Error(`Permission denied: Viewers cannot perform write operations (${toolName}).`);
+    }
+
+    // Admin-only tools
+    const adminTools = ["invite_member", "remove_member", "revoke_google_connection", "grant_dataset_access", "update_member_role"];
+    if (adminTools.includes(toolName) && level < ROLE_LEVEL.admin) {
+      throw new Error(`Permission denied: '${toolName}' requires admin privileges.`);
+    }
+
+    // Manager-only tools (destructive)
+    const managerTools = ["delete_dataset", "delete_schema", "delete_source", "delete_dataset_record", "delete_schema_field"];
+    if (managerTools.includes(toolName) && level < ROLE_LEVEL.manager) {
+      throw new Error(`Permission denied: '${toolName}' requires manager privileges.`);
+    }
+  }
+
   switch (toolName) {
 
     // ── Navigation (client-side, just echo intent) ─────────────────────────
@@ -334,8 +369,12 @@ export async function executeTool(
 
     case "update_dataset": {
       const datasetId = requireString(args.datasetId, "datasetId");
+      const { verifyDatasetAccess } = await import("@/lib/auth");
       const dataset = await db.dataset.findUnique({ where: { id: datasetId } });
       if (!dataset || dataset.organizationId !== organizationId) throw new Error(`Dataset ${datasetId} not found`);
+      const hasAccess = await verifyDatasetAccess(dataset, organizationId, userId, "edit");
+      if (!hasAccess) throw new Error(`Access denied to update dataset ${datasetId}`);
+
       const schemaId = typeof args.schemaId === "string" ? args.schemaId : undefined;
       if (schemaId) {
         const schema = await db.schema.findFirst({ where: { id: schemaId, organizationId } });
@@ -348,8 +387,12 @@ export async function executeTool(
 
     case "delete_dataset": {
       const datasetId = requireString(args.datasetId, "datasetId");
+      const { verifyDatasetAccess } = await import("@/lib/auth");
       const dataset = await db.dataset.findUnique({ where: { id: datasetId } });
       if (!dataset || dataset.organizationId !== organizationId) throw new Error(`Dataset ${datasetId} not found`);
+      const hasAccess = await verifyDatasetAccess(dataset, organizationId, userId, "owner");
+      if (!hasAccess) throw new Error(`Access denied to delete dataset ${datasetId}`);
+
       await db.dataset.delete({ where: { id: datasetId } });
       await logAudit({ organizationId, actorId: userId, actorType: "ai", action: "delete", entity: "dataset", entityId: datasetId, before: { name: dataset.name } });
       // Dataset deletes are NOT undoable — records cascade-deleted permanently
@@ -359,8 +402,12 @@ export async function executeTool(
     case "update_record_status": {
       const recordId = requireString(args.recordId, "recordId");
       const status = requireString(args.status, "status"); // "approved" | "rejected" | "needs_review"
+      const { verifyDatasetAccess } = await import("@/lib/auth");
       const record = await db.datasetRecord.findUnique({ where: { id: recordId }, include: { dataset: true } });
       if (!record || record.dataset.organizationId !== organizationId) throw new Error(`Record ${recordId} not found`);
+      const hasAccess = await verifyDatasetAccess(record.dataset, organizationId, userId, "edit");
+      if (!hasAccess) throw new Error(`Access denied to update records in dataset ${record.datasetId}`);
+
       await db.datasetRecord.update({ where: { id: recordId }, data: { status } });
       await logAudit({ organizationId, actorId: userId, actorType: "ai", action: "update_status", entity: "record", entityId: recordId, before: { status: record.status }, after: { status } });
       return { ok: true, recordId, status };
@@ -369,12 +416,17 @@ export async function executeTool(
     case "correct_extracted_value": {
       const valueId = requireString(args.valueId, "valueId");
       const newValue = requireString(args.newValue, "newValue");
+      const { verifyDatasetAccess } = await import("@/lib/auth");
       // Find the value, ensuring the parent record and dataset belong to the user's org
       const datasetValue = await db.datasetValue.findUnique({ 
         where: { id: valueId }, 
         include: { record: { include: { dataset: true } } } 
       });
       if (!datasetValue || datasetValue.record.dataset.organizationId !== organizationId) throw new Error(`Value ${valueId} not found`);
+      
+      const hasAccess = await verifyDatasetAccess(datasetValue.record.dataset, organizationId, userId, "edit");
+      if (!hasAccess) throw new Error(`Access denied to correct values in dataset ${datasetValue.record.datasetId}`);
+
       
       // Keep the original value if it's the first correction, else keep existing originalValue
       const originalValue = datasetValue.originalValue ?? datasetValue.value;
@@ -922,6 +974,16 @@ export async function executeTool(
         throw new Error(`Invalid role "${newRole}". Must be one of: ${validRoles.join(", ")}`);
       }
 
+      // Security Check: Enforce role hierarchy for AI-driven role changes
+      const ROLE_LEVEL: Record<string, number> = { owner: 5, admin: 4, manager: 3, member: 2, viewer: 1 };
+      const actorMembership = await db.organizationMember.findUnique({
+        where: { organizationId_userId: { organizationId, userId } }
+      });
+      if (!actorMembership || actorMembership.status !== "active") throw new Error("Actor is not an active member");
+      
+      const actorLevel = ROLE_LEVEL[actorMembership.role] ?? 0;
+      if (actorLevel < ROLE_LEVEL.manager) throw new Error("Only managers and above can change roles.");
+
       // Find the target user
       const targetUser = await db.user.findUnique({ where: { email: targetEmail } });
       if (!targetUser) throw new Error(`No user found with email "${targetEmail}"`);
@@ -931,6 +993,16 @@ export async function executeTool(
         where: { organizationId, userId: targetUser.id, status: "active" },
       });
       if (!membership) throw new Error(`"${targetEmail}" is not an active member of this organization`);
+
+      const targetLevel = ROLE_LEVEL[membership.role] ?? 0;
+      const newLevel = ROLE_LEVEL[newRole] ?? 0;
+
+      if (userId === targetUser.id) {
+        if (newLevel > targetLevel) throw new Error("You cannot promote yourself.");
+      } else {
+        if (actorLevel <= targetLevel && membership.role !== "viewer") throw new Error(`You cannot modify the role of a ${membership.role}`);
+        if (actorLevel < newLevel) throw new Error(`You cannot grant a role higher than your own (${actorMembership.role})`);
+      }
 
       // Prevent changing the last owner
       if (membership.role === "owner" && newRole !== "owner") {
@@ -960,3 +1032,8 @@ function requireString(value: unknown, fieldName: string): string {
   }
   return value.trim();
 }
+
+
+
+
+

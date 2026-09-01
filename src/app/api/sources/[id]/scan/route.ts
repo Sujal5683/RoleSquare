@@ -43,6 +43,13 @@ export async function POST(
     const body = await req.json().catch(() => ({}));
     const mode = body?.mode === "historical" ? "historical" : "incremental";
 
+    if (source.runState === "scanning") {
+      return NextResponse.json(
+        { error: "A scan is already in progress for this source." },
+        { status: 409 }
+      );
+    }
+
     try {
       const { checkUserLimits } = await import("@/lib/usage");
       await checkUserLimits(user.id, "jobs");

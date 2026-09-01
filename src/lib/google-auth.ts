@@ -85,7 +85,7 @@ export interface OAuthState {
 
 /**
  * Builds the Google OAuth consent URL.
- * @param state  An object with userId + organizationId, base64-encoded into the `state` param.
+ * @param state  An object with userId + organizationId, encrypted into the `state` param.
  */
 export function buildGoogleOAuthUrl(state: OAuthState): string {
   const clientId = process.env.GOOGLE_CLIENT_ID;
@@ -101,7 +101,7 @@ export function buildGoogleOAuthUrl(state: OAuthState): string {
     scope: OAUTH_SCOPES.join(" "),
     access_type: "offline",    // request refresh token
     prompt: "consent",          // always show consent to force refresh token issuance
-    state: Buffer.from(JSON.stringify(state)).toString("base64url"),
+    state: encryptToken(JSON.stringify(state)),
   });
 
   return `${GOOGLE_AUTH_URL}?${params.toString()}`;
@@ -110,11 +110,11 @@ export function buildGoogleOAuthUrl(state: OAuthState): string {
 /**
  * Decodes and validates the `state` parameter from the OAuth callback.
  */
-export function decodeOAuthState(stateB64: string): OAuthState {
+export function decodeOAuthState(encryptedState: string): OAuthState {
   try {
-    const decoded = JSON.parse(Buffer.from(stateB64, "base64url").toString("utf8"));
+    const decoded = JSON.parse(decryptToken(encryptedState));
     if (!decoded.userId || !decoded.organizationId) {
-      throw new Error("Invalid state");
+      throw new Error("Invalid state structure");
     }
     return decoded as OAuthState;
   } catch {

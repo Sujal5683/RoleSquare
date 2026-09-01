@@ -317,16 +317,21 @@ export async function POST(req: NextRequest) {
               select: { id: true },
             });
 
+            const externalIdPayloads = [];
             for (let i = 0; i < records.length && i < tabData.dataRows.length; i++) {
-              await db.datasetRowExternalId.create({
-                data: {
-                  datasetId: dataset.id,
-                  recordId: records[i].id,
-                  sheetMappingId: m.id,
-                  externalId: tabData.dataRows[i].externalId,
-                  sheetRowIndex: i + 2, // 1-based, row 1 = header
-                  lastSyncedAt: new Date(),
-                },
+              externalIdPayloads.push({
+                datasetId: dataset.id,
+                recordId: records[i].id,
+                sheetMappingId: m.id,
+                externalId: tabData.dataRows[i].externalId,
+                sheetRowIndex: i + 2, // 1-based, row 1 = header
+                lastSyncedAt: new Date(),
+              });
+            }
+
+            if (externalIdPayloads.length > 0) {
+              await db.datasetRowExternalId.createMany({
+                data: externalIdPayloads,
               });
             }
 

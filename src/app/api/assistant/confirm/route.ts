@@ -128,17 +128,17 @@ function buildUndoToken(
 
   // create_schema → undo = delete the schema
   if (toolName === "create_schema" && typeof res?.id === "string") {
-    return btoa(JSON.stringify({ action: "delete_schema", entity: "schema", entityId: res.id, expiresAt }));
+    return encryptContent(JSON.stringify({ action: "delete_schema", entity: "schema", entityId: res.id, expiresAt }));
   }
 
   // create_dataset → undo = delete the dataset
   if (toolName === "create_dataset" && typeof res?.id === "string") {
-    return btoa(JSON.stringify({ action: "delete_dataset", entity: "dataset", entityId: res.id, expiresAt }));
+    return encryptContent(JSON.stringify({ action: "delete_dataset", entity: "dataset", entityId: res.id, expiresAt }));
   }
 
   // delete_schema → undo = re-create from _undoData embedded in the result
   if (toolName === "delete_schema" && typeof res?._undoData !== "undefined") {
-    return btoa(JSON.stringify({
+    return encryptContent(JSON.stringify({
       action: "recreate_schema",
       entity: "schema",
       entityId: res.deletedId,
@@ -149,12 +149,12 @@ function buildUndoToken(
 
   // add_schema_field → undo = delete the new field
   if (toolName === "add_schema_field" && typeof res?.fieldId === "string") {
-    return btoa(JSON.stringify({ action: "delete_schema_field", entity: "schema_field", entityId: res.fieldId, expiresAt }));
+    return encryptContent(JSON.stringify({ action: "delete_schema_field", entity: "schema_field", entityId: res.fieldId, expiresAt }));
   }
 
   // update_member_role → undo = restore the previous role
   if (toolName === "update_member_role" && typeof res?.previousRole === "string") {
-    return btoa(JSON.stringify({
+    return encryptContent(JSON.stringify({
       action: "restore_member_role",
       entity: "org_member",
       email: args.email,
@@ -165,12 +165,12 @@ function buildUndoToken(
 
   // pause_source → undo = resume
   if (toolName === "pause_source" && typeof res?.sourceId === "string") {
-    return btoa(JSON.stringify({ action: "resume_source", entity: "source", entityId: res.sourceId, expiresAt }));
+    return encryptContent(JSON.stringify({ action: "resume_source", entity: "source", entityId: res.sourceId, expiresAt }));
   }
 
   // resume_source → undo = pause
   if (toolName === "resume_source" && typeof res?.sourceId === "string") {
-    return btoa(JSON.stringify({ action: "pause_source", entity: "source", entityId: res.sourceId, expiresAt }));
+    return encryptContent(JSON.stringify({ action: "pause_source", entity: "source", entityId: res.sourceId, expiresAt }));
   }
 
   // delete_dataset, cancel_job, retry_job etc. are not undoable
