@@ -139,7 +139,7 @@ export async function executeTool(
   userId: string,
   appOrigin: string
 ): Promise<unknown> {
-    const def = getToolDef(toolName);
+  const def = getToolDef(toolName);
   if (!def) {
     throw new Error(`Unknown tool: ${toolName}. Check the available tools list.`);
   }

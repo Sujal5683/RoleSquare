@@ -317,7 +317,7 @@ export async function POST(req: NextRequest) {
               select: { id: true },
             });
 
-            const externalIdPayloads = [];
+            const externalIdPayloads: any[] = [];
             for (let i = 0; i < records.length && i < tabData.dataRows.length; i++) {
               externalIdPayloads.push({
                 datasetId: dataset.id,
