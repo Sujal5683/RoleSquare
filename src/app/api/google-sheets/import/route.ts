@@ -22,7 +22,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { requireOrgContext, AuthError, authErrorResponse , requireRole} from "@/lib/auth";
 import { logAudit } from "@/lib/audit";
-import { enqueueJob } from "@/lib/job-queue";
+import { enqueueJob } from "@/lib/queue";
 
 const VALID_MODES = ["append", "update_existing", "append_update", "replace"];
 

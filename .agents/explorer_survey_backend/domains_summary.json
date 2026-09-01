@@ -1,0 +1,1899 @@
+{
+  "Auth & Session": [
+    {
+      "file": "auth/callback/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "auth": {
+        "hasOrgContext": false,
+        "hasExplicitOrg": false,
+        "hasCurrentUser": false,
+        "roles": [],
+        "hasVerifyDatasetAccess": false,
+        "hasAuthError": false
+      },
+      "hasZod": false,
+      "lines": 33
+    },
+    {
+      "file": "auth/logout/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "auth": {
+        "hasOrgContext": false,
+        "hasExplicitOrg": false,
+        "hasCurrentUser": true,
+        "roles": [],
+        "hasVerifyDatasetAccess": false,
+        "hasAuthError": false
+      },
+      "hasZod": false,
+      "lines": 23
+    },
+    {
+      "file": "session/route.ts",
+      "methods": [
+        "GET",
+        "PATCH"
+      ],
+      "auth": {
+        "hasOrgContext": false,
+        "hasExplicitOrg": false,
+        "hasCurrentUser": true,
+        "roles": [],
+        "hasVerifyDatasetAccess": false,
+        "hasAuthError": false
+      },
+      "hasZod": false,
+      "lines": 78
+    },
+    {
+      "file": "debug-error/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "auth": {
+        "hasOrgContext": false,
+        "hasExplicitOrg": false,
+        "hasCurrentUser": true,
+        "roles": [],
+        "hasVerifyDatasetAccess": false,
+        "hasAuthError": false
+      },
+      "hasZod": false,
+      "lines": 18
+    },
+    {
+      "file": "users/search/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "auth": {
+        "hasOrgContext": false,
+        "hasExplicitOrg": false,
+        "hasCurrentUser": true,
+        "roles": [],
+        "hasVerifyDatasetAccess": false,
+        "hasAuthError": true
+      },
+      "hasZod": false,
+      "lines": 60
+    }
+  ],
+  "2FA": [
+    {
+      "file": "2fa/setup/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "auth": {
+        "hasOrgContext": false,
+        "hasExplicitOrg": false,
+        "hasCurrentUser": true,
+        "roles": [],
+        "hasVerifyDatasetAccess": false,
+        "hasAuthError": false
+      },
+      "hasZod": false,
+      "lines": 42
+    },
+    {
+      "file": "2fa/verify/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "auth": {
+        "hasOrgContext": false,
+        "hasExplicitOrg": false,
+        "hasCurrentUser": true,
+        "roles": [],
+        "hasVerifyDatasetAccess": false,
+        "hasAuthError": false
+      },
+      "hasZod": false,
+      "lines": 56
+    },
+    {
+      "file": "2fa/disable/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "auth": {
+        "hasOrgContext": false,
+        "hasExplicitOrg": false,
+        "hasCurrentUser": true,
+        "roles": [],
+        "hasVerifyDatasetAccess": false,
+        "hasAuthError": false
+      },
+      "hasZod": false,
+      "lines": 26
+    }
+  ],
+  "Organizations, Members & Invitations": [
+    {
+      "file": "organizations/route.ts",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "auth": {
+        "hasOrgContext": false,
+        "hasExplicitOrg": false,
+        "hasCurrentUser": true,
+        "roles": [],
+        "hasVerifyDatasetAccess": false,
+        "hasAuthError": false
+      },
+      "hasZod": false,
+      "lines": 101
+    },
+    {
+      "file": "organizations/search/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "auth": {
+        "hasOrgContext": true,
+        "hasExplicitOrg": false,
+        "hasCurrentUser": false,
+        "roles": [],
+        "hasVerifyDatasetAccess": false,
+        "hasAuthError": true
+      },
+      "hasZod": false,
+      "lines": 46
+    },
+    {
+      "file": "organizations/[id]/route.ts",
+      "methods": [
+        "GET",
+        "PATCH",
+        "DELETE"
+      ],
+      "auth": {
+        "hasOrgContext": false,
+        "hasExplicitOrg": false,
+        "hasCurrentUser": true,
+        "roles": [],
+        "hasVerifyDatasetAccess": false,
+        "hasAuthError": true
+      },
+      "hasZod": false,
+      "lines": 185
+    },
+    {
+      "file": "organizations/[id]/invitations/route.ts",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "auth": {
+        "hasOrgContext": false,
+        "hasExplicitOrg": false,
+        "hasCurrentUser": true,
+        "roles": [],
+        "hasVerifyDatasetAccess": false,
+        "hasAuthError": true
+      },
+      "hasZod": false,
+      "lines": 158
+    },
+    {
+      "file": "organizations/[id]/members/route.ts",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "auth": {
+        "hasOrgContext": false,
+        "hasExplicitOrg": false,
+        "hasCurrentUser": true,
+        "roles": [],
+        "hasVerifyDatasetAccess": false,
+        "hasAuthError": true
+      },
+      "hasZod": false,
+      "lines": 164
+    },
+    {
+      "file": "organizations/[id]/members/me/route.ts",
+      "methods": [
+        "PATCH"
+      ],
+      "auth": {
+        "hasOrgContext": false,
+        "hasExplicitOrg": false,
+        "hasCurrentUser": true,
+        "roles": [],
+        "hasVerifyDatasetAccess": false,
+        "hasAuthError": true
+      },
+      "hasZod": false,
+      "lines": 86
+    },
+    {
+      "file": "organizations/[id]/members/[memberId]/route.ts",
+      "methods": [
+        "PATCH",
+        "DELETE"
+      ],
+      "auth": {
+        "hasOrgContext": false,
+        "hasExplicitOrg": false,
+        "hasCurrentUser": true,
+        "roles": [],
+        "hasVerifyDatasetAccess": false,
+        "hasAuthError": true
+      },
+      "hasZod": false,
+      "lines": 213
+    },
+    {
+      "file": "organizations/[id]/members/[memberId]/resend/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "auth": {
+        "hasOrgContext": false,
+        "hasExplicitOrg": false,
+        "hasCurrentUser": true,
+        "roles": [],
+        "hasVerifyDatasetAccess": false,
+        "hasAuthError": true
+      },
+      "hasZod": false,
+      "lines": 80
+    },
+    {
+      "file": "invitations/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "auth": {
+        "hasOrgContext": false,
+        "hasExplicitOrg": false,
+        "hasCurrentUser": true,
+        "roles": [],
+        "hasVerifyDatasetAccess": false,
+        "hasAuthError": true
+      },
+      "hasZod": false,
+      "lines": 62
+    },
+    {
+      "file": "invitations/accept/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "auth": {
+        "hasOrgContext": false,
+        "hasExplicitOrg": false,
+        "hasCurrentUser": true,
+        "roles": [],
+        "hasVerifyDatasetAccess": false,
+        "hasAuthError": true
+      },
+      "hasZod": false,
+      "lines": 115
+    },
+    {
+      "file": "invitations/decline/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "auth": {
+        "hasOrgContext": false,
+        "hasExplicitOrg": false,
+        "hasCurrentUser": true,
+        "roles": [],
+        "hasVerifyDatasetAccess": false,
+        "hasAuthError": true
+      },
+      "hasZod": false,
+      "lines": 53
+    }
+  ],
+  "Datasets, Records & Columns": [
+    {
+      "file": "datasets/route.ts",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "auth": {
+        "hasOrgContext": true,
+        "hasExplicitOrg": false,
+        "hasCurrentUser": false,
+        "roles": [
+          "member"
+        ],
+        "hasVerifyDatasetAccess": false,
+        "hasAuthError": true
+      },
+      "hasZod": false,
+      "lines": 182
+    },
+    {
+      "file": "datasets/[id]/route.ts",
+      "methods": [
+        "GET",
+        "PATCH",
+        "DELETE"
+      ],
+      "auth": {
+        "hasOrgContext": true,
+        "hasExplicitOrg": false,
+        "hasCurrentUser": false,
+        "roles": [
+          "member",
+          "member"
+        ],
+        "hasVerifyDatasetAccess": true,
+        "hasAuthError": true
+      },
+      "hasZod": false,
+      "lines": 200
+    },
+    {
+      "file": "datasets/[id]/columns/route.ts",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "auth": {
+        "hasOrgContext": true,
+        "hasExplicitOrg": false,
+        "hasCurrentUser": false,
+        "roles": [
+          "member"
+        ],
+        "hasVerifyDatasetAccess": true,
+        "hasAuthError": true
+      },
+      "hasZod": false,
+      "lines": 100
+    },
+    {
+      "file": "datasets/[id]/columns/[columnId]/route.ts",
+      "methods": [
+        "DELETE"
+      ],
+      "auth": {
+        "hasOrgContext": true,
+        "hasExplicitOrg": false,
+        "hasCurrentUser": false,
+        "roles": [
+          "member"
+        ],
+        "hasVerifyDatasetAccess": true,
+        "hasAuthError": true
+      },
+      "hasZod": false,
+      "lines": 34
+    },
+    {
+      "file": "datasets/[id]/records/route.ts",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "auth": {
+        "hasOrgContext": true,
+        "hasExplicitOrg": false,
+        "hasCurrentUser": false,
+        "roles": [
+          "member"
+        ],
+        "hasVerifyDatasetAccess": true,
+        "hasAuthError": true
+      },
+      "hasZod": false,
+      "lines": 169
+    },
+    {
+      "file": "datasets/[id]/records/bulk/route.ts",
+      "methods": [
+        "DELETE",
+        "PATCH"
+      ],
+      "auth": {
+        "hasOrgContext": true,
+        "hasExplicitOrg": false,
+        "hasCurrentUser": false,
+        "roles": [
+          "member",
+          "member"
+        ],
+        "hasVerifyDatasetAccess": true,
+        "hasAuthError": true
+      },
+      "hasZod": false,
+      "lines": 120
+    },
+    {
+      "file": "datasets/[id]/records/[recordId]/route.ts",
+      "methods": [
+        "GET",
+        "PATCH"
+      ],
+      "auth": {
+        "hasOrgContext": true,
+        "hasExplicitOrg": false,
+        "hasCurrentUser": false,
+        "roles": [
+          "member"
+        ],
+        "hasVerifyDatasetAccess": true,
+        "hasAuthError": true
+      },
+      "hasZod": false,
+      "lines": 113
+    },
+    {
+      "file": "datasets/[id]/records/[recordId]/values/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "auth": {
+        "hasOrgContext": true,
+        "hasExplicitOrg": false,
+        "hasCurrentUser": false,
+        "roles": [],
+        "hasVerifyDatasetAccess": true,
+        "hasAuthError": true
+      },
+      "hasZod": false,
+      "lines": 56
+    },
+    {
+      "file": "datasets/[id]/records/[recordId]/values/[valueId]/route.ts",
+      "methods": [
+        "PATCH"
+      ],
+      "auth": {
+        "hasOrgContext": true,
+        "hasExplicitOrg": false,
+        "hasCurrentUser": false,
+        "roles": [
+          "member"
+        ],
+        "hasVerifyDatasetAccess": true,
+        "hasAuthError": true
+      },
+      "hasZod": false,
+      "lines": 116
+    },
+    {
+      "file": "datasets/[id]/export/route.ts",
+      "methods": [
+        "POST",
+        "GET"
+      ],
+      "auth": {
+        "hasOrgContext": false,
+        "hasExplicitOrg": false,
+        "hasCurrentUser": false,
+        "roles": [
+          "member",
+          "member"
+        ],
+        "hasVerifyDatasetAccess": true,
+        "hasAuthError": true
+      },
+      "hasZod": false,
+      "lines": 141
+    },
+    {
+      "file": "datasets/[id]/import/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "auth": {
+        "hasOrgContext": true,
+        "hasExplicitOrg": false,
+        "hasCurrentUser": false,
+        "roles": [
+          "member"
+        ],
+        "hasVerifyDatasetAccess": true,
+        "hasAuthError": true
+      },
+      "hasZod": false,
+      "lines": 194
+    },
+    {
+      "file": "datasets/[id]/import-history/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "auth": {
+        "hasOrgContext": true,
+        "hasExplicitOrg": false,
+        "hasCurrentUser": false,
+        "roles": [],
+        "hasVerifyDatasetAccess": false,
+        "hasAuthError": true
+      },
+      "hasZod": false,
+      "lines": 69
+    }
+  ],
+  "Schemas & Fields": [
+    {
+      "file": "schemas/route.ts",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "auth": {
+        "hasOrgContext": true,
+        "hasExplicitOrg": false,
+        "hasCurrentUser": false,
+        "roles": [
+          "member"
+        ],
+        "hasVerifyDatasetAccess": false,
+        "hasAuthError": true
+      },
+      "hasZod": false,
+      "lines": 94
+    },
+    {
+      "file": "schemas/[id]/route.ts",
+      "methods": [
+        "GET",
+        "PATCH",
+        "DELETE"
+      ],
+      "auth": {
+        "hasOrgContext": true,
+        "hasExplicitOrg": false,
+        "hasCurrentUser": false,
+        "roles": [
+          "member",
+          "member"
+        ],
+        "hasVerifyDatasetAccess": false,
+        "hasAuthError": true
+      },
+      "hasZod": false,
+      "lines": 147
+    },
+    {
+      "file": "schemas/[id]/clone/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "auth": {
+        "hasOrgContext": true,
+        "hasExplicitOrg": false,
+        "hasCurrentUser": false,
+        "roles": [
+          "member"
+        ],
+        "hasVerifyDatasetAccess": false,
+        "hasAuthError": true
+      },
+      "hasZod": false,
+      "lines": 77
+    },
+    {
+      "file": "schemas/[id]/fields/route.ts",
+      "methods": [
+        "POST",
+        "PUT"
+      ],
+      "auth": {
+        "hasOrgContext": true,
+        "hasExplicitOrg": false,
+        "hasCurrentUser": false,
+        "roles": [
+          "member",
+          "member"
+        ],
+        "hasVerifyDatasetAccess": false,
+        "hasAuthError": true
+      },
+      "hasZod": false,
+      "lines": 148
+    },
+    {
+      "file": "schemas/[id]/fields/reorder/route.ts",
+      "methods": [
+        "PATCH"
+      ],
+      "auth": {
+        "hasOrgContext": true,
+        "hasExplicitOrg": false,
+        "hasCurrentUser": false,
+        "roles": [
+          "member"
+        ],
+        "hasVerifyDatasetAccess": false,
+        "hasAuthError": true
+      },
+      "hasZod": false,
+      "lines": 49
+    },
+    {
+      "file": "schemas/[id]/fields/[fieldId]/route.ts",
+      "methods": [
+        "PATCH",
+        "DELETE"
+      ],
+      "auth": {
+        "hasOrgContext": true,
+        "hasExplicitOrg": false,
+        "hasCurrentUser": false,
+        "roles": [
+          "member",
+          "member"
+        ],
+        "hasVerifyDatasetAccess": false,
+        "hasAuthError": true
+      },
+      "hasZod": false,
+      "lines": 145
+    },
+    {
+      "file": "schemas/[id]/test-extraction/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "auth": {
+        "hasOrgContext": true,
+        "hasExplicitOrg": false,
+        "hasCurrentUser": false,
+        "roles": [
+          "member"
+        ],
+        "hasVerifyDatasetAccess": false,
+        "hasAuthError": true
+      },
+      "hasZod": false,
+      "lines": 79
+    }
+  ],
+  "Sources, Rules, Runs & Scanning": [
+    {
+      "file": "sources/route.ts",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "auth": {
+        "hasOrgContext": true,
+        "hasExplicitOrg": false,
+        "hasCurrentUser": false,
+        "roles": [
+          "member"
+        ],
+        "hasVerifyDatasetAccess": false,
+        "hasAuthError": true
+      },
+      "hasZod": false,
+      "lines": 154
+    },
+    {
+      "file": "sources/test-scan/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "auth": {
+        "hasOrgContext": true,
+        "hasExplicitOrg": false,
+        "hasCurrentUser": false,
+        "roles": [
+          "member"
+        ],
+        "hasVerifyDatasetAccess": false,
+        "hasAuthError": true
+      },
+      "hasZod": false,
+      "lines": 125
+    },
+    {
+      "file": "sources/[id]/route.ts",
+      "methods": [
+        "GET",
+        "PATCH",
+        "DELETE"
+      ],
+      "auth": {
+        "hasOrgContext": true,
+        "hasExplicitOrg": false,
+        "hasCurrentUser": false,
+        "roles": [
+          "member",
+          "member"
+        ],
+        "hasVerifyDatasetAccess": false,
+        "hasAuthError": true
+      },
+      "hasZod": false,
+      "lines": 170
+    },
+    {
+      "file": "sources/[id]/cancel-scan/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "auth": {
+        "hasOrgContext": false,
+        "hasExplicitOrg": false,
+        "hasCurrentUser": false,
+        "roles": [
+          "member"
+        ],
+        "hasVerifyDatasetAccess": false,
+        "hasAuthError": true
+      },
+      "hasZod": false,
+      "lines": 99
+    },
+    {
+      "file": "sources/[id]/clone/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "auth": {
+        "hasOrgContext": true,
+        "hasExplicitOrg": false,
+        "hasCurrentUser": false,
+        "roles": [
+          "member"
+        ],
+        "hasVerifyDatasetAccess": false,
+        "hasAuthError": true
+      },
+      "hasZod": false,
+      "lines": 87
+    },
+    {
+      "file": "sources/[id]/default-dataset/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "auth": {
+        "hasOrgContext": true,
+        "hasExplicitOrg": false,
+        "hasCurrentUser": false,
+        "roles": [],
+        "hasVerifyDatasetAccess": false,
+        "hasAuthError": true
+      },
+      "hasZod": false,
+      "lines": 58
+    },
+    {
+      "file": "sources/[id]/emails/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "auth": {
+        "hasOrgContext": true,
+        "hasExplicitOrg": false,
+        "hasCurrentUser": false,
+        "roles": [],
+        "hasVerifyDatasetAccess": false,
+        "hasAuthError": true
+      },
+      "hasZod": false,
+      "lines": 83
+    },
+    {
+      "file": "sources/[id]/extract/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "auth": {
+        "hasOrgContext": true,
+        "hasExplicitOrg": false,
+        "hasCurrentUser": false,
+        "roles": [
+          "member"
+        ],
+        "hasVerifyDatasetAccess": false,
+        "hasAuthError": true
+      },
+      "hasZod": false,
+      "lines": 143
+    },
+    {
+      "file": "sources/[id]/rules/route.ts",
+      "methods": [
+        "GET",
+        "PUT"
+      ],
+      "auth": {
+        "hasOrgContext": true,
+        "hasExplicitOrg": false,
+        "hasCurrentUser": false,
+        "roles": [
+          "member"
+        ],
+        "hasVerifyDatasetAccess": false,
+        "hasAuthError": true
+      },
+      "hasZod": false,
+      "lines": 101
+    },
+    {
+      "file": "sources/[id]/runs/route.ts",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "auth": {
+        "hasOrgContext": true,
+        "hasExplicitOrg": false,
+        "hasCurrentUser": false,
+        "roles": [
+          "member"
+        ],
+        "hasVerifyDatasetAccess": false,
+        "hasAuthError": true
+      },
+      "hasZod": false,
+      "lines": 131
+    },
+    {
+      "file": "sources/[id]/scan/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "auth": {
+        "hasOrgContext": true,
+        "hasExplicitOrg": false,
+        "hasCurrentUser": false,
+        "roles": [
+          "member"
+        ],
+        "hasVerifyDatasetAccess": false,
+        "hasAuthError": true
+      },
+      "hasZod": false,
+      "lines": 105
+    }
+  ],
+  "AI Extraction, Jobs & Logs": [
+    {
+      "file": "extraction/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "auth": {
+        "hasOrgContext": true,
+        "hasExplicitOrg": false,
+        "hasCurrentUser": false,
+        "roles": [
+          "member"
+        ],
+        "hasVerifyDatasetAccess": false,
+        "hasAuthError": true
+      },
+      "hasZod": false,
+      "lines": 155
+    },
+    {
+      "file": "ai/extract-wizard/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "auth": {
+        "hasOrgContext": true,
+        "hasExplicitOrg": false,
+        "hasCurrentUser": false,
+        "roles": [
+          "member"
+        ],
+        "hasVerifyDatasetAccess": false,
+        "hasAuthError": true
+      },
+      "hasZod": false,
+      "lines": 143
+    },
+    {
+      "file": "ai/model-status/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "auth": {
+        "hasOrgContext": false,
+        "hasExplicitOrg": false,
+        "hasCurrentUser": false,
+        "roles": [],
+        "hasVerifyDatasetAccess": false,
+        "hasAuthError": false
+      },
+      "hasZod": false,
+      "lines": 23
+    },
+    {
+      "file": "ai-jobs/route.ts",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "auth": {
+        "hasOrgContext": true,
+        "hasExplicitOrg": false,
+        "hasCurrentUser": false,
+        "roles": [
+          "member"
+        ],
+        "hasVerifyDatasetAccess": false,
+        "hasAuthError": true
+      },
+      "hasZod": false,
+      "lines": 96
+    },
+    {
+      "file": "ai-jobs/[id]/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "auth": {
+        "hasOrgContext": true,
+        "hasExplicitOrg": false,
+        "hasCurrentUser": false,
+        "roles": [],
+        "hasVerifyDatasetAccess": false,
+        "hasAuthError": true
+      },
+      "hasZod": false,
+      "lines": 37
+    },
+    {
+      "file": "ai-jobs/[id]/cancel/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "auth": {
+        "hasOrgContext": true,
+        "hasExplicitOrg": false,
+        "hasCurrentUser": false,
+        "roles": [
+          "member"
+        ],
+        "hasVerifyDatasetAccess": false,
+        "hasAuthError": true
+      },
+      "hasZod": false,
+      "lines": 90
+    },
+    {
+      "file": "ai-jobs/[id]/logs/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "auth": {
+        "hasOrgContext": true,
+        "hasExplicitOrg": false,
+        "hasCurrentUser": false,
+        "roles": [],
+        "hasVerifyDatasetAccess": false,
+        "hasAuthError": true
+      },
+      "hasZod": false,
+      "lines": 59
+    },
+    {
+      "file": "ai-jobs/[id]/outputs/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "auth": {
+        "hasOrgContext": true,
+        "hasExplicitOrg": false,
+        "hasCurrentUser": false,
+        "roles": [],
+        "hasVerifyDatasetAccess": false,
+        "hasAuthError": true
+      },
+      "hasZod": false,
+      "lines": 53
+    },
+    {
+      "file": "ai-jobs/[id]/retry/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "auth": {
+        "hasOrgContext": true,
+        "hasExplicitOrg": false,
+        "hasCurrentUser": false,
+        "roles": [
+          "member"
+        ],
+        "hasVerifyDatasetAccess": false,
+        "hasAuthError": true
+      },
+      "hasZod": false,
+      "lines": 100
+    },
+    {
+      "file": "agent-logs/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "auth": {
+        "hasOrgContext": true,
+        "hasExplicitOrg": false,
+        "hasCurrentUser": false,
+        "roles": [],
+        "hasVerifyDatasetAccess": false,
+        "hasAuthError": true
+      },
+      "hasZod": false,
+      "lines": 48
+    }
+  ],
+  "AI Assistant & Sessions": [
+    {
+      "file": "assistant/chat/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "auth": {
+        "hasOrgContext": false,
+        "hasExplicitOrg": false,
+        "hasCurrentUser": false,
+        "roles": [
+          "member"
+        ],
+        "hasVerifyDatasetAccess": false,
+        "hasAuthError": true
+      },
+      "hasZod": false,
+      "lines": 446
+    },
+    {
+      "file": "assistant/confirm/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "auth": {
+        "hasOrgContext": false,
+        "hasExplicitOrg": false,
+        "hasCurrentUser": false,
+        "roles": [
+          "member"
+        ],
+        "hasVerifyDatasetAccess": false,
+        "hasAuthError": true
+      },
+      "hasZod": false,
+      "lines": 179
+    },
+    {
+      "file": "assistant/undo/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "auth": {
+        "hasOrgContext": false,
+        "hasExplicitOrg": false,
+        "hasCurrentUser": false,
+        "roles": [
+          "member"
+        ],
+        "hasVerifyDatasetAccess": false,
+        "hasAuthError": true
+      },
+      "hasZod": false,
+      "lines": 296
+    },
+    {
+      "file": "assistant/sessions/route.ts",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "auth": {
+        "hasOrgContext": false,
+        "hasExplicitOrg": false,
+        "hasCurrentUser": false,
+        "roles": [
+          "member",
+          "member"
+        ],
+        "hasVerifyDatasetAccess": false,
+        "hasAuthError": true
+      },
+      "hasZod": false,
+      "lines": 105
+    },
+    {
+      "file": "assistant/sessions/[id]/route.ts",
+      "methods": [
+        "GET",
+        "DELETE"
+      ],
+      "auth": {
+        "hasOrgContext": false,
+        "hasExplicitOrg": false,
+        "hasCurrentUser": false,
+        "roles": [
+          "member",
+          "member"
+        ],
+        "hasVerifyDatasetAccess": false,
+        "hasAuthError": true
+      },
+      "hasZod": false,
+      "lines": 129
+    }
+  ],
+  "Google Connections & OAuth": [
+    {
+      "file": "google/authorize/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "auth": {
+        "hasOrgContext": true,
+        "hasExplicitOrg": false,
+        "hasCurrentUser": false,
+        "roles": [
+          "member"
+        ],
+        "hasVerifyDatasetAccess": false,
+        "hasAuthError": true
+      },
+      "hasZod": false,
+      "lines": 27
+    },
+    {
+      "file": "google/callback/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "auth": {
+        "hasOrgContext": false,
+        "hasExplicitOrg": false,
+        "hasCurrentUser": true,
+        "roles": [],
+        "hasVerifyDatasetAccess": false,
+        "hasAuthError": false
+      },
+      "hasZod": false,
+      "lines": 142
+    },
+    {
+      "file": "google-connections/route.ts",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "auth": {
+        "hasOrgContext": true,
+        "hasExplicitOrg": false,
+        "hasCurrentUser": false,
+        "roles": [
+          "member"
+        ],
+        "hasVerifyDatasetAccess": false,
+        "hasAuthError": true
+      },
+      "hasZod": false,
+      "lines": 49
+    },
+    {
+      "file": "google-connections/[id]/route.ts",
+      "methods": [
+        "PATCH",
+        "DELETE"
+      ],
+      "auth": {
+        "hasOrgContext": true,
+        "hasExplicitOrg": false,
+        "hasCurrentUser": false,
+        "roles": [
+          "member",
+          "member"
+        ],
+        "hasVerifyDatasetAccess": false,
+        "hasAuthError": true
+      },
+      "hasZod": false,
+      "lines": 117
+    }
+  ],
+  "Google Sheets Integration": [
+    {
+      "file": "google-sheets/auth/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "auth": {
+        "hasOrgContext": true,
+        "hasExplicitOrg": false,
+        "hasCurrentUser": false,
+        "roles": [
+          "member"
+        ],
+        "hasVerifyDatasetAccess": false,
+        "hasAuthError": true
+      },
+      "hasZod": false,
+      "lines": 41
+    },
+    {
+      "file": "google-sheets/auth/callback/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "auth": {
+        "hasOrgContext": false,
+        "hasExplicitOrg": false,
+        "hasCurrentUser": true,
+        "roles": [],
+        "hasVerifyDatasetAccess": false,
+        "hasAuthError": false
+      },
+      "hasZod": false,
+      "lines": 126
+    },
+    {
+      "file": "google-sheets/accounts/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "auth": {
+        "hasOrgContext": true,
+        "hasExplicitOrg": false,
+        "hasCurrentUser": false,
+        "roles": [],
+        "hasVerifyDatasetAccess": false,
+        "hasAuthError": true
+      },
+      "hasZod": false,
+      "lines": 61
+    },
+    {
+      "file": "google-sheets/accounts/[id]/route.ts",
+      "methods": [
+        "DELETE"
+      ],
+      "auth": {
+        "hasOrgContext": true,
+        "hasExplicitOrg": false,
+        "hasCurrentUser": false,
+        "roles": [
+          "member"
+        ],
+        "hasVerifyDatasetAccess": false,
+        "hasAuthError": true
+      },
+      "hasZod": false,
+      "lines": 82
+    },
+    {
+      "file": "google-sheets/spreadsheets/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "auth": {
+        "hasOrgContext": true,
+        "hasExplicitOrg": false,
+        "hasCurrentUser": false,
+        "roles": [],
+        "hasVerifyDatasetAccess": false,
+        "hasAuthError": true
+      },
+      "hasZod": false,
+      "lines": 43
+    },
+    {
+      "file": "google-sheets/spreadsheets/[id]/tabs/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "auth": {
+        "hasOrgContext": true,
+        "hasExplicitOrg": false,
+        "hasCurrentUser": false,
+        "roles": [],
+        "hasVerifyDatasetAccess": false,
+        "hasAuthError": true
+      },
+      "hasZod": false,
+      "lines": 45
+    },
+    {
+      "file": "google-sheets/spreadsheets/[id]/preview/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "auth": {
+        "hasOrgContext": true,
+        "hasExplicitOrg": false,
+        "hasCurrentUser": false,
+        "roles": [],
+        "hasVerifyDatasetAccess": false,
+        "hasAuthError": true
+      },
+      "hasZod": false,
+      "lines": 68
+    },
+    {
+      "file": "google-sheets/ai-mapping/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "auth": {
+        "hasOrgContext": true,
+        "hasExplicitOrg": false,
+        "hasCurrentUser": false,
+        "roles": [
+          "member"
+        ],
+        "hasVerifyDatasetAccess": false,
+        "hasAuthError": true
+      },
+      "hasZod": false,
+      "lines": 94
+    },
+    {
+      "file": "google-sheets/link/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "auth": {
+        "hasOrgContext": true,
+        "hasExplicitOrg": false,
+        "hasCurrentUser": false,
+        "roles": [
+          "member"
+        ],
+        "hasVerifyDatasetAccess": false,
+        "hasAuthError": true
+      },
+      "hasZod": false,
+      "lines": 195
+    },
+    {
+      "file": "google-sheets/mappings/[id]/route.ts",
+      "methods": [
+        "GET",
+        "PATCH",
+        "DELETE"
+      ],
+      "auth": {
+        "hasOrgContext": true,
+        "hasExplicitOrg": false,
+        "hasCurrentUser": false,
+        "roles": [
+          "member",
+          "member"
+        ],
+        "hasVerifyDatasetAccess": false,
+        "hasAuthError": true
+      },
+      "hasZod": false,
+      "lines": 215
+    },
+    {
+      "file": "google-sheets/mappings/[id]/sync/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "auth": {
+        "hasOrgContext": true,
+        "hasExplicitOrg": false,
+        "hasCurrentUser": false,
+        "roles": [
+          "member"
+        ],
+        "hasVerifyDatasetAccess": false,
+        "hasAuthError": true
+      },
+      "hasZod": false,
+      "lines": 48
+    },
+    {
+      "file": "google-sheets/mappings/[id]/history/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "auth": {
+        "hasOrgContext": true,
+        "hasExplicitOrg": false,
+        "hasCurrentUser": false,
+        "roles": [],
+        "hasVerifyDatasetAccess": false,
+        "hasAuthError": true
+      },
+      "hasZod": false,
+      "lines": 77
+    },
+    {
+      "file": "google-sheets/mappings/[id]/conflicts/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "auth": {
+        "hasOrgContext": true,
+        "hasExplicitOrg": false,
+        "hasCurrentUser": false,
+        "roles": [],
+        "hasVerifyDatasetAccess": false,
+        "hasAuthError": true
+      },
+      "hasZod": false,
+      "lines": 39
+    },
+    {
+      "file": "google-sheets/mappings/[id]/conflicts/[conflictId]/resolve/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "auth": {
+        "hasOrgContext": true,
+        "hasExplicitOrg": false,
+        "hasCurrentUser": false,
+        "roles": [
+          "member"
+        ],
+        "hasVerifyDatasetAccess": false,
+        "hasAuthError": true
+      },
+      "hasZod": false,
+      "lines": 69
+    },
+    {
+      "file": "google-sheets/mappings/[id]/schema-versions/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "auth": {
+        "hasOrgContext": true,
+        "hasExplicitOrg": false,
+        "hasCurrentUser": false,
+        "roles": [],
+        "hasVerifyDatasetAccess": false,
+        "hasAuthError": true
+      },
+      "hasZod": false,
+      "lines": 36
+    },
+    {
+      "file": "google-sheets/mappings/[id]/schema-versions/[versionId]/rollback/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "auth": {
+        "hasOrgContext": true,
+        "hasExplicitOrg": false,
+        "hasCurrentUser": false,
+        "roles": [
+          "member"
+        ],
+        "hasVerifyDatasetAccess": false,
+        "hasAuthError": true
+      },
+      "hasZod": false,
+      "lines": 56
+    },
+    {
+      "file": "google-sheets/import/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "auth": {
+        "hasOrgContext": true,
+        "hasExplicitOrg": false,
+        "hasCurrentUser": false,
+        "roles": [
+          "member"
+        ],
+        "hasVerifyDatasetAccess": false,
+        "hasAuthError": true
+      },
+      "hasZod": false,
+      "lines": 153
+    },
+    {
+      "file": "google-sheets/import/[id]/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "auth": {
+        "hasOrgContext": true,
+        "hasExplicitOrg": false,
+        "hasCurrentUser": false,
+        "roles": [],
+        "hasVerifyDatasetAccess": false,
+        "hasAuthError": true
+      },
+      "hasZod": false,
+      "lines": 75
+    },
+    {
+      "file": "google-sheets/export/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "auth": {
+        "hasOrgContext": true,
+        "hasExplicitOrg": false,
+        "hasCurrentUser": false,
+        "roles": [
+          "member"
+        ],
+        "hasVerifyDatasetAccess": true,
+        "hasAuthError": true
+      },
+      "hasZod": false,
+      "lines": 89
+    },
+    {
+      "file": "google-sheets/org-export/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "auth": {
+        "hasOrgContext": true,
+        "hasExplicitOrg": false,
+        "hasCurrentUser": false,
+        "roles": [
+          "member"
+        ],
+        "hasVerifyDatasetAccess": false,
+        "hasAuthError": true
+      },
+      "hasZod": false,
+      "lines": 364
+    },
+    {
+      "file": "cron/sheets-sync/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "auth": {
+        "hasOrgContext": false,
+        "hasExplicitOrg": false,
+        "hasCurrentUser": false,
+        "roles": [],
+        "hasVerifyDatasetAccess": false,
+        "hasAuthError": false
+      },
+      "hasZod": false,
+      "lines": 112
+    }
+  ],
+  "Sharing & Access Governance": [
+    {
+      "file": "sharing/permissions/route.ts",
+      "methods": [
+        "GET",
+        "POST",
+        "DELETE",
+        "PATCH"
+      ],
+      "auth": {
+        "hasOrgContext": true,
+        "hasExplicitOrg": false,
+        "hasCurrentUser": false,
+        "roles": [
+          "member",
+          "member",
+          "member"
+        ],
+        "hasVerifyDatasetAccess": false,
+        "hasAuthError": true
+      },
+      "hasZod": false,
+      "lines": 281
+    },
+    {
+      "file": "sharing/cross-org/route.ts",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "auth": {
+        "hasOrgContext": true,
+        "hasExplicitOrg": false,
+        "hasCurrentUser": false,
+        "roles": [
+          "member"
+        ],
+        "hasVerifyDatasetAccess": false,
+        "hasAuthError": true
+      },
+      "hasZod": false,
+      "lines": 100
+    },
+    {
+      "file": "sharing/cross-org/[id]/route.ts",
+      "methods": [
+        "PATCH"
+      ],
+      "auth": {
+        "hasOrgContext": true,
+        "hasExplicitOrg": false,
+        "hasCurrentUser": false,
+        "roles": [
+          "member"
+        ],
+        "hasVerifyDatasetAccess": false,
+        "hasAuthError": true
+      },
+      "hasZod": false,
+      "lines": 120
+    },
+    {
+      "file": "sharing/requests/route.ts",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "auth": {
+        "hasOrgContext": true,
+        "hasExplicitOrg": false,
+        "hasCurrentUser": false,
+        "roles": [
+          "member"
+        ],
+        "hasVerifyDatasetAccess": false,
+        "hasAuthError": true
+      },
+      "hasZod": false,
+      "lines": 112
+    },
+    {
+      "file": "sharing/requests/[id]/approve/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "auth": {
+        "hasOrgContext": true,
+        "hasExplicitOrg": false,
+        "hasCurrentUser": false,
+        "roles": [
+          "member"
+        ],
+        "hasVerifyDatasetAccess": false,
+        "hasAuthError": true
+      },
+      "hasZod": false,
+      "lines": 126
+    },
+    {
+      "file": "sharing/requests/[id]/reject/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "auth": {
+        "hasOrgContext": true,
+        "hasExplicitOrg": false,
+        "hasCurrentUser": false,
+        "roles": [
+          "member"
+        ],
+        "hasVerifyDatasetAccess": false,
+        "hasAuthError": true
+      },
+      "hasZod": false,
+      "lines": 70
+    }
+  ],
+  "Audit, Usage & Dashboard": [
+    {
+      "file": "audit/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "auth": {
+        "hasOrgContext": true,
+        "hasExplicitOrg": false,
+        "hasCurrentUser": false,
+        "roles": [],
+        "hasVerifyDatasetAccess": false,
+        "hasAuthError": true
+      },
+      "hasZod": false,
+      "lines": 58
+    },
+    {
+      "file": "usage/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "auth": {
+        "hasOrgContext": true,
+        "hasExplicitOrg": false,
+        "hasCurrentUser": false,
+        "roles": [],
+        "hasVerifyDatasetAccess": false,
+        "hasAuthError": true
+      },
+      "hasZod": false,
+      "lines": 112
+    },
+    {
+      "file": "usage/trends/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "auth": {
+        "hasOrgContext": true,
+        "hasExplicitOrg": false,
+        "hasCurrentUser": false,
+        "roles": [],
+        "hasVerifyDatasetAccess": false,
+        "hasAuthError": true
+      },
+      "hasZod": false,
+      "lines": 286
+    },
+    {
+      "file": "dashboard/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "auth": {
+        "hasOrgContext": true,
+        "hasExplicitOrg": false,
+        "hasCurrentUser": false,
+        "roles": [],
+        "hasVerifyDatasetAccess": false,
+        "hasAuthError": true
+      },
+      "hasZod": false,
+      "lines": 240
+    }
+  ],
+  "Webhooks": [
+    {
+      "file": "webhooks/route.ts",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "auth": {
+        "hasOrgContext": true,
+        "hasExplicitOrg": false,
+        "hasCurrentUser": false,
+        "roles": [
+          "member"
+        ],
+        "hasVerifyDatasetAccess": false,
+        "hasAuthError": true
+      },
+      "hasZod": false,
+      "lines": 106
+    },
+    {
+      "file": "webhooks/[id]/route.ts",
+      "methods": [
+        "PATCH",
+        "DELETE"
+      ],
+      "auth": {
+        "hasOrgContext": true,
+        "hasExplicitOrg": false,
+        "hasCurrentUser": false,
+        "roles": [
+          "member",
+          "member"
+        ],
+        "hasVerifyDatasetAccess": false,
+        "hasAuthError": true
+      },
+      "hasZod": false,
+      "lines": 129
+    }
+  ],
+  "Invoices & Billing": [
+    {
+      "file": "invoices/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "auth": {
+        "hasOrgContext": false,
+        "hasExplicitOrg": false,
+        "hasCurrentUser": true,
+        "roles": [],
+        "hasVerifyDatasetAccess": false,
+        "hasAuthError": false
+      },
+      "hasZod": false,
+      "lines": 28
+    }
+  ],
+  "Search": [
+    {
+      "file": "search/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "auth": {
+        "hasOrgContext": true,
+        "hasExplicitOrg": false,
+        "hasCurrentUser": false,
+        "roles": [],
+        "hasVerifyDatasetAccess": false,
+        "hasAuthError": true
+      },
+      "hasZod": false,
+      "lines": 138
+    }
+  ],
+  "System / Jobs / Misc": [
+    {
+      "file": "jobs/process/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "auth": {
+        "hasOrgContext": false,
+        "hasExplicitOrg": false,
+        "hasCurrentUser": false,
+        "roles": [],
+        "hasVerifyDatasetAccess": false,
+        "hasAuthError": false
+      },
+      "hasZod": false,
+      "lines": 18
+    },
+    {
+      "file": "health/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "auth": {
+        "hasOrgContext": false,
+        "hasExplicitOrg": false,
+        "hasCurrentUser": false,
+        "roles": [],
+        "hasVerifyDatasetAccess": false,
+        "hasAuthError": false
+      },
+      "hasZod": false,
+      "lines": 203
+    },
+    {
+      "file": "route.ts",
+      "methods": [
+        "GET"
+      ],
+      "auth": {
+        "hasOrgContext": false,
+        "hasExplicitOrg": false,
+        "hasCurrentUser": false,
+        "roles": [],
+        "hasVerifyDatasetAccess": false,
+        "hasAuthError": false
+      },
+      "hasZod": false,
+      "lines": 5
+    }
+  ]
+}

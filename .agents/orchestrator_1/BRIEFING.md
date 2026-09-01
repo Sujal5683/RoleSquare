@@ -1,4 +1,4 @@
-# BRIEFING — 2026-09-01T08:40:29Z
+# BRIEFING — 2026-09-01T08:48:55Z
 
 ## Mission
 Lead a deep, iterative, production-grade audit and stabilization of the entire codebase at `c:\CDS IIT JMU`, executing 50+ meaningful documented audit cycles with full subagent delegation across frontend, backend, supabase/DB, async jobs, and security/auth.
@@ -34,7 +34,7 @@ Lead a deep, iterative, production-grade audit and stabilization of the entire c
   6. Batch 5: Security, RBAC, Role Escalation & Member Lifecycle (M5) [pending]
   7. Final Verification & Stabilization Verification (M6) [pending]
 - **Current phase**: Survey & Mapping (Phase 0)
-- **Current focus**: Surveying codebase via 3 parallel Explorers
+- **Current focus**: Waiting for Explorer 3 (DB, Supabase RLS & Security) survey report
 
 ## 🔒 Key Constraints
 - NEVER write, modify, or create source code files directly (Dispatch-Only).
@@ -46,23 +46,24 @@ Lead a deep, iterative, production-grade audit and stabilization of the entire c
 
 ## Current Parent
 - Conversation ID: 2da9fcfb-ff46-4cb4-98d8-99403a99bcd7
-- Updated: 2026-09-01T08:40:29Z
+- Updated: 2026-09-01T08:48:55Z
 
 ## Key Decisions Made
-- Architecture: Next.js / Supabase / AI Studio / Role-based management stack.
-- Orchestration pattern: Project Pattern with iterative dispatch batches.
+- Architecture: Next.js 16 + React 19 + Tailwind 4 hybrid App Router / 106 REST API endpoints / Supabase / Zustand + TanStack Query.
+- Key Frontend Findings: Missing ErrorBoundaries / error.tsx, Optimistic Mutation key/structure bugs in dataset-detail-view, Query key inconsistencies, Org switcher stale resource IDs, localStorage hydration mismatch, missing AbortControllers in SSE assistant chat.
+- Key Backend Findings: VULN-01 (Session privilege escalation), VULN-02 (2FA bypass on disable), VULN-03 (Cron secret bypass), VULN-04 (Stack trace leak), VULN-05 (Middleware 307 vs 401 on APIs), VULN-06 (Org-id scoping).
 
 ## Team Roster
 | Agent | Type | Work Item | Status | Conv ID |
 |-------|------|-----------|--------|---------|
-| explorer_survey_frontend | teamwork_preview_explorer | Phase 0 Frontend Survey | running | aa899a7d-2452-477e-80f6-1d191cd99194 |
-| explorer_survey_backend | teamwork_preview_explorer | Phase 0 Backend API Survey | running | 80b0a40d-7a44-4983-9763-ee6d5f317bff |
+| explorer_survey_frontend | teamwork_preview_explorer | Phase 0 Frontend Survey | completed | aa899a7d-2452-477e-80f6-1d191cd99194 |
+| explorer_survey_backend | teamwork_preview_explorer | Phase 0 Backend API Survey | completed | 80b0a40d-7a44-4983-9763-ee6d5f317bff |
 | explorer_survey_db_security | teamwork_preview_explorer | Phase 0 DB & Security Survey | running | 43e2e3e8-7aab-4a51-b380-c7590cf6d63c |
 
 ## Succession Status
 - Succession required: no
 - Spawn count: 3 / 16
-- Pending subagents: aa899a7d-2452-477e-80f6-1d191cd99194, 80b0a40d-7a44-4983-9763-ee6d5f317bff, 43e2e3e8-7aab-4a51-b380-c7590cf6d63c
+- Pending subagents: 43e2e3e8-7aab-4a51-b380-c7590cf6d63c
 - Predecessor: none
 - Successor: not yet spawned
 
@@ -75,4 +76,6 @@ Lead a deep, iterative, production-grade audit and stabilization of the entire c
 - `c:\CDS IIT JMU\.agents\orchestrator_1\DISPATCH.md` — Dispatch log
 - `c:\CDS IIT JMU\.agents\orchestrator_1\plan.md` — Master audit plan
 - `c:\CDS IIT JMU\.agents\orchestrator_1\progress.md` — Progress tracker
+- `c:\CDS IIT JMU\.agents\explorer_survey_frontend\survey_report.md` — Explorer 1 Frontend Survey
+- `c:\CDS IIT JMU\.agents\explorer_survey_backend\survey_report.md` — Explorer 2 Backend Survey
 - `c:\CDS IIT JMU\PROJECT.md` — Global architecture & audit inventory

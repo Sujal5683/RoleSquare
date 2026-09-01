@@ -1,0 +1,2966 @@
+[
+  {
+    "file": "2fa/disable/route.ts",
+    "methods": [
+      {
+        "method": "POST",
+        "params": ""
+      }
+    ],
+    "auth": {
+      "hasRequireOrgContext": false,
+      "hasRequireRole": false,
+      "roles": [],
+      "hasRequireExplicitOrg": false,
+      "hasGetCurrentUser": true,
+      "hasVerifyDatasetAccess": false,
+      "hasCreateClient": false,
+      "hasAuthErrorResponse": false
+    },
+    "hasZod": false,
+    "hasJsonParse": false,
+    "potentialIdor": [],
+    "externalAPIs": [],
+    "codeLength": 26
+  },
+  {
+    "file": "2fa/setup/route.ts",
+    "methods": [
+      {
+        "method": "POST",
+        "params": ""
+      }
+    ],
+    "auth": {
+      "hasRequireOrgContext": false,
+      "hasRequireRole": false,
+      "roles": [],
+      "hasRequireExplicitOrg": false,
+      "hasGetCurrentUser": true,
+      "hasVerifyDatasetAccess": false,
+      "hasCreateClient": false,
+      "hasAuthErrorResponse": false
+    },
+    "hasZod": false,
+    "hasJsonParse": false,
+    "potentialIdor": [],
+    "externalAPIs": [],
+    "codeLength": 42
+  },
+  {
+    "file": "2fa/verify/route.ts",
+    "methods": [
+      {
+        "method": "POST",
+        "params": "req: NextRequest"
+      }
+    ],
+    "auth": {
+      "hasRequireOrgContext": false,
+      "hasRequireRole": false,
+      "roles": [],
+      "hasRequireExplicitOrg": false,
+      "hasGetCurrentUser": true,
+      "hasVerifyDatasetAccess": false,
+      "hasCreateClient": false,
+      "hasAuthErrorResponse": false
+    },
+    "hasZod": false,
+    "hasJsonParse": false,
+    "potentialIdor": [],
+    "externalAPIs": [],
+    "codeLength": 56
+  },
+  {
+    "file": "agent-logs/route.ts",
+    "methods": [
+      {
+        "method": "GET",
+        "params": "req: NextRequest"
+      }
+    ],
+    "auth": {
+      "hasRequireOrgContext": true,
+      "hasRequireRole": false,
+      "roles": [],
+      "hasRequireExplicitOrg": false,
+      "hasGetCurrentUser": false,
+      "hasVerifyDatasetAccess": false,
+      "hasCreateClient": false,
+      "hasAuthErrorResponse": true
+    },
+    "hasZod": false,
+    "hasJsonParse": false,
+    "potentialIdor": [],
+    "externalAPIs": [],
+    "codeLength": 48
+  },
+  {
+    "file": "ai/extract-wizard/route.ts",
+    "methods": [
+      {
+        "method": "POST",
+        "params": "req: NextRequest"
+      }
+    ],
+    "auth": {
+      "hasRequireOrgContext": true,
+      "hasRequireRole": true,
+      "roles": [
+        "member"
+      ],
+      "hasRequireExplicitOrg": false,
+      "hasGetCurrentUser": false,
+      "hasVerifyDatasetAccess": false,
+      "hasCreateClient": false,
+      "hasAuthErrorResponse": true
+    },
+    "hasZod": false,
+    "hasJsonParse": false,
+    "potentialIdor": [],
+    "externalAPIs": [
+      "BullMQ/Redis"
+    ],
+    "codeLength": 143
+  },
+  {
+    "file": "ai/model-status/route.ts",
+    "methods": [
+      {
+        "method": "GET",
+        "params": ""
+      }
+    ],
+    "auth": {
+      "hasRequireOrgContext": false,
+      "hasRequireRole": false,
+      "roles": [],
+      "hasRequireExplicitOrg": false,
+      "hasGetCurrentUser": false,
+      "hasVerifyDatasetAccess": false,
+      "hasCreateClient": false,
+      "hasAuthErrorResponse": false
+    },
+    "hasZod": false,
+    "hasJsonParse": false,
+    "potentialIdor": [],
+    "externalAPIs": [
+      "Gemini AI"
+    ],
+    "codeLength": 23
+  },
+  {
+    "file": "ai-jobs/route.ts",
+    "methods": [
+      {
+        "method": "GET",
+        "params": "req: NextRequest"
+      },
+      {
+        "method": "POST",
+        "params": "req: NextRequest"
+      }
+    ],
+    "auth": {
+      "hasRequireOrgContext": true,
+      "hasRequireRole": true,
+      "roles": [
+        "member"
+      ],
+      "hasRequireExplicitOrg": false,
+      "hasGetCurrentUser": false,
+      "hasVerifyDatasetAccess": false,
+      "hasCreateClient": false,
+      "hasAuthErrorResponse": true
+    },
+    "hasZod": false,
+    "hasJsonParse": false,
+    "potentialIdor": [],
+    "externalAPIs": [
+      "BullMQ/Redis"
+    ],
+    "codeLength": 96
+  },
+  {
+    "file": "ai-jobs/[id]/cancel/route.ts",
+    "methods": [
+      {
+        "method": "POST",
+        "params": "\r\n  req: NextRequest,\r\n  { params }: { params: Promise<{ id: string }> }\r\n"
+      }
+    ],
+    "auth": {
+      "hasRequireOrgContext": true,
+      "hasRequireRole": true,
+      "roles": [
+        "member"
+      ],
+      "hasRequireExplicitOrg": false,
+      "hasGetCurrentUser": false,
+      "hasVerifyDatasetAccess": false,
+      "hasCreateClient": false,
+      "hasAuthErrorResponse": true
+    },
+    "hasZod": false,
+    "hasJsonParse": true,
+    "potentialIdor": [
+      "db.aiJob.findUnique({ where: { id }",
+      "db.aiJob.update({\r\n      where: { id }"
+    ],
+    "externalAPIs": [],
+    "codeLength": 90
+  },
+  {
+    "file": "ai-jobs/[id]/logs/route.ts",
+    "methods": [
+      {
+        "method": "GET",
+        "params": "\n  req: NextRequest,\n  { params }: { params: Promise<{ id: string }> }\n"
+      }
+    ],
+    "auth": {
+      "hasRequireOrgContext": true,
+      "hasRequireRole": false,
+      "roles": [],
+      "hasRequireExplicitOrg": false,
+      "hasGetCurrentUser": false,
+      "hasVerifyDatasetAccess": false,
+      "hasCreateClient": false,
+      "hasAuthErrorResponse": true
+    },
+    "hasZod": false,
+    "hasJsonParse": false,
+    "potentialIdor": [],
+    "externalAPIs": [],
+    "codeLength": 59
+  },
+  {
+    "file": "ai-jobs/[id]/outputs/route.ts",
+    "methods": [
+      {
+        "method": "GET",
+        "params": "\n  req: NextRequest,\n  { params }: { params: Promise<{ id: string }> }\n"
+      }
+    ],
+    "auth": {
+      "hasRequireOrgContext": true,
+      "hasRequireRole": false,
+      "roles": [],
+      "hasRequireExplicitOrg": false,
+      "hasGetCurrentUser": false,
+      "hasVerifyDatasetAccess": false,
+      "hasCreateClient": false,
+      "hasAuthErrorResponse": true
+    },
+    "hasZod": false,
+    "hasJsonParse": false,
+    "potentialIdor": [],
+    "externalAPIs": [],
+    "codeLength": 53
+  },
+  {
+    "file": "ai-jobs/[id]/retry/route.ts",
+    "methods": [
+      {
+        "method": "POST",
+        "params": "\r\n  req: NextRequest,\r\n  { params }: { params: Promise<{ id: string }> }\r\n"
+      }
+    ],
+    "auth": {
+      "hasRequireOrgContext": true,
+      "hasRequireRole": true,
+      "roles": [
+        "member"
+      ],
+      "hasRequireExplicitOrg": false,
+      "hasGetCurrentUser": false,
+      "hasVerifyDatasetAccess": false,
+      "hasCreateClient": false,
+      "hasAuthErrorResponse": true
+    },
+    "hasZod": false,
+    "hasJsonParse": true,
+    "potentialIdor": [
+      "db.aiJob.findUnique({ where: { id }",
+      "db.aiJob.update({\r\n      where: { id }"
+    ],
+    "externalAPIs": [
+      "BullMQ/Redis"
+    ],
+    "codeLength": 100
+  },
+  {
+    "file": "ai-jobs/[id]/route.ts",
+    "methods": [
+      {
+        "method": "GET",
+        "params": "\n  req: NextRequest,\n  { params }: { params: Promise<{ id: string }> }\n"
+      }
+    ],
+    "auth": {
+      "hasRequireOrgContext": true,
+      "hasRequireRole": false,
+      "roles": [],
+      "hasRequireExplicitOrg": false,
+      "hasGetCurrentUser": false,
+      "hasVerifyDatasetAccess": false,
+      "hasCreateClient": false,
+      "hasAuthErrorResponse": true
+    },
+    "hasZod": false,
+    "hasJsonParse": false,
+    "potentialIdor": [
+      "db.aiJob.findUnique({\n      where: { id }"
+    ],
+    "externalAPIs": [],
+    "codeLength": 37
+  },
+  {
+    "file": "assistant/chat/route.ts",
+    "methods": [
+      {
+        "method": "POST",
+        "params": "req: NextRequest"
+      }
+    ],
+    "auth": {
+      "hasRequireOrgContext": false,
+      "hasRequireRole": true,
+      "roles": [
+        "member"
+      ],
+      "hasRequireExplicitOrg": false,
+      "hasGetCurrentUser": false,
+      "hasVerifyDatasetAccess": false,
+      "hasCreateClient": false,
+      "hasAuthErrorResponse": true
+    },
+    "hasZod": false,
+    "hasJsonParse": true,
+    "potentialIdor": [],
+    "externalAPIs": [
+      "Gemini AI"
+    ],
+    "codeLength": 446
+  },
+  {
+    "file": "assistant/confirm/route.ts",
+    "methods": [
+      {
+        "method": "POST",
+        "params": "req: NextRequest"
+      }
+    ],
+    "auth": {
+      "hasRequireOrgContext": false,
+      "hasRequireRole": true,
+      "roles": [
+        "member"
+      ],
+      "hasRequireExplicitOrg": false,
+      "hasGetCurrentUser": false,
+      "hasVerifyDatasetAccess": false,
+      "hasCreateClient": false,
+      "hasAuthErrorResponse": true
+    },
+    "hasZod": false,
+    "hasJsonParse": false,
+    "potentialIdor": [],
+    "externalAPIs": [],
+    "codeLength": 179
+  },
+  {
+    "file": "assistant/sessions/route.ts",
+    "methods": [
+      {
+        "method": "GET",
+        "params": "req: NextRequest"
+      },
+      {
+        "method": "POST",
+        "params": "req: NextRequest"
+      }
+    ],
+    "auth": {
+      "hasRequireOrgContext": false,
+      "hasRequireRole": true,
+      "roles": [
+        "member",
+        "member"
+      ],
+      "hasRequireExplicitOrg": false,
+      "hasGetCurrentUser": false,
+      "hasVerifyDatasetAccess": false,
+      "hasCreateClient": false,
+      "hasAuthErrorResponse": true
+    },
+    "hasZod": false,
+    "hasJsonParse": false,
+    "potentialIdor": [],
+    "externalAPIs": [],
+    "codeLength": 105
+  },
+  {
+    "file": "assistant/sessions/[id]/route.ts",
+    "methods": [
+      {
+        "method": "GET",
+        "params": "\r\n  req: NextRequest,\r\n  { params }: { params: Promise<{ id: string }> }\r\n"
+      },
+      {
+        "method": "DELETE",
+        "params": "\r\n  req: NextRequest,\r\n  { params }: { params: Promise<{ id: string }> }\r\n"
+      }
+    ],
+    "auth": {
+      "hasRequireOrgContext": false,
+      "hasRequireRole": true,
+      "roles": [
+        "member",
+        "member"
+      ],
+      "hasRequireExplicitOrg": false,
+      "hasGetCurrentUser": false,
+      "hasVerifyDatasetAccess": false,
+      "hasCreateClient": false,
+      "hasAuthErrorResponse": true
+    },
+    "hasZod": false,
+    "hasJsonParse": true,
+    "potentialIdor": [
+      "db.assistantSession.update({\r\n      where: { id }"
+    ],
+    "externalAPIs": [
+      "Gemini AI"
+    ],
+    "codeLength": 129
+  },
+  {
+    "file": "assistant/undo/route.ts",
+    "methods": [
+      {
+        "method": "POST",
+        "params": "req: NextRequest"
+      }
+    ],
+    "auth": {
+      "hasRequireOrgContext": false,
+      "hasRequireRole": true,
+      "roles": [
+        "member"
+      ],
+      "hasRequireExplicitOrg": false,
+      "hasGetCurrentUser": false,
+      "hasVerifyDatasetAccess": false,
+      "hasCreateClient": false,
+      "hasAuthErrorResponse": true
+    },
+    "hasZod": false,
+    "hasJsonParse": true,
+    "potentialIdor": [],
+    "externalAPIs": [],
+    "codeLength": 296
+  },
+  {
+    "file": "audit/route.ts",
+    "methods": [
+      {
+        "method": "GET",
+        "params": "req: NextRequest"
+      }
+    ],
+    "auth": {
+      "hasRequireOrgContext": true,
+      "hasRequireRole": false,
+      "roles": [],
+      "hasRequireExplicitOrg": false,
+      "hasGetCurrentUser": false,
+      "hasVerifyDatasetAccess": false,
+      "hasCreateClient": false,
+      "hasAuthErrorResponse": true
+    },
+    "hasZod": false,
+    "hasJsonParse": false,
+    "potentialIdor": [],
+    "externalAPIs": [],
+    "codeLength": 58
+  },
+  {
+    "file": "auth/callback/route.ts",
+    "methods": [
+      {
+        "method": "GET",
+        "params": "request: Request"
+      }
+    ],
+    "auth": {
+      "hasRequireOrgContext": false,
+      "hasRequireRole": false,
+      "roles": [],
+      "hasRequireExplicitOrg": false,
+      "hasGetCurrentUser": false,
+      "hasVerifyDatasetAccess": false,
+      "hasCreateClient": true,
+      "hasAuthErrorResponse": false
+    },
+    "hasZod": false,
+    "hasJsonParse": false,
+    "potentialIdor": [],
+    "externalAPIs": [],
+    "codeLength": 33
+  },
+  {
+    "file": "auth/logout/route.ts",
+    "methods": [
+      {
+        "method": "POST",
+        "params": ""
+      }
+    ],
+    "auth": {
+      "hasRequireOrgContext": false,
+      "hasRequireRole": false,
+      "roles": [],
+      "hasRequireExplicitOrg": false,
+      "hasGetCurrentUser": true,
+      "hasVerifyDatasetAccess": false,
+      "hasCreateClient": true,
+      "hasAuthErrorResponse": false
+    },
+    "hasZod": false,
+    "hasJsonParse": false,
+    "potentialIdor": [],
+    "externalAPIs": [],
+    "codeLength": 23
+  },
+  {
+    "file": "cron/sheets-sync/route.ts",
+    "methods": [
+      {
+        "method": "GET",
+        "params": "req: NextRequest"
+      }
+    ],
+    "auth": {
+      "hasRequireOrgContext": false,
+      "hasRequireRole": false,
+      "roles": [],
+      "hasRequireExplicitOrg": false,
+      "hasGetCurrentUser": false,
+      "hasVerifyDatasetAccess": false,
+      "hasCreateClient": false,
+      "hasAuthErrorResponse": false
+    },
+    "hasZod": false,
+    "hasJsonParse": false,
+    "potentialIdor": [],
+    "externalAPIs": [],
+    "codeLength": 112
+  },
+  {
+    "file": "dashboard/route.ts",
+    "methods": [
+      {
+        "method": "GET",
+        "params": "req: NextRequest"
+      }
+    ],
+    "auth": {
+      "hasRequireOrgContext": true,
+      "hasRequireRole": false,
+      "roles": [],
+      "hasRequireExplicitOrg": false,
+      "hasGetCurrentUser": false,
+      "hasVerifyDatasetAccess": false,
+      "hasCreateClient": false,
+      "hasAuthErrorResponse": true
+    },
+    "hasZod": false,
+    "hasJsonParse": true,
+    "potentialIdor": [],
+    "externalAPIs": [],
+    "codeLength": 240
+  },
+  {
+    "file": "datasets/route.ts",
+    "methods": [
+      {
+        "method": "GET",
+        "params": "req: NextRequest"
+      },
+      {
+        "method": "POST",
+        "params": "req: NextRequest"
+      }
+    ],
+    "auth": {
+      "hasRequireOrgContext": true,
+      "hasRequireRole": true,
+      "roles": [
+        "member"
+      ],
+      "hasRequireExplicitOrg": false,
+      "hasGetCurrentUser": false,
+      "hasVerifyDatasetAccess": false,
+      "hasCreateClient": false,
+      "hasAuthErrorResponse": true
+    },
+    "hasZod": false,
+    "hasJsonParse": false,
+    "potentialIdor": [],
+    "externalAPIs": [],
+    "codeLength": 182
+  },
+  {
+    "file": "datasets/[id]/columns/route.ts",
+    "methods": [
+      {
+        "method": "GET",
+        "params": "\r\n  req: NextRequest,\r\n  { params }: { params: Promise<{ id: string }> }\r\n"
+      },
+      {
+        "method": "POST",
+        "params": "\r\n  req: NextRequest,\r\n  { params }: { params: Promise<{ id: string }> }\r\n"
+      }
+    ],
+    "auth": {
+      "hasRequireOrgContext": true,
+      "hasRequireRole": true,
+      "roles": [
+        "member"
+      ],
+      "hasRequireExplicitOrg": false,
+      "hasGetCurrentUser": false,
+      "hasVerifyDatasetAccess": true,
+      "hasCreateClient": false,
+      "hasAuthErrorResponse": true
+    },
+    "hasZod": false,
+    "hasJsonParse": false,
+    "potentialIdor": [
+      "db.dataset.findUnique({\r\n      where: { id }",
+      "db.dataset.findUnique({\r\n      where: { id }"
+    ],
+    "externalAPIs": [],
+    "codeLength": 100
+  },
+  {
+    "file": "datasets/[id]/columns/[columnId]/route.ts",
+    "methods": [
+      {
+        "method": "DELETE",
+        "params": "\r\n  req: NextRequest,\r\n  { params }: { params: Promise<{ id: string; columnId: string }> }\r\n"
+      }
+    ],
+    "auth": {
+      "hasRequireOrgContext": true,
+      "hasRequireRole": true,
+      "roles": [
+        "member"
+      ],
+      "hasRequireExplicitOrg": false,
+      "hasGetCurrentUser": false,
+      "hasVerifyDatasetAccess": true,
+      "hasCreateClient": false,
+      "hasAuthErrorResponse": true
+    },
+    "hasZod": false,
+    "hasJsonParse": false,
+    "potentialIdor": [
+      "db.dataset.findUnique({\r\n      where: { id }"
+    ],
+    "externalAPIs": [],
+    "codeLength": 34
+  },
+  {
+    "file": "datasets/[id]/export/route.ts",
+    "methods": [
+      {
+        "method": "POST",
+        "params": "\n  req: NextRequest,\n  { params }: { params: Promise<{ id: string }> }\n"
+      },
+      {
+        "method": "GET",
+        "params": "\n  req: NextRequest,\n  { params }: { params: Promise<{ id: string }> }\n"
+      }
+    ],
+    "auth": {
+      "hasRequireOrgContext": false,
+      "hasRequireRole": true,
+      "roles": [
+        "member",
+        "member"
+      ],
+      "hasRequireExplicitOrg": false,
+      "hasGetCurrentUser": false,
+      "hasVerifyDatasetAccess": true,
+      "hasCreateClient": false,
+      "hasAuthErrorResponse": true
+    },
+    "hasZod": false,
+    "hasJsonParse": false,
+    "potentialIdor": [
+      "db.dataset.findUnique({ where: { id }",
+      "db.dataset.findUnique({ where: { id }",
+      "db.dataset.findUnique({\n      where: { id }"
+    ],
+    "externalAPIs": [],
+    "codeLength": 141
+  },
+  {
+    "file": "datasets/[id]/import/route.ts",
+    "methods": [
+      {
+        "method": "POST",
+        "params": "\r\n  req: NextRequest,\r\n  { params }: { params: Promise<{ id: string }> }\r\n"
+      }
+    ],
+    "auth": {
+      "hasRequireOrgContext": true,
+      "hasRequireRole": true,
+      "roles": [
+        "member"
+      ],
+      "hasRequireExplicitOrg": false,
+      "hasGetCurrentUser": false,
+      "hasVerifyDatasetAccess": true,
+      "hasCreateClient": false,
+      "hasAuthErrorResponse": true
+    },
+    "hasZod": false,
+    "hasJsonParse": false,
+    "potentialIdor": [],
+    "externalAPIs": [
+      "Gemini AI"
+    ],
+    "codeLength": 194
+  },
+  {
+    "file": "datasets/[id]/import-history/route.ts",
+    "methods": [
+      {
+        "method": "GET",
+        "params": "\n  req: NextRequest,\n  { params }: { params: Promise<{ id: string }> }\n"
+      }
+    ],
+    "auth": {
+      "hasRequireOrgContext": true,
+      "hasRequireRole": false,
+      "roles": [],
+      "hasRequireExplicitOrg": false,
+      "hasGetCurrentUser": false,
+      "hasVerifyDatasetAccess": false,
+      "hasCreateClient": false,
+      "hasAuthErrorResponse": true
+    },
+    "hasZod": false,
+    "hasJsonParse": true,
+    "potentialIdor": [],
+    "externalAPIs": [],
+    "codeLength": 69
+  },
+  {
+    "file": "datasets/[id]/records/bulk/route.ts",
+    "methods": [
+      {
+        "method": "DELETE",
+        "params": "\r\n  req: NextRequest,\r\n  { params }: { params: Promise<{ id: string }> }\r\n"
+      },
+      {
+        "method": "PATCH",
+        "params": "\n  req: NextRequest,\n  { params }: { params: Promise<{ id: string }> }\n"
+      }
+    ],
+    "auth": {
+      "hasRequireOrgContext": true,
+      "hasRequireRole": true,
+      "roles": [
+        "member",
+        "member"
+      ],
+      "hasRequireExplicitOrg": false,
+      "hasGetCurrentUser": false,
+      "hasVerifyDatasetAccess": true,
+      "hasCreateClient": false,
+      "hasAuthErrorResponse": true
+    },
+    "hasZod": false,
+    "hasJsonParse": false,
+    "potentialIdor": [],
+    "externalAPIs": [],
+    "codeLength": 120
+  },
+  {
+    "file": "datasets/[id]/records/route.ts",
+    "methods": [
+      {
+        "method": "GET",
+        "params": "\r\n  req: NextRequest,\r\n  { params }: { params: Promise<{ id: string }> }\r\n"
+      },
+      {
+        "method": "POST",
+        "params": "\r\n  req: NextRequest,\r\n  { params }: { params: Promise<{ id: string }> }\r\n"
+      }
+    ],
+    "auth": {
+      "hasRequireOrgContext": true,
+      "hasRequireRole": true,
+      "roles": [
+        "member"
+      ],
+      "hasRequireExplicitOrg": false,
+      "hasGetCurrentUser": false,
+      "hasVerifyDatasetAccess": true,
+      "hasCreateClient": false,
+      "hasAuthErrorResponse": true
+    },
+    "hasZod": false,
+    "hasJsonParse": false,
+    "potentialIdor": [
+      "db.dataset.findUnique({\r\n    where: { id }",
+      "db.dataset.update({\r\n      where: { id }"
+    ],
+    "externalAPIs": [],
+    "codeLength": 169
+  },
+  {
+    "file": "datasets/[id]/records/[recordId]/route.ts",
+    "methods": [
+      {
+        "method": "GET",
+        "params": "\r\n  req: NextRequest,\r\n  { params }: { params: Promise<{ id: string; recordId: string }> }\r\n"
+      },
+      {
+        "method": "PATCH",
+        "params": "\r\n  req: NextRequest,\r\n  { params }: { params: Promise<{ id: string; recordId: string }> }\r\n"
+      }
+    ],
+    "auth": {
+      "hasRequireOrgContext": true,
+      "hasRequireRole": true,
+      "roles": [
+        "member"
+      ],
+      "hasRequireExplicitOrg": false,
+      "hasGetCurrentUser": false,
+      "hasVerifyDatasetAccess": true,
+      "hasCreateClient": false,
+      "hasAuthErrorResponse": true
+    },
+    "hasZod": false,
+    "hasJsonParse": false,
+    "potentialIdor": [
+      "db.dataset.findUnique({ where: { id }"
+    ],
+    "externalAPIs": [],
+    "codeLength": 113
+  },
+  {
+    "file": "datasets/[id]/records/[recordId]/values/route.ts",
+    "methods": [
+      {
+        "method": "POST",
+        "params": "\n  req: NextRequest,\n  { params }: { params: Promise<{ id: string; recordId: string }> }\n"
+      }
+    ],
+    "auth": {
+      "hasRequireOrgContext": true,
+      "hasRequireRole": false,
+      "roles": [],
+      "hasRequireExplicitOrg": false,
+      "hasGetCurrentUser": false,
+      "hasVerifyDatasetAccess": true,
+      "hasCreateClient": false,
+      "hasAuthErrorResponse": true
+    },
+    "hasZod": false,
+    "hasJsonParse": true,
+    "potentialIdor": [
+      "db.dataset.findUnique({ where: { id }"
+    ],
+    "externalAPIs": [
+      "Gemini AI"
+    ],
+    "codeLength": 56
+  },
+  {
+    "file": "datasets/[id]/records/[recordId]/values/[valueId]/route.ts",
+    "methods": [
+      {
+        "method": "PATCH",
+        "params": "\r\n  req: NextRequest,\r\n  { params }: { params: Promise<{ id: string; recordId: string; valueId: string }> }\r\n"
+      }
+    ],
+    "auth": {
+      "hasRequireOrgContext": true,
+      "hasRequireRole": true,
+      "roles": [
+        "member"
+      ],
+      "hasRequireExplicitOrg": false,
+      "hasGetCurrentUser": false,
+      "hasVerifyDatasetAccess": true,
+      "hasCreateClient": false,
+      "hasAuthErrorResponse": true
+    },
+    "hasZod": false,
+    "hasJsonParse": true,
+    "potentialIdor": [],
+    "externalAPIs": [],
+    "codeLength": 116
+  },
+  {
+    "file": "datasets/[id]/route.ts",
+    "methods": [
+      {
+        "method": "GET",
+        "params": "\r\n  req: NextRequest,\r\n  { params }: { params: Promise<{ id: string }> }\r\n"
+      },
+      {
+        "method": "PATCH",
+        "params": "\r\n  req: NextRequest,\r\n  { params }: { params: Promise<{ id: string }> }\r\n"
+      },
+      {
+        "method": "DELETE",
+        "params": "\r\n  req: NextRequest,\r\n  { params }: { params: Promise<{ id: string }> }\r\n"
+      }
+    ],
+    "auth": {
+      "hasRequireOrgContext": true,
+      "hasRequireRole": true,
+      "roles": [
+        "member",
+        "member"
+      ],
+      "hasRequireExplicitOrg": false,
+      "hasGetCurrentUser": false,
+      "hasVerifyDatasetAccess": true,
+      "hasCreateClient": false,
+      "hasAuthErrorResponse": true
+    },
+    "hasZod": false,
+    "hasJsonParse": false,
+    "potentialIdor": [
+      "db.dataset.findUnique({\r\n    where: { id }",
+      "db.dataset.update({\r\n      where: { id }",
+      "db.dataset.delete({ where: { id }"
+    ],
+    "externalAPIs": [],
+    "codeLength": 200
+  },
+  {
+    "file": "debug-error/route.ts",
+    "methods": [
+      {
+        "method": "GET",
+        "params": ""
+      }
+    ],
+    "auth": {
+      "hasRequireOrgContext": false,
+      "hasRequireRole": false,
+      "roles": [],
+      "hasRequireExplicitOrg": false,
+      "hasGetCurrentUser": true,
+      "hasVerifyDatasetAccess": false,
+      "hasCreateClient": false,
+      "hasAuthErrorResponse": false
+    },
+    "hasZod": false,
+    "hasJsonParse": false,
+    "potentialIdor": [],
+    "externalAPIs": [],
+    "codeLength": 18
+  },
+  {
+    "file": "extraction/route.ts",
+    "methods": [
+      {
+        "method": "POST",
+        "params": "req: NextRequest"
+      }
+    ],
+    "auth": {
+      "hasRequireOrgContext": true,
+      "hasRequireRole": true,
+      "roles": [
+        "member"
+      ],
+      "hasRequireExplicitOrg": false,
+      "hasGetCurrentUser": false,
+      "hasVerifyDatasetAccess": false,
+      "hasCreateClient": false,
+      "hasAuthErrorResponse": true
+    },
+    "hasZod": false,
+    "hasJsonParse": true,
+    "potentialIdor": [],
+    "externalAPIs": [
+      "Webhooks"
+    ],
+    "codeLength": 155
+  },
+  {
+    "file": "google/authorize/route.ts",
+    "methods": [
+      {
+        "method": "GET",
+        "params": "req: NextRequest"
+      }
+    ],
+    "auth": {
+      "hasRequireOrgContext": true,
+      "hasRequireRole": true,
+      "roles": [
+        "member"
+      ],
+      "hasRequireExplicitOrg": false,
+      "hasGetCurrentUser": false,
+      "hasVerifyDatasetAccess": false,
+      "hasCreateClient": false,
+      "hasAuthErrorResponse": true
+    },
+    "hasZod": false,
+    "hasJsonParse": false,
+    "potentialIdor": [],
+    "externalAPIs": [],
+    "codeLength": 27
+  },
+  {
+    "file": "google/callback/route.ts",
+    "methods": [
+      {
+        "method": "GET",
+        "params": "req: NextRequest"
+      }
+    ],
+    "auth": {
+      "hasRequireOrgContext": false,
+      "hasRequireRole": false,
+      "roles": [],
+      "hasRequireExplicitOrg": false,
+      "hasGetCurrentUser": true,
+      "hasVerifyDatasetAccess": false,
+      "hasCreateClient": false,
+      "hasAuthErrorResponse": false
+    },
+    "hasZod": false,
+    "hasJsonParse": false,
+    "potentialIdor": [],
+    "externalAPIs": [],
+    "codeLength": 142
+  },
+  {
+    "file": "google-connections/route.ts",
+    "methods": [
+      {
+        "method": "GET",
+        "params": "req: NextRequest"
+      },
+      {
+        "method": "POST",
+        "params": "req: NextRequest"
+      }
+    ],
+    "auth": {
+      "hasRequireOrgContext": true,
+      "hasRequireRole": true,
+      "roles": [
+        "member"
+      ],
+      "hasRequireExplicitOrg": false,
+      "hasGetCurrentUser": false,
+      "hasVerifyDatasetAccess": false,
+      "hasCreateClient": false,
+      "hasAuthErrorResponse": true
+    },
+    "hasZod": false,
+    "hasJsonParse": false,
+    "potentialIdor": [],
+    "externalAPIs": [],
+    "codeLength": 49
+  },
+  {
+    "file": "google-connections/[id]/route.ts",
+    "methods": [
+      {
+        "method": "PATCH",
+        "params": "\r\n  req: NextRequest,\r\n  { params }: { params: Promise<{ id: string }> }\r\n"
+      },
+      {
+        "method": "DELETE",
+        "params": "\r\n  req: NextRequest,\r\n  { params }: { params: Promise<{ id: string }> }\r\n"
+      }
+    ],
+    "auth": {
+      "hasRequireOrgContext": true,
+      "hasRequireRole": true,
+      "roles": [
+        "member",
+        "member"
+      ],
+      "hasRequireExplicitOrg": false,
+      "hasGetCurrentUser": false,
+      "hasVerifyDatasetAccess": false,
+      "hasCreateClient": false,
+      "hasAuthErrorResponse": true
+    },
+    "hasZod": false,
+    "hasJsonParse": false,
+    "potentialIdor": [
+      "db.googleConnection.findUnique({ where: { id }",
+      "db.googleConnection.update({\r\n      where: { id }",
+      "db.googleConnection.update({\r\n      where: { id }"
+    ],
+    "externalAPIs": [],
+    "codeLength": 117
+  },
+  {
+    "file": "google-sheets/accounts/route.ts",
+    "methods": [
+      {
+        "method": "GET",
+        "params": "req: NextRequest"
+      }
+    ],
+    "auth": {
+      "hasRequireOrgContext": true,
+      "hasRequireRole": false,
+      "roles": [],
+      "hasRequireExplicitOrg": false,
+      "hasGetCurrentUser": false,
+      "hasVerifyDatasetAccess": false,
+      "hasCreateClient": false,
+      "hasAuthErrorResponse": true
+    },
+    "hasZod": false,
+    "hasJsonParse": false,
+    "potentialIdor": [],
+    "externalAPIs": [],
+    "codeLength": 61
+  },
+  {
+    "file": "google-sheets/accounts/[id]/route.ts",
+    "methods": [
+      {
+        "method": "DELETE",
+        "params": "\r\n  req: NextRequest,\r\n  { params }: { params: Promise<{ id: string }> }\r\n"
+      }
+    ],
+    "auth": {
+      "hasRequireOrgContext": true,
+      "hasRequireRole": true,
+      "roles": [
+        "member"
+      ],
+      "hasRequireExplicitOrg": false,
+      "hasGetCurrentUser": false,
+      "hasVerifyDatasetAccess": false,
+      "hasCreateClient": false,
+      "hasAuthErrorResponse": true
+    },
+    "hasZod": false,
+    "hasJsonParse": false,
+    "potentialIdor": [
+      "db.googleSheetsAccount.delete({ where: { id }"
+    ],
+    "externalAPIs": [],
+    "codeLength": 82
+  },
+  {
+    "file": "google-sheets/ai-mapping/route.ts",
+    "methods": [
+      {
+        "method": "POST",
+        "params": "req: NextRequest"
+      }
+    ],
+    "auth": {
+      "hasRequireOrgContext": true,
+      "hasRequireRole": true,
+      "roles": [
+        "member"
+      ],
+      "hasRequireExplicitOrg": false,
+      "hasGetCurrentUser": false,
+      "hasVerifyDatasetAccess": false,
+      "hasCreateClient": false,
+      "hasAuthErrorResponse": true
+    },
+    "hasZod": false,
+    "hasJsonParse": false,
+    "potentialIdor": [],
+    "externalAPIs": [],
+    "codeLength": 94
+  },
+  {
+    "file": "google-sheets/auth/callback/route.ts",
+    "methods": [
+      {
+        "method": "GET",
+        "params": "req: NextRequest"
+      }
+    ],
+    "auth": {
+      "hasRequireOrgContext": false,
+      "hasRequireRole": false,
+      "roles": [],
+      "hasRequireExplicitOrg": false,
+      "hasGetCurrentUser": true,
+      "hasVerifyDatasetAccess": false,
+      "hasCreateClient": false,
+      "hasAuthErrorResponse": false
+    },
+    "hasZod": false,
+    "hasJsonParse": false,
+    "potentialIdor": [],
+    "externalAPIs": [],
+    "codeLength": 126
+  },
+  {
+    "file": "google-sheets/auth/route.ts",
+    "methods": [
+      {
+        "method": "POST",
+        "params": "req: NextRequest"
+      }
+    ],
+    "auth": {
+      "hasRequireOrgContext": true,
+      "hasRequireRole": true,
+      "roles": [
+        "member"
+      ],
+      "hasRequireExplicitOrg": false,
+      "hasGetCurrentUser": false,
+      "hasVerifyDatasetAccess": false,
+      "hasCreateClient": false,
+      "hasAuthErrorResponse": true
+    },
+    "hasZod": false,
+    "hasJsonParse": false,
+    "potentialIdor": [],
+    "externalAPIs": [],
+    "codeLength": 41
+  },
+  {
+    "file": "google-sheets/export/route.ts",
+    "methods": [
+      {
+        "method": "POST",
+        "params": "req: NextRequest"
+      }
+    ],
+    "auth": {
+      "hasRequireOrgContext": true,
+      "hasRequireRole": true,
+      "roles": [
+        "member"
+      ],
+      "hasRequireExplicitOrg": false,
+      "hasGetCurrentUser": false,
+      "hasVerifyDatasetAccess": true,
+      "hasCreateClient": false,
+      "hasAuthErrorResponse": true
+    },
+    "hasZod": false,
+    "hasJsonParse": false,
+    "potentialIdor": [],
+    "externalAPIs": [],
+    "codeLength": 89
+  },
+  {
+    "file": "google-sheets/import/route.ts",
+    "methods": [
+      {
+        "method": "POST",
+        "params": "req: NextRequest"
+      }
+    ],
+    "auth": {
+      "hasRequireOrgContext": true,
+      "hasRequireRole": true,
+      "roles": [
+        "member"
+      ],
+      "hasRequireExplicitOrg": false,
+      "hasGetCurrentUser": false,
+      "hasVerifyDatasetAccess": false,
+      "hasCreateClient": false,
+      "hasAuthErrorResponse": true
+    },
+    "hasZod": false,
+    "hasJsonParse": false,
+    "potentialIdor": [],
+    "externalAPIs": [
+      "BullMQ/Redis"
+    ],
+    "codeLength": 153
+  },
+  {
+    "file": "google-sheets/import/[id]/route.ts",
+    "methods": [
+      {
+        "method": "GET",
+        "params": "\n  req: NextRequest,\n  { params }: { params: Promise<{ id: string }> }\n"
+      }
+    ],
+    "auth": {
+      "hasRequireOrgContext": true,
+      "hasRequireRole": false,
+      "roles": [],
+      "hasRequireExplicitOrg": false,
+      "hasGetCurrentUser": false,
+      "hasVerifyDatasetAccess": false,
+      "hasCreateClient": false,
+      "hasAuthErrorResponse": true
+    },
+    "hasZod": false,
+    "hasJsonParse": true,
+    "potentialIdor": [],
+    "externalAPIs": [],
+    "codeLength": 75
+  },
+  {
+    "file": "google-sheets/link/route.ts",
+    "methods": [
+      {
+        "method": "POST",
+        "params": "req: NextRequest"
+      }
+    ],
+    "auth": {
+      "hasRequireOrgContext": true,
+      "hasRequireRole": true,
+      "roles": [
+        "member"
+      ],
+      "hasRequireExplicitOrg": false,
+      "hasGetCurrentUser": false,
+      "hasVerifyDatasetAccess": false,
+      "hasCreateClient": false,
+      "hasAuthErrorResponse": true
+    },
+    "hasZod": false,
+    "hasJsonParse": false,
+    "potentialIdor": [],
+    "externalAPIs": [],
+    "codeLength": 195
+  },
+  {
+    "file": "google-sheets/mappings/[id]/conflicts/route.ts",
+    "methods": [
+      {
+        "method": "GET",
+        "params": "\n  req: NextRequest,\n  { params }: { params: Promise<{ id: string }> }\n"
+      }
+    ],
+    "auth": {
+      "hasRequireOrgContext": true,
+      "hasRequireRole": false,
+      "roles": [],
+      "hasRequireExplicitOrg": false,
+      "hasGetCurrentUser": false,
+      "hasVerifyDatasetAccess": false,
+      "hasCreateClient": false,
+      "hasAuthErrorResponse": true
+    },
+    "hasZod": false,
+    "hasJsonParse": false,
+    "potentialIdor": [],
+    "externalAPIs": [],
+    "codeLength": 39
+  },
+  {
+    "file": "google-sheets/mappings/[id]/conflicts/[conflictId]/resolve/route.ts",
+    "methods": [
+      {
+        "method": "POST",
+        "params": "\r\n  req: NextRequest,\r\n  { params }: { params: Promise<{ id: string; conflictId: string }> }\r\n"
+      }
+    ],
+    "auth": {
+      "hasRequireOrgContext": true,
+      "hasRequireRole": true,
+      "roles": [
+        "member"
+      ],
+      "hasRequireExplicitOrg": false,
+      "hasGetCurrentUser": false,
+      "hasVerifyDatasetAccess": false,
+      "hasCreateClient": false,
+      "hasAuthErrorResponse": true
+    },
+    "hasZod": false,
+    "hasJsonParse": false,
+    "potentialIdor": [],
+    "externalAPIs": [],
+    "codeLength": 69
+  },
+  {
+    "file": "google-sheets/mappings/[id]/history/route.ts",
+    "methods": [
+      {
+        "method": "GET",
+        "params": "\n  req: NextRequest,\n  { params }: { params: Promise<{ id: string }> }\n"
+      }
+    ],
+    "auth": {
+      "hasRequireOrgContext": true,
+      "hasRequireRole": false,
+      "roles": [],
+      "hasRequireExplicitOrg": false,
+      "hasGetCurrentUser": false,
+      "hasVerifyDatasetAccess": false,
+      "hasCreateClient": false,
+      "hasAuthErrorResponse": true
+    },
+    "hasZod": false,
+    "hasJsonParse": true,
+    "potentialIdor": [],
+    "externalAPIs": [],
+    "codeLength": 77
+  },
+  {
+    "file": "google-sheets/mappings/[id]/route.ts",
+    "methods": [
+      {
+        "method": "GET",
+        "params": "\r\n  req: NextRequest,\r\n  { params }: { params: Promise<{ id: string }> }\r\n"
+      },
+      {
+        "method": "PATCH",
+        "params": "\r\n  req: NextRequest,\r\n  { params }: { params: Promise<{ id: string }> }\r\n"
+      },
+      {
+        "method": "DELETE",
+        "params": "\r\n  req: NextRequest,\r\n  { params }: { params: Promise<{ id: string }> }\r\n"
+      }
+    ],
+    "auth": {
+      "hasRequireOrgContext": true,
+      "hasRequireRole": true,
+      "roles": [
+        "member",
+        "member"
+      ],
+      "hasRequireExplicitOrg": false,
+      "hasGetCurrentUser": false,
+      "hasVerifyDatasetAccess": false,
+      "hasCreateClient": false,
+      "hasAuthErrorResponse": true
+    },
+    "hasZod": false,
+    "hasJsonParse": false,
+    "potentialIdor": [
+      "db.sheetMapping.update({\r\n      where: { id }",
+      "db.sheetMapping.delete({ where: { id }",
+      "db.sheetMapping.update({\r\n        where: { id }"
+    ],
+    "externalAPIs": [],
+    "codeLength": 215
+  },
+  {
+    "file": "google-sheets/mappings/[id]/schema-versions/route.ts",
+    "methods": [
+      {
+        "method": "GET",
+        "params": "\n  req: NextRequest,\n  { params }: { params: Promise<{ id: string }> }\n"
+      }
+    ],
+    "auth": {
+      "hasRequireOrgContext": true,
+      "hasRequireRole": false,
+      "roles": [],
+      "hasRequireExplicitOrg": false,
+      "hasGetCurrentUser": false,
+      "hasVerifyDatasetAccess": false,
+      "hasCreateClient": false,
+      "hasAuthErrorResponse": true
+    },
+    "hasZod": false,
+    "hasJsonParse": false,
+    "potentialIdor": [],
+    "externalAPIs": [],
+    "codeLength": 36
+  },
+  {
+    "file": "google-sheets/mappings/[id]/schema-versions/[versionId]/rollback/route.ts",
+    "methods": [
+      {
+        "method": "POST",
+        "params": "\r\n  req: NextRequest,\r\n  { params }: { params: Promise<{ id: string; versionId: string }> }\r\n"
+      }
+    ],
+    "auth": {
+      "hasRequireOrgContext": true,
+      "hasRequireRole": true,
+      "roles": [
+        "member"
+      ],
+      "hasRequireExplicitOrg": false,
+      "hasGetCurrentUser": false,
+      "hasVerifyDatasetAccess": false,
+      "hasCreateClient": false,
+      "hasAuthErrorResponse": true
+    },
+    "hasZod": false,
+    "hasJsonParse": false,
+    "potentialIdor": [],
+    "externalAPIs": [],
+    "codeLength": 56
+  },
+  {
+    "file": "google-sheets/mappings/[id]/sync/route.ts",
+    "methods": [
+      {
+        "method": "POST",
+        "params": "\r\n  req: NextRequest,\r\n  { params }: { params: Promise<{ id: string }> }\r\n"
+      }
+    ],
+    "auth": {
+      "hasRequireOrgContext": true,
+      "hasRequireRole": true,
+      "roles": [
+        "member"
+      ],
+      "hasRequireExplicitOrg": false,
+      "hasGetCurrentUser": false,
+      "hasVerifyDatasetAccess": false,
+      "hasCreateClient": false,
+      "hasAuthErrorResponse": true
+    },
+    "hasZod": false,
+    "hasJsonParse": false,
+    "potentialIdor": [],
+    "externalAPIs": [],
+    "codeLength": 48
+  },
+  {
+    "file": "google-sheets/org-export/route.ts",
+    "methods": [
+      {
+        "method": "POST",
+        "params": "req: NextRequest"
+      }
+    ],
+    "auth": {
+      "hasRequireOrgContext": true,
+      "hasRequireRole": true,
+      "roles": [
+        "member"
+      ],
+      "hasRequireExplicitOrg": false,
+      "hasGetCurrentUser": false,
+      "hasVerifyDatasetAccess": false,
+      "hasCreateClient": false,
+      "hasAuthErrorResponse": true
+    },
+    "hasZod": false,
+    "hasJsonParse": true,
+    "potentialIdor": [],
+    "externalAPIs": [
+      "Google Workspace"
+    ],
+    "codeLength": 364
+  },
+  {
+    "file": "google-sheets/spreadsheets/route.ts",
+    "methods": [
+      {
+        "method": "GET",
+        "params": "req: NextRequest"
+      }
+    ],
+    "auth": {
+      "hasRequireOrgContext": true,
+      "hasRequireRole": false,
+      "roles": [],
+      "hasRequireExplicitOrg": false,
+      "hasGetCurrentUser": false,
+      "hasVerifyDatasetAccess": false,
+      "hasCreateClient": false,
+      "hasAuthErrorResponse": true
+    },
+    "hasZod": false,
+    "hasJsonParse": false,
+    "potentialIdor": [],
+    "externalAPIs": [],
+    "codeLength": 43
+  },
+  {
+    "file": "google-sheets/spreadsheets/[id]/preview/route.ts",
+    "methods": [
+      {
+        "method": "GET",
+        "params": "\n  req: NextRequest,\n  { params }: { params: Promise<{ id: string }> }\n"
+      }
+    ],
+    "auth": {
+      "hasRequireOrgContext": true,
+      "hasRequireRole": false,
+      "roles": [],
+      "hasRequireExplicitOrg": false,
+      "hasGetCurrentUser": false,
+      "hasVerifyDatasetAccess": false,
+      "hasCreateClient": false,
+      "hasAuthErrorResponse": true
+    },
+    "hasZod": false,
+    "hasJsonParse": false,
+    "potentialIdor": [],
+    "externalAPIs": [],
+    "codeLength": 68
+  },
+  {
+    "file": "google-sheets/spreadsheets/[id]/tabs/route.ts",
+    "methods": [
+      {
+        "method": "GET",
+        "params": "\n  req: NextRequest,\n  { params }: { params: Promise<{ id: string }> }\n"
+      }
+    ],
+    "auth": {
+      "hasRequireOrgContext": true,
+      "hasRequireRole": false,
+      "roles": [],
+      "hasRequireExplicitOrg": false,
+      "hasGetCurrentUser": false,
+      "hasVerifyDatasetAccess": false,
+      "hasCreateClient": false,
+      "hasAuthErrorResponse": true
+    },
+    "hasZod": false,
+    "hasJsonParse": false,
+    "potentialIdor": [],
+    "externalAPIs": [],
+    "codeLength": 45
+  },
+  {
+    "file": "health/route.ts",
+    "methods": [
+      {
+        "method": "GET",
+        "params": ""
+      }
+    ],
+    "auth": {
+      "hasRequireOrgContext": false,
+      "hasRequireRole": false,
+      "roles": [],
+      "hasRequireExplicitOrg": false,
+      "hasGetCurrentUser": false,
+      "hasVerifyDatasetAccess": false,
+      "hasCreateClient": false,
+      "hasAuthErrorResponse": false
+    },
+    "hasZod": false,
+    "hasJsonParse": false,
+    "potentialIdor": [],
+    "externalAPIs": [],
+    "codeLength": 203
+  },
+  {
+    "file": "invitations/accept/route.ts",
+    "methods": [
+      {
+        "method": "POST",
+        "params": "req: NextRequest"
+      }
+    ],
+    "auth": {
+      "hasRequireOrgContext": false,
+      "hasRequireRole": false,
+      "roles": [],
+      "hasRequireExplicitOrg": false,
+      "hasGetCurrentUser": true,
+      "hasVerifyDatasetAccess": false,
+      "hasCreateClient": false,
+      "hasAuthErrorResponse": true
+    },
+    "hasZod": false,
+    "hasJsonParse": false,
+    "potentialIdor": [],
+    "externalAPIs": [],
+    "codeLength": 115
+  },
+  {
+    "file": "invitations/decline/route.ts",
+    "methods": [
+      {
+        "method": "POST",
+        "params": "req: NextRequest"
+      }
+    ],
+    "auth": {
+      "hasRequireOrgContext": false,
+      "hasRequireRole": false,
+      "roles": [],
+      "hasRequireExplicitOrg": false,
+      "hasGetCurrentUser": true,
+      "hasVerifyDatasetAccess": false,
+      "hasCreateClient": false,
+      "hasAuthErrorResponse": true
+    },
+    "hasZod": false,
+    "hasJsonParse": false,
+    "potentialIdor": [],
+    "externalAPIs": [],
+    "codeLength": 53
+  },
+  {
+    "file": "invitations/route.ts",
+    "methods": [
+      {
+        "method": "GET",
+        "params": "req: NextRequest"
+      }
+    ],
+    "auth": {
+      "hasRequireOrgContext": false,
+      "hasRequireRole": false,
+      "roles": [],
+      "hasRequireExplicitOrg": false,
+      "hasGetCurrentUser": true,
+      "hasVerifyDatasetAccess": false,
+      "hasCreateClient": false,
+      "hasAuthErrorResponse": true
+    },
+    "hasZod": false,
+    "hasJsonParse": false,
+    "potentialIdor": [],
+    "externalAPIs": [],
+    "codeLength": 62
+  },
+  {
+    "file": "invoices/route.ts",
+    "methods": [
+      {
+        "method": "GET",
+        "params": "req: NextRequest"
+      }
+    ],
+    "auth": {
+      "hasRequireOrgContext": false,
+      "hasRequireRole": false,
+      "roles": [],
+      "hasRequireExplicitOrg": false,
+      "hasGetCurrentUser": true,
+      "hasVerifyDatasetAccess": false,
+      "hasCreateClient": false,
+      "hasAuthErrorResponse": false
+    },
+    "hasZod": false,
+    "hasJsonParse": false,
+    "potentialIdor": [],
+    "externalAPIs": [],
+    "codeLength": 28
+  },
+  {
+    "file": "jobs/process/route.ts",
+    "methods": [
+      {
+        "method": "POST",
+        "params": ""
+      }
+    ],
+    "auth": {
+      "hasRequireOrgContext": false,
+      "hasRequireRole": false,
+      "roles": [],
+      "hasRequireExplicitOrg": false,
+      "hasGetCurrentUser": false,
+      "hasVerifyDatasetAccess": false,
+      "hasCreateClient": false,
+      "hasAuthErrorResponse": false
+    },
+    "hasZod": false,
+    "hasJsonParse": false,
+    "potentialIdor": [],
+    "externalAPIs": [],
+    "codeLength": 18
+  },
+  {
+    "file": "organizations/route.ts",
+    "methods": [
+      {
+        "method": "GET",
+        "params": ""
+      },
+      {
+        "method": "POST",
+        "params": "req: NextRequest"
+      }
+    ],
+    "auth": {
+      "hasRequireOrgContext": false,
+      "hasRequireRole": false,
+      "roles": [],
+      "hasRequireExplicitOrg": false,
+      "hasGetCurrentUser": true,
+      "hasVerifyDatasetAccess": false,
+      "hasCreateClient": false,
+      "hasAuthErrorResponse": false
+    },
+    "hasZod": false,
+    "hasJsonParse": false,
+    "potentialIdor": [],
+    "externalAPIs": [],
+    "codeLength": 101
+  },
+  {
+    "file": "organizations/search/route.ts",
+    "methods": [
+      {
+        "method": "GET",
+        "params": "req: NextRequest"
+      }
+    ],
+    "auth": {
+      "hasRequireOrgContext": true,
+      "hasRequireRole": false,
+      "roles": [],
+      "hasRequireExplicitOrg": false,
+      "hasGetCurrentUser": false,
+      "hasVerifyDatasetAccess": false,
+      "hasCreateClient": false,
+      "hasAuthErrorResponse": true
+    },
+    "hasZod": false,
+    "hasJsonParse": false,
+    "potentialIdor": [],
+    "externalAPIs": [],
+    "codeLength": 46
+  },
+  {
+    "file": "organizations/[id]/invitations/route.ts",
+    "methods": [
+      {
+        "method": "GET",
+        "params": "\n  _req: NextRequest,\n  { params }: { params: Promise<{ id: string }> }\n"
+      },
+      {
+        "method": "POST",
+        "params": "\n  req: NextRequest,\n  { params }: { params: Promise<{ id: string }> }\n"
+      }
+    ],
+    "auth": {
+      "hasRequireOrgContext": false,
+      "hasRequireRole": false,
+      "roles": [],
+      "hasRequireExplicitOrg": false,
+      "hasGetCurrentUser": true,
+      "hasVerifyDatasetAccess": false,
+      "hasCreateClient": false,
+      "hasAuthErrorResponse": true
+    },
+    "hasZod": false,
+    "hasJsonParse": false,
+    "potentialIdor": [],
+    "externalAPIs": [],
+    "codeLength": 158
+  },
+  {
+    "file": "organizations/[id]/members/me/route.ts",
+    "methods": [
+      {
+        "method": "PATCH",
+        "params": "\n  req: NextRequest,\n  { params }: { params: Promise<{ id: string }> }\n"
+      }
+    ],
+    "auth": {
+      "hasRequireOrgContext": false,
+      "hasRequireRole": false,
+      "roles": [],
+      "hasRequireExplicitOrg": false,
+      "hasGetCurrentUser": true,
+      "hasVerifyDatasetAccess": false,
+      "hasCreateClient": false,
+      "hasAuthErrorResponse": true
+    },
+    "hasZod": false,
+    "hasJsonParse": false,
+    "potentialIdor": [],
+    "externalAPIs": [],
+    "codeLength": 86
+  },
+  {
+    "file": "organizations/[id]/members/route.ts",
+    "methods": [
+      {
+        "method": "GET",
+        "params": "\n  _req: NextRequest,\n  { params }: { params: Promise<{ id: string }> }\n"
+      },
+      {
+        "method": "POST",
+        "params": "\n  req: NextRequest,\n  { params }: { params: Promise<{ id: string }> }\n"
+      }
+    ],
+    "auth": {
+      "hasRequireOrgContext": false,
+      "hasRequireRole": false,
+      "roles": [],
+      "hasRequireExplicitOrg": false,
+      "hasGetCurrentUser": true,
+      "hasVerifyDatasetAccess": false,
+      "hasCreateClient": false,
+      "hasAuthErrorResponse": true
+    },
+    "hasZod": false,
+    "hasJsonParse": false,
+    "potentialIdor": [],
+    "externalAPIs": [
+      "Webhooks"
+    ],
+    "codeLength": 164
+  },
+  {
+    "file": "organizations/[id]/members/[memberId]/resend/route.ts",
+    "methods": [
+      {
+        "method": "POST",
+        "params": "\n  req: NextRequest,\n  { params }: { params: Promise<{ id: string; memberId: string }> }\n"
+      }
+    ],
+    "auth": {
+      "hasRequireOrgContext": false,
+      "hasRequireRole": false,
+      "roles": [],
+      "hasRequireExplicitOrg": false,
+      "hasGetCurrentUser": true,
+      "hasVerifyDatasetAccess": false,
+      "hasCreateClient": false,
+      "hasAuthErrorResponse": true
+    },
+    "hasZod": false,
+    "hasJsonParse": false,
+    "potentialIdor": [],
+    "externalAPIs": [
+      "Webhooks",
+      "Resend/Email"
+    ],
+    "codeLength": 80
+  },
+  {
+    "file": "organizations/[id]/members/[memberId]/route.ts",
+    "methods": [
+      {
+        "method": "PATCH",
+        "params": "\n  req: NextRequest,\n  { params }: { params: Promise<{ id: string; memberId: string }> }\n"
+      },
+      {
+        "method": "DELETE",
+        "params": "\n  req: NextRequest,\n  { params }: { params: Promise<{ id: string; memberId: string }> }\n"
+      }
+    ],
+    "auth": {
+      "hasRequireOrgContext": false,
+      "hasRequireRole": false,
+      "roles": [],
+      "hasRequireExplicitOrg": false,
+      "hasGetCurrentUser": true,
+      "hasVerifyDatasetAccess": false,
+      "hasCreateClient": false,
+      "hasAuthErrorResponse": true
+    },
+    "hasZod": false,
+    "hasJsonParse": false,
+    "potentialIdor": [],
+    "externalAPIs": [],
+    "codeLength": 213
+  },
+  {
+    "file": "organizations/[id]/route.ts",
+    "methods": [
+      {
+        "method": "GET",
+        "params": "\n  _req: NextRequest,\n  { params }: { params: Promise<{ id: string }> }\n"
+      },
+      {
+        "method": "PATCH",
+        "params": "\n  req: NextRequest,\n  { params }: { params: Promise<{ id: string }> }\n"
+      },
+      {
+        "method": "DELETE",
+        "params": "\n  req: NextRequest,\n  { params }: { params: Promise<{ id: string }> }\n"
+      }
+    ],
+    "auth": {
+      "hasRequireOrgContext": false,
+      "hasRequireRole": false,
+      "roles": [],
+      "hasRequireExplicitOrg": false,
+      "hasGetCurrentUser": true,
+      "hasVerifyDatasetAccess": false,
+      "hasCreateClient": false,
+      "hasAuthErrorResponse": true
+    },
+    "hasZod": false,
+    "hasJsonParse": false,
+    "potentialIdor": [
+      "db.organization.findUnique({\n      where: { id }",
+      "db.organization.findUnique({ where: { id }",
+      "db.organization.update({\n      where: { id }",
+      "db.organization.findUnique({ where: { id }",
+      "db.organization.delete({\n      where: { id }"
+    ],
+    "externalAPIs": [],
+    "codeLength": 185
+  },
+  {
+    "file": "route.ts",
+    "methods": [
+      {
+        "method": "GET",
+        "params": ""
+      }
+    ],
+    "auth": {
+      "hasRequireOrgContext": false,
+      "hasRequireRole": false,
+      "roles": [],
+      "hasRequireExplicitOrg": false,
+      "hasGetCurrentUser": false,
+      "hasVerifyDatasetAccess": false,
+      "hasCreateClient": false,
+      "hasAuthErrorResponse": false
+    },
+    "hasZod": false,
+    "hasJsonParse": false,
+    "potentialIdor": [],
+    "externalAPIs": [],
+    "codeLength": 5
+  },
+  {
+    "file": "schemas/route.ts",
+    "methods": [
+      {
+        "method": "GET",
+        "params": "req: NextRequest"
+      },
+      {
+        "method": "POST",
+        "params": "req: NextRequest"
+      }
+    ],
+    "auth": {
+      "hasRequireOrgContext": true,
+      "hasRequireRole": true,
+      "roles": [
+        "member"
+      ],
+      "hasRequireExplicitOrg": false,
+      "hasGetCurrentUser": false,
+      "hasVerifyDatasetAccess": false,
+      "hasCreateClient": false,
+      "hasAuthErrorResponse": true
+    },
+    "hasZod": false,
+    "hasJsonParse": false,
+    "potentialIdor": [],
+    "externalAPIs": [],
+    "codeLength": 94
+  },
+  {
+    "file": "schemas/[id]/clone/route.ts",
+    "methods": [
+      {
+        "method": "POST",
+        "params": "\n  req: NextRequest,\n  { params }: { params: Promise<{ id: string }> }\n"
+      }
+    ],
+    "auth": {
+      "hasRequireOrgContext": true,
+      "hasRequireRole": true,
+      "roles": [
+        "member"
+      ],
+      "hasRequireExplicitOrg": false,
+      "hasGetCurrentUser": false,
+      "hasVerifyDatasetAccess": false,
+      "hasCreateClient": false,
+      "hasAuthErrorResponse": true
+    },
+    "hasZod": false,
+    "hasJsonParse": false,
+    "potentialIdor": [],
+    "externalAPIs": [],
+    "codeLength": 77
+  },
+  {
+    "file": "schemas/[id]/fields/reorder/route.ts",
+    "methods": [
+      {
+        "method": "PATCH",
+        "params": "\r\n  req: NextRequest,\r\n  { params }: { params: Promise<{ id: string }> }\r\n"
+      }
+    ],
+    "auth": {
+      "hasRequireOrgContext": true,
+      "hasRequireRole": true,
+      "roles": [
+        "member"
+      ],
+      "hasRequireExplicitOrg": false,
+      "hasGetCurrentUser": false,
+      "hasVerifyDatasetAccess": false,
+      "hasCreateClient": false,
+      "hasAuthErrorResponse": true
+    },
+    "hasZod": false,
+    "hasJsonParse": false,
+    "potentialIdor": [
+      "db.schema.findUnique({\r\n      where: { id }"
+    ],
+    "externalAPIs": [],
+    "codeLength": 49
+  },
+  {
+    "file": "schemas/[id]/fields/route.ts",
+    "methods": [
+      {
+        "method": "POST",
+        "params": "\r\n  req: NextRequest,\r\n  { params }: { params: Promise<{ id: string }> }\r\n"
+      },
+      {
+        "method": "PUT",
+        "params": "\r\n  req: NextRequest,\r\n  { params }: { params: Promise<{ id: string }> }\r\n"
+      }
+    ],
+    "auth": {
+      "hasRequireOrgContext": true,
+      "hasRequireRole": true,
+      "roles": [
+        "member",
+        "member"
+      ],
+      "hasRequireExplicitOrg": false,
+      "hasGetCurrentUser": false,
+      "hasVerifyDatasetAccess": false,
+      "hasCreateClient": false,
+      "hasAuthErrorResponse": true
+    },
+    "hasZod": false,
+    "hasJsonParse": false,
+    "potentialIdor": [
+      "db.schema.findUnique({ where: { id }",
+      "db.schema.update({\r\n      where: { id }"
+    ],
+    "externalAPIs": [],
+    "codeLength": 148
+  },
+  {
+    "file": "schemas/[id]/fields/[fieldId]/route.ts",
+    "methods": [
+      {
+        "method": "PATCH",
+        "params": "\n  req: NextRequest,\n  { params }: { params: Promise<{ id: string; fieldId: string }> }\n"
+      },
+      {
+        "method": "DELETE",
+        "params": "\n  req: NextRequest,\n  { params }: { params: Promise<{ id: string; fieldId: string }> }\n"
+      }
+    ],
+    "auth": {
+      "hasRequireOrgContext": true,
+      "hasRequireRole": true,
+      "roles": [
+        "member",
+        "member"
+      ],
+      "hasRequireExplicitOrg": false,
+      "hasGetCurrentUser": false,
+      "hasVerifyDatasetAccess": false,
+      "hasCreateClient": false,
+      "hasAuthErrorResponse": true
+    },
+    "hasZod": false,
+    "hasJsonParse": false,
+    "potentialIdor": [
+      "db.schema.findUnique({ where: { id }",
+      "db.schema.update({\n      where: { id }",
+      "db.schema.update({\n      where: { id }"
+    ],
+    "externalAPIs": [],
+    "codeLength": 145
+  },
+  {
+    "file": "schemas/[id]/route.ts",
+    "methods": [
+      {
+        "method": "GET",
+        "params": "\r\n  req: NextRequest,\r\n  { params }: { params: Promise<{ id: string }> }\r\n"
+      },
+      {
+        "method": "PATCH",
+        "params": "\r\n  req: NextRequest,\r\n  { params }: { params: Promise<{ id: string }> }\r\n"
+      },
+      {
+        "method": "DELETE",
+        "params": "\r\n  req: NextRequest,\r\n  { params }: { params: Promise<{ id: string }> }\r\n"
+      }
+    ],
+    "auth": {
+      "hasRequireOrgContext": true,
+      "hasRequireRole": true,
+      "roles": [
+        "member",
+        "member"
+      ],
+      "hasRequireExplicitOrg": false,
+      "hasGetCurrentUser": false,
+      "hasVerifyDatasetAccess": false,
+      "hasCreateClient": false,
+      "hasAuthErrorResponse": true
+    },
+    "hasZod": false,
+    "hasJsonParse": false,
+    "potentialIdor": [
+      "db.schema.findUnique({\r\n    where: { id }",
+      "db.schema.update({ where: { id }",
+      "db.schema.delete({ where: { id }"
+    ],
+    "externalAPIs": [],
+    "codeLength": 147
+  },
+  {
+    "file": "schemas/[id]/test-extraction/route.ts",
+    "methods": [
+      {
+        "method": "POST",
+        "params": "\r\n  req: NextRequest,\r\n  { params }: { params: Promise<{ id: string }> }\r\n"
+      }
+    ],
+    "auth": {
+      "hasRequireOrgContext": true,
+      "hasRequireRole": true,
+      "roles": [
+        "member"
+      ],
+      "hasRequireExplicitOrg": false,
+      "hasGetCurrentUser": false,
+      "hasVerifyDatasetAccess": false,
+      "hasCreateClient": false,
+      "hasAuthErrorResponse": true
+    },
+    "hasZod": false,
+    "hasJsonParse": true,
+    "potentialIdor": [
+      "db.schema.findUnique({\r\n      where: { id }"
+    ],
+    "externalAPIs": [],
+    "codeLength": 79
+  },
+  {
+    "file": "search/route.ts",
+    "methods": [
+      {
+        "method": "GET",
+        "params": "req: NextRequest"
+      }
+    ],
+    "auth": {
+      "hasRequireOrgContext": true,
+      "hasRequireRole": false,
+      "roles": [],
+      "hasRequireExplicitOrg": false,
+      "hasGetCurrentUser": false,
+      "hasVerifyDatasetAccess": false,
+      "hasCreateClient": false,
+      "hasAuthErrorResponse": true
+    },
+    "hasZod": false,
+    "hasJsonParse": false,
+    "potentialIdor": [],
+    "externalAPIs": [],
+    "codeLength": 138
+  },
+  {
+    "file": "session/route.ts",
+    "methods": [
+      {
+        "method": "GET",
+        "params": ""
+      },
+      {
+        "method": "PATCH",
+        "params": "req: Request"
+      }
+    ],
+    "auth": {
+      "hasRequireOrgContext": false,
+      "hasRequireRole": false,
+      "roles": [],
+      "hasRequireExplicitOrg": false,
+      "hasGetCurrentUser": true,
+      "hasVerifyDatasetAccess": false,
+      "hasCreateClient": false,
+      "hasAuthErrorResponse": false
+    },
+    "hasZod": false,
+    "hasJsonParse": false,
+    "potentialIdor": [],
+    "externalAPIs": [],
+    "codeLength": 78
+  },
+  {
+    "file": "sharing/cross-org/route.ts",
+    "methods": [
+      {
+        "method": "GET",
+        "params": "req: NextRequest"
+      },
+      {
+        "method": "POST",
+        "params": "req: NextRequest"
+      }
+    ],
+    "auth": {
+      "hasRequireOrgContext": true,
+      "hasRequireRole": true,
+      "roles": [
+        "member"
+      ],
+      "hasRequireExplicitOrg": false,
+      "hasGetCurrentUser": false,
+      "hasVerifyDatasetAccess": false,
+      "hasCreateClient": false,
+      "hasAuthErrorResponse": true
+    },
+    "hasZod": false,
+    "hasJsonParse": false,
+    "potentialIdor": [],
+    "externalAPIs": [],
+    "codeLength": 100
+  },
+  {
+    "file": "sharing/cross-org/[id]/route.ts",
+    "methods": [
+      {
+        "method": "PATCH",
+        "params": "\r\n  req: NextRequest,\r\n  { params }: { params: Promise<{ id: string }> }\r\n"
+      }
+    ],
+    "auth": {
+      "hasRequireOrgContext": true,
+      "hasRequireRole": true,
+      "roles": [
+        "member"
+      ],
+      "hasRequireExplicitOrg": false,
+      "hasGetCurrentUser": false,
+      "hasVerifyDatasetAccess": false,
+      "hasCreateClient": false,
+      "hasAuthErrorResponse": true
+    },
+    "hasZod": false,
+    "hasJsonParse": false,
+    "potentialIdor": [
+      "db.sharingRequest.findUnique({\r\n      where: { id }",
+      "db.sharingRequest.update({\r\n      where: { id }"
+    ],
+    "externalAPIs": [],
+    "codeLength": 120
+  },
+  {
+    "file": "sharing/permissions/route.ts",
+    "methods": [
+      {
+        "method": "GET",
+        "params": "req: NextRequest"
+      },
+      {
+        "method": "POST",
+        "params": "req: NextRequest"
+      },
+      {
+        "method": "DELETE",
+        "params": "req: NextRequest"
+      },
+      {
+        "method": "PATCH",
+        "params": "req: NextRequest"
+      }
+    ],
+    "auth": {
+      "hasRequireOrgContext": true,
+      "hasRequireRole": true,
+      "roles": [
+        "member",
+        "member",
+        "member"
+      ],
+      "hasRequireExplicitOrg": false,
+      "hasGetCurrentUser": false,
+      "hasVerifyDatasetAccess": false,
+      "hasCreateClient": false,
+      "hasAuthErrorResponse": true
+    },
+    "hasZod": false,
+    "hasJsonParse": false,
+    "potentialIdor": [
+      "db.datasetAccess.findUnique({ where: { id }",
+      "db.datasetAccess.update({\r\n      where: { id }",
+      "db.datasetAccess.findUnique({ where: { id }",
+      "db.datasetAccess.update({\r\n      where: { id }"
+    ],
+    "externalAPIs": [],
+    "codeLength": 281
+  },
+  {
+    "file": "sharing/requests/route.ts",
+    "methods": [
+      {
+        "method": "GET",
+        "params": "req: NextRequest"
+      },
+      {
+        "method": "POST",
+        "params": "req: NextRequest"
+      }
+    ],
+    "auth": {
+      "hasRequireOrgContext": true,
+      "hasRequireRole": true,
+      "roles": [
+        "member"
+      ],
+      "hasRequireExplicitOrg": false,
+      "hasGetCurrentUser": false,
+      "hasVerifyDatasetAccess": false,
+      "hasCreateClient": false,
+      "hasAuthErrorResponse": true
+    },
+    "hasZod": false,
+    "hasJsonParse": false,
+    "potentialIdor": [],
+    "externalAPIs": [],
+    "codeLength": 112
+  },
+  {
+    "file": "sharing/requests/[id]/approve/route.ts",
+    "methods": [
+      {
+        "method": "POST",
+        "params": "\r\n  req: NextRequest,\r\n  { params }: { params: Promise<{ id: string }> }\r\n"
+      }
+    ],
+    "auth": {
+      "hasRequireOrgContext": true,
+      "hasRequireRole": true,
+      "roles": [
+        "member"
+      ],
+      "hasRequireExplicitOrg": false,
+      "hasGetCurrentUser": false,
+      "hasVerifyDatasetAccess": false,
+      "hasCreateClient": false,
+      "hasAuthErrorResponse": true
+    },
+    "hasZod": false,
+    "hasJsonParse": false,
+    "potentialIdor": [
+      "db.sharingRequest.findUnique({\r\n      where: { id }"
+    ],
+    "externalAPIs": [
+      "Webhooks"
+    ],
+    "codeLength": 126
+  },
+  {
+    "file": "sharing/requests/[id]/reject/route.ts",
+    "methods": [
+      {
+        "method": "POST",
+        "params": "\r\n  req: NextRequest,\r\n  { params }: { params: Promise<{ id: string }> }\r\n"
+      }
+    ],
+    "auth": {
+      "hasRequireOrgContext": true,
+      "hasRequireRole": true,
+      "roles": [
+        "member"
+      ],
+      "hasRequireExplicitOrg": false,
+      "hasGetCurrentUser": false,
+      "hasVerifyDatasetAccess": false,
+      "hasCreateClient": false,
+      "hasAuthErrorResponse": true
+    },
+    "hasZod": false,
+    "hasJsonParse": false,
+    "potentialIdor": [
+      "db.sharingRequest.findUnique({\r\n      where: { id }",
+      "db.sharingRequest.update({\r\n      where: { id }"
+    ],
+    "externalAPIs": [],
+    "codeLength": 70
+  },
+  {
+    "file": "sources/route.ts",
+    "methods": [
+      {
+        "method": "GET",
+        "params": "req: NextRequest"
+      },
+      {
+        "method": "POST",
+        "params": "req: NextRequest"
+      }
+    ],
+    "auth": {
+      "hasRequireOrgContext": true,
+      "hasRequireRole": true,
+      "roles": [
+        "member"
+      ],
+      "hasRequireExplicitOrg": false,
+      "hasGetCurrentUser": false,
+      "hasVerifyDatasetAccess": false,
+      "hasCreateClient": false,
+      "hasAuthErrorResponse": true
+    },
+    "hasZod": false,
+    "hasJsonParse": false,
+    "potentialIdor": [],
+    "externalAPIs": [],
+    "codeLength": 154
+  },
+  {
+    "file": "sources/test-scan/route.ts",
+    "methods": [
+      {
+        "method": "POST",
+        "params": "req: NextRequest"
+      }
+    ],
+    "auth": {
+      "hasRequireOrgContext": true,
+      "hasRequireRole": true,
+      "roles": [
+        "member"
+      ],
+      "hasRequireExplicitOrg": false,
+      "hasGetCurrentUser": false,
+      "hasVerifyDatasetAccess": false,
+      "hasCreateClient": false,
+      "hasAuthErrorResponse": true
+    },
+    "hasZod": false,
+    "hasJsonParse": true,
+    "potentialIdor": [],
+    "externalAPIs": [],
+    "codeLength": 125
+  },
+  {
+    "file": "sources/[id]/cancel-scan/route.ts",
+    "methods": [
+      {
+        "method": "POST",
+        "params": "\n  req: NextRequest,\n  { params }: { params: Promise<{ id: string }> }\n"
+      }
+    ],
+    "auth": {
+      "hasRequireOrgContext": false,
+      "hasRequireRole": true,
+      "roles": [
+        "member"
+      ],
+      "hasRequireExplicitOrg": false,
+      "hasGetCurrentUser": false,
+      "hasVerifyDatasetAccess": false,
+      "hasCreateClient": false,
+      "hasAuthErrorResponse": true
+    },
+    "hasZod": false,
+    "hasJsonParse": true,
+    "potentialIdor": [
+      "db.source.findUnique({ where: { id }",
+      "db.source.update({\n          where: { id }",
+      "db.source.update({\n          where: { id }"
+    ],
+    "externalAPIs": [],
+    "codeLength": 99
+  },
+  {
+    "file": "sources/[id]/clone/route.ts",
+    "methods": [
+      {
+        "method": "POST",
+        "params": "\r\n  req: NextRequest,\r\n  { params }: { params: Promise<{ id: string }> }\r\n"
+      }
+    ],
+    "auth": {
+      "hasRequireOrgContext": true,
+      "hasRequireRole": true,
+      "roles": [
+        "member"
+      ],
+      "hasRequireExplicitOrg": false,
+      "hasGetCurrentUser": false,
+      "hasVerifyDatasetAccess": false,
+      "hasCreateClient": false,
+      "hasAuthErrorResponse": true
+    },
+    "hasZod": false,
+    "hasJsonParse": false,
+    "potentialIdor": [],
+    "externalAPIs": [],
+    "codeLength": 87
+  },
+  {
+    "file": "sources/[id]/default-dataset/route.ts",
+    "methods": [
+      {
+        "method": "GET",
+        "params": "\n  req: NextRequest,\n  { params }: { params: Promise<{ id: string }> }\n"
+      }
+    ],
+    "auth": {
+      "hasRequireOrgContext": true,
+      "hasRequireRole": false,
+      "roles": [],
+      "hasRequireExplicitOrg": false,
+      "hasGetCurrentUser": false,
+      "hasVerifyDatasetAccess": false,
+      "hasCreateClient": false,
+      "hasAuthErrorResponse": true
+    },
+    "hasZod": false,
+    "hasJsonParse": false,
+    "potentialIdor": [],
+    "externalAPIs": [],
+    "codeLength": 58
+  },
+  {
+    "file": "sources/[id]/emails/route.ts",
+    "methods": [
+      {
+        "method": "GET",
+        "params": "\n  req: NextRequest,\n  { params }: { params: Promise<{ id: string }> }\n"
+      }
+    ],
+    "auth": {
+      "hasRequireOrgContext": true,
+      "hasRequireRole": false,
+      "roles": [],
+      "hasRequireExplicitOrg": false,
+      "hasGetCurrentUser": false,
+      "hasVerifyDatasetAccess": false,
+      "hasCreateClient": false,
+      "hasAuthErrorResponse": true
+    },
+    "hasZod": false,
+    "hasJsonParse": false,
+    "potentialIdor": [],
+    "externalAPIs": [],
+    "codeLength": 83
+  },
+  {
+    "file": "sources/[id]/extract/route.ts",
+    "methods": [
+      {
+        "method": "POST",
+        "params": "\r\n  req: NextRequest,\r\n  { params }: { params: Promise<{ id: string }> }\r\n"
+      }
+    ],
+    "auth": {
+      "hasRequireOrgContext": true,
+      "hasRequireRole": true,
+      "roles": [
+        "member"
+      ],
+      "hasRequireExplicitOrg": false,
+      "hasGetCurrentUser": false,
+      "hasVerifyDatasetAccess": false,
+      "hasCreateClient": false,
+      "hasAuthErrorResponse": true
+    },
+    "hasZod": false,
+    "hasJsonParse": false,
+    "potentialIdor": [
+      "db.source.findUnique({ where: { id }"
+    ],
+    "externalAPIs": [
+      "BullMQ/Redis"
+    ],
+    "codeLength": 143
+  },
+  {
+    "file": "sources/[id]/route.ts",
+    "methods": [
+      {
+        "method": "GET",
+        "params": "\r\n  req: NextRequest,\r\n  { params }: { params: Promise<{ id: string }> }\r\n"
+      },
+      {
+        "method": "PATCH",
+        "params": "\r\n  req: NextRequest,\r\n  { params }: { params: Promise<{ id: string }> }\r\n"
+      },
+      {
+        "method": "DELETE",
+        "params": "\r\n  req: NextRequest,\r\n  { params }: { params: Promise<{ id: string }> }\r\n"
+      }
+    ],
+    "auth": {
+      "hasRequireOrgContext": true,
+      "hasRequireRole": true,
+      "roles": [
+        "member",
+        "member"
+      ],
+      "hasRequireExplicitOrg": false,
+      "hasGetCurrentUser": false,
+      "hasVerifyDatasetAccess": false,
+      "hasCreateClient": false,
+      "hasAuthErrorResponse": true
+    },
+    "hasZod": false,
+    "hasJsonParse": false,
+    "potentialIdor": [
+      "db.source.findUnique({\r\n    where: { id }",
+      "db.source.update({\r\n      where: { id }",
+      "db.source.delete({ where: { id }"
+    ],
+    "externalAPIs": [],
+    "codeLength": 170
+  },
+  {
+    "file": "sources/[id]/rules/route.ts",
+    "methods": [
+      {
+        "method": "GET",
+        "params": "\r\n  req: NextRequest,\r\n  { params }: { params: Promise<{ id: string }> }\r\n"
+      },
+      {
+        "method": "PUT",
+        "params": "\r\n  req: NextRequest,\r\n  { params }: { params: Promise<{ id: string }> }\r\n"
+      }
+    ],
+    "auth": {
+      "hasRequireOrgContext": true,
+      "hasRequireRole": true,
+      "roles": [
+        "member"
+      ],
+      "hasRequireExplicitOrg": false,
+      "hasGetCurrentUser": false,
+      "hasVerifyDatasetAccess": false,
+      "hasCreateClient": false,
+      "hasAuthErrorResponse": true
+    },
+    "hasZod": false,
+    "hasJsonParse": false,
+    "potentialIdor": [
+      "db.source.findUnique({ where: { id }"
+    ],
+    "externalAPIs": [],
+    "codeLength": 101
+  },
+  {
+    "file": "sources/[id]/runs/route.ts",
+    "methods": [
+      {
+        "method": "GET",
+        "params": "\r\n  req: NextRequest,\r\n  { params }: { params: Promise<{ id: string }> }\r\n"
+      },
+      {
+        "method": "POST",
+        "params": "\r\n  req: NextRequest,\r\n  { params }: { params: Promise<{ id: string }> }\r\n"
+      }
+    ],
+    "auth": {
+      "hasRequireOrgContext": true,
+      "hasRequireRole": true,
+      "roles": [
+        "member"
+      ],
+      "hasRequireExplicitOrg": false,
+      "hasGetCurrentUser": false,
+      "hasVerifyDatasetAccess": false,
+      "hasCreateClient": false,
+      "hasAuthErrorResponse": true
+    },
+    "hasZod": false,
+    "hasJsonParse": false,
+    "potentialIdor": [
+      "db.source.findUnique({ where: { id }",
+      "db.source.update({ where: { id }"
+    ],
+    "externalAPIs": [
+      "BullMQ/Redis"
+    ],
+    "codeLength": 131
+  },
+  {
+    "file": "sources/[id]/scan/route.ts",
+    "methods": [
+      {
+        "method": "POST",
+        "params": "\r\n  req: NextRequest,\r\n  { params }: { params: Promise<{ id: string }> }\r\n"
+      }
+    ],
+    "auth": {
+      "hasRequireOrgContext": true,
+      "hasRequireRole": true,
+      "roles": [
+        "member"
+      ],
+      "hasRequireExplicitOrg": false,
+      "hasGetCurrentUser": false,
+      "hasVerifyDatasetAccess": false,
+      "hasCreateClient": false,
+      "hasAuthErrorResponse": true
+    },
+    "hasZod": false,
+    "hasJsonParse": false,
+    "potentialIdor": [
+      "db.source.findUnique({ where: { id }"
+    ],
+    "externalAPIs": [
+      "BullMQ/Redis",
+      "Webhooks"
+    ],
+    "codeLength": 105
+  },
+  {
+    "file": "usage/route.ts",
+    "methods": [
+      {
+        "method": "GET",
+        "params": "req: NextRequest"
+      }
+    ],
+    "auth": {
+      "hasRequireOrgContext": true,
+      "hasRequireRole": false,
+      "roles": [],
+      "hasRequireExplicitOrg": false,
+      "hasGetCurrentUser": false,
+      "hasVerifyDatasetAccess": false,
+      "hasCreateClient": false,
+      "hasAuthErrorResponse": true
+    },
+    "hasZod": false,
+    "hasJsonParse": false,
+    "potentialIdor": [],
+    "externalAPIs": [
+      "Gemini AI"
+    ],
+    "codeLength": 112
+  },
+  {
+    "file": "usage/trends/route.ts",
+    "methods": [
+      {
+        "method": "GET",
+        "params": "req: NextRequest"
+      }
+    ],
+    "auth": {
+      "hasRequireOrgContext": true,
+      "hasRequireRole": false,
+      "roles": [],
+      "hasRequireExplicitOrg": false,
+      "hasGetCurrentUser": false,
+      "hasVerifyDatasetAccess": false,
+      "hasCreateClient": false,
+      "hasAuthErrorResponse": true
+    },
+    "hasZod": false,
+    "hasJsonParse": false,
+    "potentialIdor": [],
+    "externalAPIs": [
+      "Gemini AI"
+    ],
+    "codeLength": 286
+  },
+  {
+    "file": "users/search/route.ts",
+    "methods": [
+      {
+        "method": "GET",
+        "params": "req: NextRequest"
+      }
+    ],
+    "auth": {
+      "hasRequireOrgContext": false,
+      "hasRequireRole": false,
+      "roles": [],
+      "hasRequireExplicitOrg": false,
+      "hasGetCurrentUser": true,
+      "hasVerifyDatasetAccess": false,
+      "hasCreateClient": false,
+      "hasAuthErrorResponse": true
+    },
+    "hasZod": false,
+    "hasJsonParse": false,
+    "potentialIdor": [],
+    "externalAPIs": [],
+    "codeLength": 60
+  },
+  {
+    "file": "webhooks/route.ts",
+    "methods": [
+      {
+        "method": "GET",
+        "params": "req: NextRequest"
+      },
+      {
+        "method": "POST",
+        "params": "req: NextRequest"
+      }
+    ],
+    "auth": {
+      "hasRequireOrgContext": true,
+      "hasRequireRole": true,
+      "roles": [
+        "member"
+      ],
+      "hasRequireExplicitOrg": false,
+      "hasGetCurrentUser": false,
+      "hasVerifyDatasetAccess": false,
+      "hasCreateClient": false,
+      "hasAuthErrorResponse": true
+    },
+    "hasZod": false,
+    "hasJsonParse": false,
+    "potentialIdor": [],
+    "externalAPIs": [],
+    "codeLength": 106
+  },
+  {
+    "file": "webhooks/[id]/route.ts",
+    "methods": [
+      {
+        "method": "PATCH",
+        "params": "\r\n  req: NextRequest,\r\n  { params }: { params: Promise<{ id: string }> }\r\n"
+      },
+      {
+        "method": "DELETE",
+        "params": "\r\n  req: NextRequest,\r\n  { params }: { params: Promise<{ id: string }> }\r\n"
+      }
+    ],
+    "auth": {
+      "hasRequireOrgContext": true,
+      "hasRequireRole": true,
+      "roles": [
+        "member",
+        "member"
+      ],
+      "hasRequireExplicitOrg": false,
+      "hasGetCurrentUser": false,
+      "hasVerifyDatasetAccess": false,
+      "hasCreateClient": false,
+      "hasAuthErrorResponse": true
+    },
+    "hasZod": false,
+    "hasJsonParse": false,
+    "potentialIdor": [
+      "db.webhook.update({\r\n      where: { id }",
+      "db.webhook.delete({ where: { id }"
+    ],
+    "externalAPIs": [],
+    "codeLength": 129
+  }
+]

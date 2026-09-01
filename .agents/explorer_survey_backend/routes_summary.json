@@ -1,0 +1,2450 @@
+[
+  {
+    "file": "2fa/disable/route.ts",
+    "methods": [
+      {
+        "method": "POST",
+        "line": 6
+      }
+    ],
+    "authCalls": [
+      "getCurrentUser"
+    ],
+    "hasZod": false,
+    "zodCount": 0,
+    "hasManualValidation": false,
+    "hasTryCatch": true,
+    "catchesAuthError": false,
+    "extServices": [
+      "Prisma/Postgres"
+    ],
+    "lines": 26
+  },
+  {
+    "file": "2fa/setup/route.ts",
+    "methods": [
+      {
+        "method": "POST",
+        "line": 7
+      }
+    ],
+    "authCalls": [
+      "getCurrentUser"
+    ],
+    "hasZod": false,
+    "zodCount": 0,
+    "hasManualValidation": false,
+    "hasTryCatch": true,
+    "catchesAuthError": false,
+    "extServices": [
+      "Prisma/Postgres"
+    ],
+    "lines": 42
+  },
+  {
+    "file": "2fa/verify/route.ts",
+    "methods": [
+      {
+        "method": "POST",
+        "line": 8
+      }
+    ],
+    "authCalls": [
+      "getCurrentUser"
+    ],
+    "hasZod": false,
+    "zodCount": 0,
+    "hasManualValidation": true,
+    "hasTryCatch": true,
+    "catchesAuthError": false,
+    "extServices": [
+      "Prisma/Postgres"
+    ],
+    "lines": 56
+  },
+  {
+    "file": "agent-logs/route.ts",
+    "methods": [
+      {
+        "method": "GET",
+        "line": 9
+      }
+    ],
+    "authCalls": [
+      "requireOrgContext"
+    ],
+    "hasZod": false,
+    "zodCount": 0,
+    "hasManualValidation": false,
+    "hasTryCatch": true,
+    "catchesAuthError": true,
+    "extServices": [
+      "Prisma/Postgres"
+    ],
+    "lines": 48
+  },
+  {
+    "file": "ai/extract-wizard/route.ts",
+    "methods": [
+      {
+        "method": "POST",
+        "line": 21
+      }
+    ],
+    "authCalls": [
+      "requireRole(member)",
+      "requireOrgContext"
+    ],
+    "hasZod": false,
+    "zodCount": 0,
+    "hasManualValidation": true,
+    "hasTryCatch": true,
+    "catchesAuthError": true,
+    "extServices": [
+      "BullMQ/Redis",
+      "Prisma/Postgres"
+    ],
+    "lines": 143
+  },
+  {
+    "file": "ai/model-status/route.ts",
+    "methods": [
+      {
+        "method": "GET",
+        "line": 12
+      }
+    ],
+    "authCalls": [
+      "NONE/CUSTOM"
+    ],
+    "hasZod": false,
+    "zodCount": 0,
+    "hasManualValidation": false,
+    "hasTryCatch": true,
+    "catchesAuthError": false,
+    "extServices": [
+      "Gemini AI"
+    ],
+    "lines": 23
+  },
+  {
+    "file": "ai-jobs/route.ts",
+    "methods": [
+      {
+        "method": "GET",
+        "line": 11
+      },
+      {
+        "method": "POST",
+        "line": 52
+      }
+    ],
+    "authCalls": [
+      "requireRole(member)",
+      "requireOrgContext"
+    ],
+    "hasZod": false,
+    "zodCount": 0,
+    "hasManualValidation": true,
+    "hasTryCatch": true,
+    "catchesAuthError": true,
+    "extServices": [
+      "BullMQ/Redis",
+      "Prisma/Postgres"
+    ],
+    "lines": 96
+  },
+  {
+    "file": "ai-jobs/[id]/cancel/route.ts",
+    "methods": [
+      {
+        "method": "POST",
+        "line": 12
+      }
+    ],
+    "authCalls": [
+      "requireRole(member)",
+      "requireOrgContext"
+    ],
+    "hasZod": false,
+    "zodCount": 0,
+    "hasManualValidation": false,
+    "hasTryCatch": true,
+    "catchesAuthError": true,
+    "extServices": [
+      "Prisma/Postgres"
+    ],
+    "lines": 90
+  },
+  {
+    "file": "ai-jobs/[id]/logs/route.ts",
+    "methods": [
+      {
+        "method": "GET",
+        "line": 9
+      }
+    ],
+    "authCalls": [
+      "requireOrgContext"
+    ],
+    "hasZod": false,
+    "zodCount": 0,
+    "hasManualValidation": false,
+    "hasTryCatch": true,
+    "catchesAuthError": true,
+    "extServices": [
+      "Prisma/Postgres"
+    ],
+    "lines": 59
+  },
+  {
+    "file": "ai-jobs/[id]/outputs/route.ts",
+    "methods": [
+      {
+        "method": "GET",
+        "line": 8
+      }
+    ],
+    "authCalls": [
+      "requireOrgContext"
+    ],
+    "hasZod": false,
+    "zodCount": 0,
+    "hasManualValidation": false,
+    "hasTryCatch": true,
+    "catchesAuthError": true,
+    "extServices": [
+      "Prisma/Postgres"
+    ],
+    "lines": 53
+  },
+  {
+    "file": "ai-jobs/[id]/retry/route.ts",
+    "methods": [
+      {
+        "method": "POST",
+        "line": 14
+      }
+    ],
+    "authCalls": [
+      "requireRole(member)",
+      "requireOrgContext"
+    ],
+    "hasZod": false,
+    "zodCount": 0,
+    "hasManualValidation": false,
+    "hasTryCatch": true,
+    "catchesAuthError": true,
+    "extServices": [
+      "BullMQ/Redis",
+      "Prisma/Postgres"
+    ],
+    "lines": 100
+  },
+  {
+    "file": "ai-jobs/[id]/route.ts",
+    "methods": [
+      {
+        "method": "GET",
+        "line": 8
+      }
+    ],
+    "authCalls": [
+      "requireOrgContext"
+    ],
+    "hasZod": false,
+    "zodCount": 0,
+    "hasManualValidation": false,
+    "hasTryCatch": true,
+    "catchesAuthError": true,
+    "extServices": [
+      "Prisma/Postgres"
+    ],
+    "lines": 37
+  },
+  {
+    "file": "assistant/chat/route.ts",
+    "methods": [
+      {
+        "method": "POST",
+        "line": 239
+      }
+    ],
+    "authCalls": [
+      "requireRole(member)"
+    ],
+    "hasZod": false,
+    "zodCount": 0,
+    "hasManualValidation": true,
+    "hasTryCatch": true,
+    "catchesAuthError": true,
+    "extServices": [
+      "Gemini AI",
+      "Prisma/Postgres"
+    ],
+    "lines": 446
+  },
+  {
+    "file": "assistant/confirm/route.ts",
+    "methods": [
+      {
+        "method": "POST",
+        "line": 37
+      }
+    ],
+    "authCalls": [
+      "requireRole(member)"
+    ],
+    "hasZod": false,
+    "zodCount": 0,
+    "hasManualValidation": true,
+    "hasTryCatch": true,
+    "catchesAuthError": true,
+    "extServices": [
+      "Prisma/Postgres"
+    ],
+    "lines": 179
+  },
+  {
+    "file": "assistant/sessions/route.ts",
+    "methods": [
+      {
+        "method": "GET",
+        "line": 25
+      },
+      {
+        "method": "POST",
+        "line": 81
+      }
+    ],
+    "authCalls": [
+      "requireRole(member, member)"
+    ],
+    "hasZod": false,
+    "zodCount": 0,
+    "hasManualValidation": false,
+    "hasTryCatch": true,
+    "catchesAuthError": true,
+    "extServices": [
+      "Prisma/Postgres"
+    ],
+    "lines": 105
+  },
+  {
+    "file": "assistant/sessions/[id]/route.ts",
+    "methods": [
+      {
+        "method": "GET",
+        "line": 40
+      },
+      {
+        "method": "DELETE",
+        "line": 105
+      }
+    ],
+    "authCalls": [
+      "requireRole(member, member)"
+    ],
+    "hasZod": false,
+    "zodCount": 0,
+    "hasManualValidation": true,
+    "hasTryCatch": true,
+    "catchesAuthError": true,
+    "extServices": [
+      "Prisma/Postgres"
+    ],
+    "lines": 129
+  },
+  {
+    "file": "assistant/undo/route.ts",
+    "methods": [
+      {
+        "method": "POST",
+        "line": 71
+      }
+    ],
+    "authCalls": [
+      "requireRole(member)"
+    ],
+    "hasZod": false,
+    "zodCount": 0,
+    "hasManualValidation": true,
+    "hasTryCatch": true,
+    "catchesAuthError": true,
+    "extServices": [
+      "Prisma/Postgres"
+    ],
+    "lines": 296
+  },
+  {
+    "file": "audit/route.ts",
+    "methods": [
+      {
+        "method": "GET",
+        "line": 12
+      }
+    ],
+    "authCalls": [
+      "requireOrgContext"
+    ],
+    "hasZod": false,
+    "zodCount": 0,
+    "hasManualValidation": false,
+    "hasTryCatch": true,
+    "catchesAuthError": true,
+    "extServices": [
+      "Prisma/Postgres"
+    ],
+    "lines": 58
+  },
+  {
+    "file": "auth/callback/route.ts",
+    "methods": [
+      {
+        "method": "GET",
+        "line": 4
+      }
+    ],
+    "authCalls": [
+      "createClient"
+    ],
+    "hasZod": false,
+    "zodCount": 0,
+    "hasManualValidation": true,
+    "hasTryCatch": false,
+    "catchesAuthError": false,
+    "extServices": [],
+    "lines": 33
+  },
+  {
+    "file": "auth/logout/route.ts",
+    "methods": [
+      {
+        "method": "POST",
+        "line": 6
+      }
+    ],
+    "authCalls": [
+      "getCurrentUser",
+      "createClient"
+    ],
+    "hasZod": false,
+    "zodCount": 0,
+    "hasManualValidation": false,
+    "hasTryCatch": true,
+    "catchesAuthError": false,
+    "extServices": [],
+    "lines": 23
+  },
+  {
+    "file": "cron/sheets-sync/route.ts",
+    "methods": [
+      {
+        "method": "GET",
+        "line": 24
+      }
+    ],
+    "authCalls": [
+      "NONE/CUSTOM"
+    ],
+    "hasZod": false,
+    "zodCount": 0,
+    "hasManualValidation": true,
+    "hasTryCatch": true,
+    "catchesAuthError": false,
+    "extServices": [
+      "Prisma/Postgres"
+    ],
+    "lines": 112
+  },
+  {
+    "file": "dashboard/route.ts",
+    "methods": [
+      {
+        "method": "GET",
+        "line": 31
+      }
+    ],
+    "authCalls": [
+      "requireOrgContext"
+    ],
+    "hasZod": false,
+    "zodCount": 0,
+    "hasManualValidation": false,
+    "hasTryCatch": true,
+    "catchesAuthError": true,
+    "extServices": [
+      "Prisma/Postgres"
+    ],
+    "lines": 240
+  },
+  {
+    "file": "datasets/route.ts",
+    "methods": [
+      {
+        "method": "GET",
+        "line": 12
+      },
+      {
+        "method": "POST",
+        "line": 123
+      }
+    ],
+    "authCalls": [
+      "requireRole(member)",
+      "requireOrgContext"
+    ],
+    "hasZod": false,
+    "zodCount": 0,
+    "hasManualValidation": true,
+    "hasTryCatch": true,
+    "catchesAuthError": true,
+    "extServices": [
+      "Prisma/Postgres"
+    ],
+    "lines": 182
+  },
+  {
+    "file": "datasets/[id]/columns/route.ts",
+    "methods": [
+      {
+        "method": "GET",
+        "line": 6
+      },
+      {
+        "method": "POST",
+        "line": 35
+      }
+    ],
+    "authCalls": [
+      "requireRole(member)",
+      "requireOrgContext",
+      "verifyDatasetAccess"
+    ],
+    "hasZod": false,
+    "zodCount": 0,
+    "hasManualValidation": true,
+    "hasTryCatch": true,
+    "catchesAuthError": true,
+    "extServices": [
+      "Prisma/Postgres"
+    ],
+    "lines": 100
+  },
+  {
+    "file": "datasets/[id]/columns/[columnId]/route.ts",
+    "methods": [
+      {
+        "method": "DELETE",
+        "line": 5
+      }
+    ],
+    "authCalls": [
+      "requireRole(member)",
+      "requireOrgContext",
+      "verifyDatasetAccess"
+    ],
+    "hasZod": false,
+    "zodCount": 0,
+    "hasManualValidation": false,
+    "hasTryCatch": true,
+    "catchesAuthError": true,
+    "extServices": [
+      "Prisma/Postgres"
+    ],
+    "lines": 34
+  },
+  {
+    "file": "datasets/[id]/export/route.ts",
+    "methods": [
+      {
+        "method": "POST",
+        "line": 6
+      },
+      {
+        "method": "GET",
+        "line": 38
+      }
+    ],
+    "authCalls": [
+      "requireRole(member, member)",
+      "verifyDatasetAccess"
+    ],
+    "hasZod": false,
+    "zodCount": 0,
+    "hasManualValidation": true,
+    "hasTryCatch": true,
+    "catchesAuthError": true,
+    "extServices": [
+      "Prisma/Postgres"
+    ],
+    "lines": 141
+  },
+  {
+    "file": "datasets/[id]/import/route.ts",
+    "methods": [
+      {
+        "method": "POST",
+        "line": 17
+      }
+    ],
+    "authCalls": [
+      "requireRole(member)",
+      "requireOrgContext",
+      "verifyDatasetAccess"
+    ],
+    "hasZod": false,
+    "zodCount": 0,
+    "hasManualValidation": true,
+    "hasTryCatch": true,
+    "catchesAuthError": true,
+    "extServices": [
+      "Prisma/Postgres"
+    ],
+    "lines": 194
+  },
+  {
+    "file": "datasets/[id]/import-history/route.ts",
+    "methods": [
+      {
+        "method": "GET",
+        "line": 5
+      }
+    ],
+    "authCalls": [
+      "requireOrgContext"
+    ],
+    "hasZod": false,
+    "zodCount": 0,
+    "hasManualValidation": false,
+    "hasTryCatch": true,
+    "catchesAuthError": true,
+    "extServices": [
+      "Prisma/Postgres"
+    ],
+    "lines": 69
+  },
+  {
+    "file": "datasets/[id]/records/bulk/route.ts",
+    "methods": [
+      {
+        "method": "DELETE",
+        "line": 8
+      },
+      {
+        "method": "PATCH",
+        "line": 60
+      }
+    ],
+    "authCalls": [
+      "requireRole(member, member)",
+      "requireOrgContext",
+      "verifyDatasetAccess"
+    ],
+    "hasZod": false,
+    "zodCount": 0,
+    "hasManualValidation": true,
+    "hasTryCatch": true,
+    "catchesAuthError": true,
+    "extServices": [
+      "Prisma/Postgres"
+    ],
+    "lines": 120
+  },
+  {
+    "file": "datasets/[id]/records/route.ts",
+    "methods": [
+      {
+        "method": "GET",
+        "line": 30
+      },
+      {
+        "method": "POST",
+        "line": 113
+      }
+    ],
+    "authCalls": [
+      "requireRole(member)",
+      "requireOrgContext",
+      "verifyDatasetAccess"
+    ],
+    "hasZod": false,
+    "zodCount": 0,
+    "hasManualValidation": true,
+    "hasTryCatch": true,
+    "catchesAuthError": true,
+    "extServices": [
+      "Prisma/Postgres"
+    ],
+    "lines": 169
+  },
+  {
+    "file": "datasets/[id]/records/[recordId]/route.ts",
+    "methods": [
+      {
+        "method": "GET",
+        "line": 37
+      },
+      {
+        "method": "PATCH",
+        "line": 66
+      }
+    ],
+    "authCalls": [
+      "requireRole(member)",
+      "requireOrgContext",
+      "verifyDatasetAccess"
+    ],
+    "hasZod": false,
+    "zodCount": 0,
+    "hasManualValidation": true,
+    "hasTryCatch": true,
+    "catchesAuthError": true,
+    "extServices": [
+      "Prisma/Postgres"
+    ],
+    "lines": 113
+  },
+  {
+    "file": "datasets/[id]/records/[recordId]/values/route.ts",
+    "methods": [
+      {
+        "method": "POST",
+        "line": 5
+      }
+    ],
+    "authCalls": [
+      "requireOrgContext",
+      "verifyDatasetAccess"
+    ],
+    "hasZod": false,
+    "zodCount": 0,
+    "hasManualValidation": true,
+    "hasTryCatch": true,
+    "catchesAuthError": true,
+    "extServices": [
+      "Prisma/Postgres"
+    ],
+    "lines": 56
+  },
+  {
+    "file": "datasets/[id]/records/[recordId]/values/[valueId]/route.ts",
+    "methods": [
+      {
+        "method": "PATCH",
+        "line": 37
+      }
+    ],
+    "authCalls": [
+      "requireRole(member)",
+      "requireOrgContext",
+      "verifyDatasetAccess"
+    ],
+    "hasZod": false,
+    "zodCount": 0,
+    "hasManualValidation": true,
+    "hasTryCatch": true,
+    "catchesAuthError": true,
+    "extServices": [
+      "Prisma/Postgres"
+    ],
+    "lines": 116
+  },
+  {
+    "file": "datasets/[id]/route.ts",
+    "methods": [
+      {
+        "method": "GET",
+        "line": 41
+      },
+      {
+        "method": "PATCH",
+        "line": 101
+      },
+      {
+        "method": "DELETE",
+        "line": 166
+      }
+    ],
+    "authCalls": [
+      "requireRole(member, member)",
+      "requireOrgContext",
+      "verifyDatasetAccess"
+    ],
+    "hasZod": false,
+    "zodCount": 0,
+    "hasManualValidation": true,
+    "hasTryCatch": true,
+    "catchesAuthError": true,
+    "extServices": [
+      "Prisma/Postgres"
+    ],
+    "lines": 200
+  },
+  {
+    "file": "debug-error/route.ts",
+    "methods": [
+      {
+        "method": "GET",
+        "line": 6
+      }
+    ],
+    "authCalls": [
+      "getCurrentUser"
+    ],
+    "hasZod": false,
+    "zodCount": 0,
+    "hasManualValidation": false,
+    "hasTryCatch": true,
+    "catchesAuthError": false,
+    "extServices": [],
+    "lines": 18
+  },
+  {
+    "file": "extraction/route.ts",
+    "methods": [
+      {
+        "method": "POST",
+        "line": 20
+      }
+    ],
+    "authCalls": [
+      "requireRole(member)",
+      "requireOrgContext"
+    ],
+    "hasZod": false,
+    "zodCount": 0,
+    "hasManualValidation": true,
+    "hasTryCatch": true,
+    "catchesAuthError": true,
+    "extServices": [
+      "Webhooks",
+      "Prisma/Postgres"
+    ],
+    "lines": 155
+  },
+  {
+    "file": "google/authorize/route.ts",
+    "methods": [
+      {
+        "method": "GET",
+        "line": 12
+      }
+    ],
+    "authCalls": [
+      "requireRole(member)",
+      "requireOrgContext"
+    ],
+    "hasZod": false,
+    "zodCount": 0,
+    "hasManualValidation": false,
+    "hasTryCatch": true,
+    "catchesAuthError": true,
+    "extServices": [],
+    "lines": 27
+  },
+  {
+    "file": "google/callback/route.ts",
+    "methods": [
+      {
+        "method": "GET",
+        "line": 21
+      }
+    ],
+    "authCalls": [
+      "getCurrentUser"
+    ],
+    "hasZod": false,
+    "zodCount": 0,
+    "hasManualValidation": true,
+    "hasTryCatch": true,
+    "catchesAuthError": false,
+    "extServices": [
+      "Prisma/Postgres"
+    ],
+    "lines": 142
+  },
+  {
+    "file": "google-connections/route.ts",
+    "methods": [
+      {
+        "method": "GET",
+        "line": 15
+      },
+      {
+        "method": "POST",
+        "line": 32
+      }
+    ],
+    "authCalls": [
+      "requireRole(member)",
+      "requireOrgContext"
+    ],
+    "hasZod": false,
+    "zodCount": 0,
+    "hasManualValidation": false,
+    "hasTryCatch": true,
+    "catchesAuthError": true,
+    "extServices": [
+      "Prisma/Postgres"
+    ],
+    "lines": 49
+  },
+  {
+    "file": "google-connections/[id]/route.ts",
+    "methods": [
+      {
+        "method": "PATCH",
+        "line": 17
+      },
+      {
+        "method": "DELETE",
+        "line": 78
+      }
+    ],
+    "authCalls": [
+      "requireRole(member, member)",
+      "requireOrgContext"
+    ],
+    "hasZod": false,
+    "zodCount": 0,
+    "hasManualValidation": true,
+    "hasTryCatch": true,
+    "catchesAuthError": true,
+    "extServices": [
+      "Prisma/Postgres"
+    ],
+    "lines": 117
+  },
+  {
+    "file": "google-sheets/accounts/route.ts",
+    "methods": [
+      {
+        "method": "GET",
+        "line": 14
+      }
+    ],
+    "authCalls": [
+      "requireOrgContext"
+    ],
+    "hasZod": false,
+    "zodCount": 0,
+    "hasManualValidation": false,
+    "hasTryCatch": true,
+    "catchesAuthError": true,
+    "extServices": [
+      "Prisma/Postgres"
+    ],
+    "lines": 61
+  },
+  {
+    "file": "google-sheets/accounts/[id]/route.ts",
+    "methods": [
+      {
+        "method": "DELETE",
+        "line": 14
+      }
+    ],
+    "authCalls": [
+      "requireRole(member)",
+      "requireOrgContext"
+    ],
+    "hasZod": false,
+    "zodCount": 0,
+    "hasManualValidation": true,
+    "hasTryCatch": true,
+    "catchesAuthError": true,
+    "extServices": [
+      "Prisma/Postgres"
+    ],
+    "lines": 82
+  },
+  {
+    "file": "google-sheets/ai-mapping/route.ts",
+    "methods": [
+      {
+        "method": "POST",
+        "line": 19
+      }
+    ],
+    "authCalls": [
+      "requireRole(member)",
+      "requireOrgContext"
+    ],
+    "hasZod": false,
+    "zodCount": 0,
+    "hasManualValidation": true,
+    "hasTryCatch": true,
+    "catchesAuthError": true,
+    "extServices": [
+      "Prisma/Postgres"
+    ],
+    "lines": 94
+  },
+  {
+    "file": "google-sheets/auth/callback/route.ts",
+    "methods": [
+      {
+        "method": "GET",
+        "line": 17
+      }
+    ],
+    "authCalls": [
+      "getCurrentUser"
+    ],
+    "hasZod": false,
+    "zodCount": 0,
+    "hasManualValidation": false,
+    "hasTryCatch": true,
+    "catchesAuthError": false,
+    "extServices": [
+      "Prisma/Postgres"
+    ],
+    "lines": 126
+  },
+  {
+    "file": "google-sheets/auth/route.ts",
+    "methods": [
+      {
+        "method": "POST",
+        "line": 16
+      }
+    ],
+    "authCalls": [
+      "requireRole(member)",
+      "requireOrgContext"
+    ],
+    "hasZod": false,
+    "zodCount": 0,
+    "hasManualValidation": false,
+    "hasTryCatch": true,
+    "catchesAuthError": true,
+    "extServices": [],
+    "lines": 41
+  },
+  {
+    "file": "google-sheets/export/route.ts",
+    "methods": [
+      {
+        "method": "POST",
+        "line": 21
+      }
+    ],
+    "authCalls": [
+      "requireRole(member)",
+      "requireOrgContext",
+      "verifyDatasetAccess"
+    ],
+    "hasZod": false,
+    "zodCount": 0,
+    "hasManualValidation": true,
+    "hasTryCatch": true,
+    "catchesAuthError": true,
+    "extServices": [
+      "Google APIs",
+      "Prisma/Postgres"
+    ],
+    "lines": 89
+  },
+  {
+    "file": "google-sheets/import/route.ts",
+    "methods": [
+      {
+        "method": "POST",
+        "line": 29
+      }
+    ],
+    "authCalls": [
+      "requireRole(member)",
+      "requireOrgContext"
+    ],
+    "hasZod": false,
+    "zodCount": 0,
+    "hasManualValidation": true,
+    "hasTryCatch": true,
+    "catchesAuthError": true,
+    "extServices": [
+      "BullMQ/Redis",
+      "Prisma/Postgres"
+    ],
+    "lines": 153
+  },
+  {
+    "file": "google-sheets/import/[id]/route.ts",
+    "methods": [
+      {
+        "method": "GET",
+        "line": 7
+      }
+    ],
+    "authCalls": [
+      "requireOrgContext"
+    ],
+    "hasZod": false,
+    "zodCount": 0,
+    "hasManualValidation": true,
+    "hasTryCatch": true,
+    "catchesAuthError": true,
+    "extServices": [
+      "Prisma/Postgres"
+    ],
+    "lines": 75
+  },
+  {
+    "file": "google-sheets/link/route.ts",
+    "methods": [
+      {
+        "method": "POST",
+        "line": 28
+      }
+    ],
+    "authCalls": [
+      "requireRole(member)",
+      "requireOrgContext"
+    ],
+    "hasZod": false,
+    "zodCount": 0,
+    "hasManualValidation": true,
+    "hasTryCatch": true,
+    "catchesAuthError": true,
+    "extServices": [
+      "Prisma/Postgres"
+    ],
+    "lines": 195
+  },
+  {
+    "file": "google-sheets/mappings/[id]/conflicts/route.ts",
+    "methods": [
+      {
+        "method": "GET",
+        "line": 12
+      }
+    ],
+    "authCalls": [
+      "requireOrgContext"
+    ],
+    "hasZod": false,
+    "zodCount": 0,
+    "hasManualValidation": true,
+    "hasTryCatch": true,
+    "catchesAuthError": true,
+    "extServices": [
+      "Prisma/Postgres"
+    ],
+    "lines": 39
+  },
+  {
+    "file": "google-sheets/mappings/[id]/conflicts/[conflictId]/resolve/route.ts",
+    "methods": [
+      {
+        "method": "POST",
+        "line": 11
+      }
+    ],
+    "authCalls": [
+      "requireRole(member)",
+      "requireOrgContext"
+    ],
+    "hasZod": false,
+    "zodCount": 0,
+    "hasManualValidation": true,
+    "hasTryCatch": true,
+    "catchesAuthError": true,
+    "extServices": [
+      "Prisma/Postgres"
+    ],
+    "lines": 69
+  },
+  {
+    "file": "google-sheets/mappings/[id]/history/route.ts",
+    "methods": [
+      {
+        "method": "GET",
+        "line": 8
+      }
+    ],
+    "authCalls": [
+      "requireOrgContext"
+    ],
+    "hasZod": false,
+    "zodCount": 0,
+    "hasManualValidation": true,
+    "hasTryCatch": true,
+    "catchesAuthError": true,
+    "extServices": [
+      "Prisma/Postgres"
+    ],
+    "lines": 77
+  },
+  {
+    "file": "google-sheets/mappings/[id]/route.ts",
+    "methods": [
+      {
+        "method": "GET",
+        "line": 69
+      },
+      {
+        "method": "PATCH",
+        "line": 94
+      },
+      {
+        "method": "DELETE",
+        "line": 167
+      }
+    ],
+    "authCalls": [
+      "requireRole(member, member)",
+      "requireOrgContext"
+    ],
+    "hasZod": false,
+    "zodCount": 0,
+    "hasManualValidation": true,
+    "hasTryCatch": true,
+    "catchesAuthError": true,
+    "extServices": [
+      "Prisma/Postgres"
+    ],
+    "lines": 215
+  },
+  {
+    "file": "google-sheets/mappings/[id]/schema-versions/route.ts",
+    "methods": [
+      {
+        "method": "GET",
+        "line": 9
+      }
+    ],
+    "authCalls": [
+      "requireOrgContext"
+    ],
+    "hasZod": false,
+    "zodCount": 0,
+    "hasManualValidation": true,
+    "hasTryCatch": true,
+    "catchesAuthError": true,
+    "extServices": [
+      "Prisma/Postgres"
+    ],
+    "lines": 36
+  },
+  {
+    "file": "google-sheets/mappings/[id]/schema-versions/[versionId]/rollback/route.ts",
+    "methods": [
+      {
+        "method": "POST",
+        "line": 10
+      }
+    ],
+    "authCalls": [
+      "requireRole(member)",
+      "requireOrgContext"
+    ],
+    "hasZod": false,
+    "zodCount": 0,
+    "hasManualValidation": true,
+    "hasTryCatch": true,
+    "catchesAuthError": true,
+    "extServices": [
+      "Prisma/Postgres"
+    ],
+    "lines": 56
+  },
+  {
+    "file": "google-sheets/mappings/[id]/sync/route.ts",
+    "methods": [
+      {
+        "method": "POST",
+        "line": 10
+      }
+    ],
+    "authCalls": [
+      "requireRole(member)",
+      "requireOrgContext"
+    ],
+    "hasZod": false,
+    "zodCount": 0,
+    "hasManualValidation": true,
+    "hasTryCatch": true,
+    "catchesAuthError": true,
+    "extServices": [
+      "Prisma/Postgres"
+    ],
+    "lines": 48
+  },
+  {
+    "file": "google-sheets/org-export/route.ts",
+    "methods": [
+      {
+        "method": "POST",
+        "line": 36
+      }
+    ],
+    "authCalls": [
+      "requireRole(member)",
+      "requireOrgContext"
+    ],
+    "hasZod": false,
+    "zodCount": 0,
+    "hasManualValidation": true,
+    "hasTryCatch": true,
+    "catchesAuthError": true,
+    "extServices": [
+      "Google APIs",
+      "Prisma/Postgres"
+    ],
+    "lines": 364
+  },
+  {
+    "file": "google-sheets/spreadsheets/route.ts",
+    "methods": [
+      {
+        "method": "GET",
+        "line": 10
+      }
+    ],
+    "authCalls": [
+      "requireOrgContext"
+    ],
+    "hasZod": false,
+    "zodCount": 0,
+    "hasManualValidation": true,
+    "hasTryCatch": true,
+    "catchesAuthError": true,
+    "extServices": [
+      "Prisma/Postgres"
+    ],
+    "lines": 43
+  },
+  {
+    "file": "google-sheets/spreadsheets/[id]/preview/route.ts",
+    "methods": [
+      {
+        "method": "GET",
+        "line": 10
+      }
+    ],
+    "authCalls": [
+      "requireOrgContext"
+    ],
+    "hasZod": false,
+    "zodCount": 0,
+    "hasManualValidation": true,
+    "hasTryCatch": true,
+    "catchesAuthError": true,
+    "extServices": [
+      "Prisma/Postgres"
+    ],
+    "lines": 68
+  },
+  {
+    "file": "google-sheets/spreadsheets/[id]/tabs/route.ts",
+    "methods": [
+      {
+        "method": "GET",
+        "line": 9
+      }
+    ],
+    "authCalls": [
+      "requireOrgContext"
+    ],
+    "hasZod": false,
+    "zodCount": 0,
+    "hasManualValidation": true,
+    "hasTryCatch": true,
+    "catchesAuthError": true,
+    "extServices": [
+      "Prisma/Postgres"
+    ],
+    "lines": 45
+  },
+  {
+    "file": "health/route.ts",
+    "methods": [
+      {
+        "method": "GET",
+        "line": 19
+      }
+    ],
+    "authCalls": [
+      "NONE/CUSTOM"
+    ],
+    "hasZod": false,
+    "zodCount": 0,
+    "hasManualValidation": false,
+    "hasTryCatch": true,
+    "catchesAuthError": false,
+    "extServices": [
+      "Prisma/Postgres"
+    ],
+    "lines": 203
+  },
+  {
+    "file": "invitations/accept/route.ts",
+    "methods": [
+      {
+        "method": "POST",
+        "line": 18
+      }
+    ],
+    "authCalls": [
+      "getCurrentUser"
+    ],
+    "hasZod": false,
+    "zodCount": 0,
+    "hasManualValidation": true,
+    "hasTryCatch": true,
+    "catchesAuthError": true,
+    "extServices": [
+      "Prisma/Postgres"
+    ],
+    "lines": 115
+  },
+  {
+    "file": "invitations/decline/route.ts",
+    "methods": [
+      {
+        "method": "POST",
+        "line": 9
+      }
+    ],
+    "authCalls": [
+      "getCurrentUser"
+    ],
+    "hasZod": false,
+    "zodCount": 0,
+    "hasManualValidation": true,
+    "hasTryCatch": true,
+    "catchesAuthError": true,
+    "extServices": [
+      "Prisma/Postgres"
+    ],
+    "lines": 53
+  },
+  {
+    "file": "invitations/route.ts",
+    "methods": [
+      {
+        "method": "GET",
+        "line": 12
+      }
+    ],
+    "authCalls": [
+      "getCurrentUser"
+    ],
+    "hasZod": false,
+    "zodCount": 0,
+    "hasManualValidation": true,
+    "hasTryCatch": true,
+    "catchesAuthError": true,
+    "extServices": [
+      "Prisma/Postgres"
+    ],
+    "lines": 62
+  },
+  {
+    "file": "invoices/route.ts",
+    "methods": [
+      {
+        "method": "GET",
+        "line": 5
+      }
+    ],
+    "authCalls": [
+      "getCurrentUser"
+    ],
+    "hasZod": false,
+    "zodCount": 0,
+    "hasManualValidation": true,
+    "hasTryCatch": true,
+    "catchesAuthError": false,
+    "extServices": [
+      "Prisma/Postgres"
+    ],
+    "lines": 28
+  },
+  {
+    "file": "jobs/process/route.ts",
+    "methods": [
+      {
+        "method": "POST",
+        "line": 15
+      }
+    ],
+    "authCalls": [
+      "NONE/CUSTOM"
+    ],
+    "hasZod": false,
+    "zodCount": 0,
+    "hasManualValidation": false,
+    "hasTryCatch": false,
+    "catchesAuthError": false,
+    "extServices": [
+      "BullMQ/Redis"
+    ],
+    "lines": 18
+  },
+  {
+    "file": "organizations/route.ts",
+    "methods": [
+      {
+        "method": "GET",
+        "line": 13
+      },
+      {
+        "method": "POST",
+        "line": 40
+      }
+    ],
+    "authCalls": [
+      "getCurrentUser"
+    ],
+    "hasZod": false,
+    "zodCount": 0,
+    "hasManualValidation": false,
+    "hasTryCatch": true,
+    "catchesAuthError": false,
+    "extServices": [
+      "Prisma/Postgres"
+    ],
+    "lines": 101
+  },
+  {
+    "file": "organizations/search/route.ts",
+    "methods": [
+      {
+        "method": "GET",
+        "line": 9
+      }
+    ],
+    "authCalls": [
+      "requireOrgContext"
+    ],
+    "hasZod": false,
+    "zodCount": 0,
+    "hasManualValidation": false,
+    "hasTryCatch": true,
+    "catchesAuthError": true,
+    "extServices": [
+      "Prisma/Postgres"
+    ],
+    "lines": 46
+  },
+  {
+    "file": "organizations/[id]/invitations/route.ts",
+    "methods": [
+      {
+        "method": "GET",
+        "line": 37
+      },
+      {
+        "method": "POST",
+        "line": 61
+      }
+    ],
+    "authCalls": [
+      "getCurrentUser"
+    ],
+    "hasZod": false,
+    "zodCount": 0,
+    "hasManualValidation": true,
+    "hasTryCatch": true,
+    "catchesAuthError": true,
+    "extServices": [
+      "Resend/Email",
+      "Prisma/Postgres"
+    ],
+    "lines": 158
+  },
+  {
+    "file": "organizations/[id]/members/me/route.ts",
+    "methods": [
+      {
+        "method": "PATCH",
+        "line": 7
+      }
+    ],
+    "authCalls": [
+      "getCurrentUser"
+    ],
+    "hasZod": false,
+    "zodCount": 0,
+    "hasManualValidation": true,
+    "hasTryCatch": true,
+    "catchesAuthError": true,
+    "extServices": [
+      "Prisma/Postgres"
+    ],
+    "lines": 86
+  },
+  {
+    "file": "organizations/[id]/members/route.ts",
+    "methods": [
+      {
+        "method": "GET",
+        "line": 14
+      },
+      {
+        "method": "POST",
+        "line": 43
+      }
+    ],
+    "authCalls": [
+      "getCurrentUser"
+    ],
+    "hasZod": false,
+    "zodCount": 0,
+    "hasManualValidation": true,
+    "hasTryCatch": true,
+    "catchesAuthError": true,
+    "extServices": [
+      "Webhooks",
+      "Prisma/Postgres"
+    ],
+    "lines": 164
+  },
+  {
+    "file": "organizations/[id]/members/[memberId]/resend/route.ts",
+    "methods": [
+      {
+        "method": "POST",
+        "line": 29
+      }
+    ],
+    "authCalls": [
+      "getCurrentUser"
+    ],
+    "hasZod": false,
+    "zodCount": 0,
+    "hasManualValidation": false,
+    "hasTryCatch": true,
+    "catchesAuthError": true,
+    "extServices": [
+      "Webhooks",
+      "Resend/Email",
+      "Prisma/Postgres"
+    ],
+    "lines": 80
+  },
+  {
+    "file": "organizations/[id]/members/[memberId]/route.ts",
+    "methods": [
+      {
+        "method": "PATCH",
+        "line": 35
+      },
+      {
+        "method": "DELETE",
+        "line": 137
+      }
+    ],
+    "authCalls": [
+      "getCurrentUser"
+    ],
+    "hasZod": false,
+    "zodCount": 0,
+    "hasManualValidation": true,
+    "hasTryCatch": true,
+    "catchesAuthError": true,
+    "extServices": [
+      "Prisma/Postgres"
+    ],
+    "lines": 213
+  },
+  {
+    "file": "organizations/[id]/route.ts",
+    "methods": [
+      {
+        "method": "GET",
+        "line": 35
+      },
+      {
+        "method": "PATCH",
+        "line": 66
+      },
+      {
+        "method": "DELETE",
+        "line": 145
+      }
+    ],
+    "authCalls": [
+      "getCurrentUser"
+    ],
+    "hasZod": false,
+    "zodCount": 0,
+    "hasManualValidation": true,
+    "hasTryCatch": true,
+    "catchesAuthError": true,
+    "extServices": [
+      "Prisma/Postgres"
+    ],
+    "lines": 185
+  },
+  {
+    "file": "route.ts",
+    "methods": [
+      {
+        "method": "GET",
+        "line": 3
+      }
+    ],
+    "authCalls": [
+      "NONE/CUSTOM"
+    ],
+    "hasZod": false,
+    "zodCount": 0,
+    "hasManualValidation": false,
+    "hasTryCatch": false,
+    "catchesAuthError": false,
+    "extServices": [],
+    "lines": 5
+  },
+  {
+    "file": "schemas/route.ts",
+    "methods": [
+      {
+        "method": "GET",
+        "line": 12
+      },
+      {
+        "method": "POST",
+        "line": 30
+      }
+    ],
+    "authCalls": [
+      "requireRole(member)",
+      "requireOrgContext"
+    ],
+    "hasZod": false,
+    "zodCount": 0,
+    "hasManualValidation": true,
+    "hasTryCatch": true,
+    "catchesAuthError": true,
+    "extServices": [
+      "Prisma/Postgres"
+    ],
+    "lines": 94
+  },
+  {
+    "file": "schemas/[id]/clone/route.ts",
+    "methods": [
+      {
+        "method": "POST",
+        "line": 10
+      }
+    ],
+    "authCalls": [
+      "requireRole(member)",
+      "requireOrgContext"
+    ],
+    "hasZod": false,
+    "zodCount": 0,
+    "hasManualValidation": true,
+    "hasTryCatch": true,
+    "catchesAuthError": true,
+    "extServices": [
+      "Prisma/Postgres"
+    ],
+    "lines": 77
+  },
+  {
+    "file": "schemas/[id]/fields/reorder/route.ts",
+    "methods": [
+      {
+        "method": "PATCH",
+        "line": 5
+      }
+    ],
+    "authCalls": [
+      "requireRole(member)",
+      "requireOrgContext"
+    ],
+    "hasZod": false,
+    "zodCount": 0,
+    "hasManualValidation": true,
+    "hasTryCatch": true,
+    "catchesAuthError": true,
+    "extServices": [
+      "Prisma/Postgres"
+    ],
+    "lines": 49
+  },
+  {
+    "file": "schemas/[id]/fields/route.ts",
+    "methods": [
+      {
+        "method": "POST",
+        "line": 18
+      },
+      {
+        "method": "PUT",
+        "line": 92
+      }
+    ],
+    "authCalls": [
+      "requireRole(member, member)",
+      "requireOrgContext"
+    ],
+    "hasZod": false,
+    "zodCount": 0,
+    "hasManualValidation": true,
+    "hasTryCatch": true,
+    "catchesAuthError": true,
+    "extServices": [
+      "Prisma/Postgres"
+    ],
+    "lines": 148
+  },
+  {
+    "file": "schemas/[id]/fields/[fieldId]/route.ts",
+    "methods": [
+      {
+        "method": "PATCH",
+        "line": 18
+      },
+      {
+        "method": "DELETE",
+        "line": 90
+      }
+    ],
+    "authCalls": [
+      "requireRole(member, member)",
+      "requireOrgContext"
+    ],
+    "hasZod": false,
+    "zodCount": 0,
+    "hasManualValidation": true,
+    "hasTryCatch": true,
+    "catchesAuthError": true,
+    "extServices": [
+      "Prisma/Postgres"
+    ],
+    "lines": 145
+  },
+  {
+    "file": "schemas/[id]/route.ts",
+    "methods": [
+      {
+        "method": "GET",
+        "line": 21
+      },
+      {
+        "method": "PATCH",
+        "line": 45
+      },
+      {
+        "method": "DELETE",
+        "line": 88
+      }
+    ],
+    "authCalls": [
+      "requireRole(member, member)",
+      "requireOrgContext"
+    ],
+    "hasZod": false,
+    "zodCount": 0,
+    "hasManualValidation": true,
+    "hasTryCatch": true,
+    "catchesAuthError": true,
+    "extServices": [
+      "Prisma/Postgres"
+    ],
+    "lines": 147
+  },
+  {
+    "file": "schemas/[id]/test-extraction/route.ts",
+    "methods": [
+      {
+        "method": "POST",
+        "line": 12
+      }
+    ],
+    "authCalls": [
+      "requireRole(member)",
+      "requireOrgContext"
+    ],
+    "hasZod": false,
+    "zodCount": 0,
+    "hasManualValidation": true,
+    "hasTryCatch": true,
+    "catchesAuthError": true,
+    "extServices": [
+      "Prisma/Postgres"
+    ],
+    "lines": 79
+  },
+  {
+    "file": "search/route.ts",
+    "methods": [
+      {
+        "method": "GET",
+        "line": 20
+      }
+    ],
+    "authCalls": [
+      "requireOrgContext"
+    ],
+    "hasZod": false,
+    "zodCount": 0,
+    "hasManualValidation": false,
+    "hasTryCatch": true,
+    "catchesAuthError": true,
+    "extServices": [
+      "Prisma/Postgres"
+    ],
+    "lines": 138
+  },
+  {
+    "file": "session/route.ts",
+    "methods": [
+      {
+        "method": "GET",
+        "line": 9
+      },
+      {
+        "method": "PATCH",
+        "line": 44
+      }
+    ],
+    "authCalls": [
+      "getCurrentUser"
+    ],
+    "hasZod": false,
+    "zodCount": 0,
+    "hasManualValidation": false,
+    "hasTryCatch": true,
+    "catchesAuthError": false,
+    "extServices": [
+      "Prisma/Postgres"
+    ],
+    "lines": 78
+  },
+  {
+    "file": "sharing/cross-org/route.ts",
+    "methods": [
+      {
+        "method": "GET",
+        "line": 12
+      },
+      {
+        "method": "POST",
+        "line": 40
+      }
+    ],
+    "authCalls": [
+      "requireRole(member)",
+      "requireOrgContext"
+    ],
+    "hasZod": false,
+    "zodCount": 0,
+    "hasManualValidation": true,
+    "hasTryCatch": true,
+    "catchesAuthError": true,
+    "extServices": [
+      "Prisma/Postgres"
+    ],
+    "lines": 100
+  },
+  {
+    "file": "sharing/cross-org/[id]/route.ts",
+    "methods": [
+      {
+        "method": "PATCH",
+        "line": 10
+      }
+    ],
+    "authCalls": [
+      "requireRole(member)",
+      "requireOrgContext"
+    ],
+    "hasZod": false,
+    "zodCount": 0,
+    "hasManualValidation": true,
+    "hasTryCatch": true,
+    "catchesAuthError": true,
+    "extServices": [
+      "Prisma/Postgres"
+    ],
+    "lines": 120
+  },
+  {
+    "file": "sharing/permissions/route.ts",
+    "methods": [
+      {
+        "method": "GET",
+        "line": 16
+      },
+      {
+        "method": "POST",
+        "line": 70
+      },
+      {
+        "method": "DELETE",
+        "line": 155
+      },
+      {
+        "method": "PATCH",
+        "line": 213
+      }
+    ],
+    "authCalls": [
+      "requireRole(member, member, member)",
+      "requireOrgContext"
+    ],
+    "hasZod": false,
+    "zodCount": 0,
+    "hasManualValidation": true,
+    "hasTryCatch": true,
+    "catchesAuthError": true,
+    "extServices": [
+      "Prisma/Postgres"
+    ],
+    "lines": 281
+  },
+  {
+    "file": "sharing/requests/route.ts",
+    "methods": [
+      {
+        "method": "GET",
+        "line": 15
+      },
+      {
+        "method": "POST",
+        "line": 47
+      }
+    ],
+    "authCalls": [
+      "requireRole(member)",
+      "requireOrgContext"
+    ],
+    "hasZod": false,
+    "zodCount": 0,
+    "hasManualValidation": true,
+    "hasTryCatch": true,
+    "catchesAuthError": true,
+    "extServices": [
+      "Prisma/Postgres"
+    ],
+    "lines": 112
+  },
+  {
+    "file": "sharing/requests/[id]/approve/route.ts",
+    "methods": [
+      {
+        "method": "POST",
+        "line": 17
+      }
+    ],
+    "authCalls": [
+      "requireRole(member)",
+      "requireOrgContext"
+    ],
+    "hasZod": false,
+    "zodCount": 0,
+    "hasManualValidation": true,
+    "hasTryCatch": true,
+    "catchesAuthError": true,
+    "extServices": [
+      "Webhooks",
+      "Prisma/Postgres"
+    ],
+    "lines": 126
+  },
+  {
+    "file": "sharing/requests/[id]/reject/route.ts",
+    "methods": [
+      {
+        "method": "POST",
+        "line": 10
+      }
+    ],
+    "authCalls": [
+      "requireRole(member)",
+      "requireOrgContext"
+    ],
+    "hasZod": false,
+    "zodCount": 0,
+    "hasManualValidation": true,
+    "hasTryCatch": true,
+    "catchesAuthError": true,
+    "extServices": [
+      "Prisma/Postgres"
+    ],
+    "lines": 70
+  },
+  {
+    "file": "sources/route.ts",
+    "methods": [
+      {
+        "method": "GET",
+        "line": 14
+      },
+      {
+        "method": "POST",
+        "line": 37
+      }
+    ],
+    "authCalls": [
+      "requireRole(member)",
+      "requireOrgContext"
+    ],
+    "hasZod": false,
+    "zodCount": 0,
+    "hasManualValidation": true,
+    "hasTryCatch": true,
+    "catchesAuthError": true,
+    "extServices": [
+      "Prisma/Postgres"
+    ],
+    "lines": 154
+  },
+  {
+    "file": "sources/test-scan/route.ts",
+    "methods": [
+      {
+        "method": "POST",
+        "line": 5
+      }
+    ],
+    "authCalls": [
+      "requireRole(member)",
+      "requireOrgContext"
+    ],
+    "hasZod": false,
+    "zodCount": 0,
+    "hasManualValidation": true,
+    "hasTryCatch": true,
+    "catchesAuthError": true,
+    "extServices": [],
+    "lines": 125
+  },
+  {
+    "file": "sources/[id]/cancel-scan/route.ts",
+    "methods": [
+      {
+        "method": "POST",
+        "line": 6
+      }
+    ],
+    "authCalls": [
+      "requireRole(member)"
+    ],
+    "hasZod": false,
+    "zodCount": 0,
+    "hasManualValidation": true,
+    "hasTryCatch": true,
+    "catchesAuthError": true,
+    "extServices": [
+      "Prisma/Postgres"
+    ],
+    "lines": 99
+  },
+  {
+    "file": "sources/[id]/clone/route.ts",
+    "methods": [
+      {
+        "method": "POST",
+        "line": 11
+      }
+    ],
+    "authCalls": [
+      "requireRole(member)",
+      "requireOrgContext"
+    ],
+    "hasZod": false,
+    "zodCount": 0,
+    "hasManualValidation": true,
+    "hasTryCatch": true,
+    "catchesAuthError": true,
+    "extServices": [
+      "Prisma/Postgres"
+    ],
+    "lines": 87
+  },
+  {
+    "file": "sources/[id]/default-dataset/route.ts",
+    "methods": [
+      {
+        "method": "GET",
+        "line": 5
+      }
+    ],
+    "authCalls": [
+      "requireOrgContext"
+    ],
+    "hasZod": false,
+    "zodCount": 0,
+    "hasManualValidation": true,
+    "hasTryCatch": true,
+    "catchesAuthError": true,
+    "extServices": [
+      "Prisma/Postgres"
+    ],
+    "lines": 58
+  },
+  {
+    "file": "sources/[id]/emails/route.ts",
+    "methods": [
+      {
+        "method": "GET",
+        "line": 11
+      }
+    ],
+    "authCalls": [
+      "requireOrgContext"
+    ],
+    "hasZod": false,
+    "zodCount": 0,
+    "hasManualValidation": true,
+    "hasTryCatch": true,
+    "catchesAuthError": true,
+    "extServices": [
+      "Prisma/Postgres"
+    ],
+    "lines": 83
+  },
+  {
+    "file": "sources/[id]/extract/route.ts",
+    "methods": [
+      {
+        "method": "POST",
+        "line": 16
+      }
+    ],
+    "authCalls": [
+      "requireRole(member)",
+      "requireOrgContext"
+    ],
+    "hasZod": false,
+    "zodCount": 0,
+    "hasManualValidation": true,
+    "hasTryCatch": true,
+    "catchesAuthError": true,
+    "extServices": [
+      "BullMQ/Redis",
+      "Prisma/Postgres"
+    ],
+    "lines": 143
+  },
+  {
+    "file": "sources/[id]/route.ts",
+    "methods": [
+      {
+        "method": "GET",
+        "line": 25
+      },
+      {
+        "method": "PATCH",
+        "line": 49
+      },
+      {
+        "method": "DELETE",
+        "line": 136
+      }
+    ],
+    "authCalls": [
+      "requireRole(member, member)",
+      "requireOrgContext"
+    ],
+    "hasZod": false,
+    "zodCount": 0,
+    "hasManualValidation": true,
+    "hasTryCatch": true,
+    "catchesAuthError": true,
+    "extServices": [
+      "Prisma/Postgres"
+    ],
+    "lines": 170
+  },
+  {
+    "file": "sources/[id]/rules/route.ts",
+    "methods": [
+      {
+        "method": "GET",
+        "line": 17
+      },
+      {
+        "method": "PUT",
+        "line": 45
+      }
+    ],
+    "authCalls": [
+      "requireRole(member)",
+      "requireOrgContext"
+    ],
+    "hasZod": false,
+    "zodCount": 0,
+    "hasManualValidation": true,
+    "hasTryCatch": true,
+    "catchesAuthError": true,
+    "extServices": [
+      "Prisma/Postgres"
+    ],
+    "lines": 101
+  },
+  {
+    "file": "sources/[id]/runs/route.ts",
+    "methods": [
+      {
+        "method": "GET",
+        "line": 21
+      },
+      {
+        "method": "POST",
+        "line": 49
+      }
+    ],
+    "authCalls": [
+      "requireRole(member)",
+      "requireOrgContext"
+    ],
+    "hasZod": false,
+    "zodCount": 0,
+    "hasManualValidation": true,
+    "hasTryCatch": true,
+    "catchesAuthError": true,
+    "extServices": [
+      "BullMQ/Redis",
+      "Prisma/Postgres"
+    ],
+    "lines": 131
+  },
+  {
+    "file": "sources/[id]/scan/route.ts",
+    "methods": [
+      {
+        "method": "POST",
+        "line": 15
+      }
+    ],
+    "authCalls": [
+      "requireRole(member)",
+      "requireOrgContext"
+    ],
+    "hasZod": false,
+    "zodCount": 0,
+    "hasManualValidation": true,
+    "hasTryCatch": true,
+    "catchesAuthError": true,
+    "extServices": [
+      "BullMQ/Redis",
+      "Webhooks",
+      "Prisma/Postgres"
+    ],
+    "lines": 105
+  },
+  {
+    "file": "usage/route.ts",
+    "methods": [
+      {
+        "method": "GET",
+        "line": 18
+      }
+    ],
+    "authCalls": [
+      "requireOrgContext"
+    ],
+    "hasZod": false,
+    "zodCount": 0,
+    "hasManualValidation": false,
+    "hasTryCatch": true,
+    "catchesAuthError": true,
+    "extServices": [
+      "Prisma/Postgres"
+    ],
+    "lines": 112
+  },
+  {
+    "file": "usage/trends/route.ts",
+    "methods": [
+      {
+        "method": "GET",
+        "line": 17
+      }
+    ],
+    "authCalls": [
+      "requireOrgContext"
+    ],
+    "hasZod": false,
+    "zodCount": 0,
+    "hasManualValidation": false,
+    "hasTryCatch": true,
+    "catchesAuthError": true,
+    "extServices": [
+      "Prisma/Postgres"
+    ],
+    "lines": 286
+  },
+  {
+    "file": "users/search/route.ts",
+    "methods": [
+      {
+        "method": "GET",
+        "line": 15
+      }
+    ],
+    "authCalls": [
+      "getCurrentUser"
+    ],
+    "hasZod": false,
+    "zodCount": 0,
+    "hasManualValidation": false,
+    "hasTryCatch": true,
+    "catchesAuthError": true,
+    "extServices": [
+      "Prisma/Postgres"
+    ],
+    "lines": 60
+  },
+  {
+    "file": "webhooks/route.ts",
+    "methods": [
+      {
+        "method": "GET",
+        "line": 9
+      },
+      {
+        "method": "POST",
+        "line": 31
+      }
+    ],
+    "authCalls": [
+      "requireRole(member)",
+      "requireOrgContext"
+    ],
+    "hasZod": false,
+    "zodCount": 0,
+    "hasManualValidation": true,
+    "hasTryCatch": true,
+    "catchesAuthError": true,
+    "extServices": [
+      "Prisma/Postgres"
+    ],
+    "lines": 106
+  },
+  {
+    "file": "webhooks/[id]/route.ts",
+    "methods": [
+      {
+        "method": "PATCH",
+        "line": 9
+      },
+      {
+        "method": "DELETE",
+        "line": 92
+      }
+    ],
+    "authCalls": [
+      "requireRole(member, member)",
+      "requireOrgContext"
+    ],
+    "hasZod": false,
+    "zodCount": 0,
+    "hasManualValidation": true,
+    "hasTryCatch": true,
+    "catchesAuthError": true,
+    "extServices": [
+      "Prisma/Postgres"
+    ],
+    "lines": 129
+  }
+]

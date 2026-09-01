@@ -8,7 +8,7 @@
 // doesn't wait for the HTTP request to complete.
 
 import { db } from "@/lib/db";
-import { enqueueJob } from "@/lib/job-queue";
+import { enqueueJob } from "@/lib/queue";
 
 export interface WebhookEvent {
   event: string;

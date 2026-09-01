@@ -47,7 +47,7 @@ function getStoredOrgId(): string | null {
   try {
     // Import inline to avoid circular dependencies — this module is loaded before
     // the store module in some bundler orderings.
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
+
     const { useAppStore } = require("@/lib/store");
     return useAppStore.getState().selectedOrganizationId ?? null;
   } catch {

@@ -141,7 +141,7 @@ export async function executeTool(
 ): Promise<unknown> {
     const def = getToolDef(toolName);
   if (!def) {
-    throw new Error("Unknown tool: $" + "{toolName}". Check the available tools list.");
+    throw new Error(`Unknown tool: ${toolName}. Check the available tools list.`);
   }
 
   const actorMembership = await db.organizationMember.findUnique({
