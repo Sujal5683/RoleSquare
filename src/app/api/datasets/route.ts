@@ -3,13 +3,11 @@
 // POST /api/datasets — create a dataset.
 //   Body: { name, description?, schemaId? }
 
-export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { requireOrgContext, requireRole, AuthError, authErrorResponse } from "@/lib/auth";
 import { logAudit } from "@/lib/audit";
 import { serializeDataset } from "@/lib/serialize";
-import { getAccessibleDatasetIds } from "@/lib/dataset-access";
 
 export async function GET(req: NextRequest) {
   try {
@@ -22,31 +20,48 @@ export async function GET(req: NextRequest) {
       orgAccessLevel = "edit";
     }
 
-    // Get owned + shared dataset IDs
-    const { ownedIds, sharedAccesses } = await getAccessibleDatasetIds(
-      user.id,
-      organizationId
-    );
-
-    // Fetch owned datasets
-    const ownedDatasets = await db.dataset.findMany({
-      where: { organizationId },
-      include: {
-        schema: { include: { fields: true } },
-        sources: { select: { id: true } },
-        sheetMappings: {
-          where: { status: { not: "unlinked" } },
-          take: 1,
-          select: {
-            id: true,
-            status: true,
-            syncState: { select: { lastSyncAt: true } },
-            _count: { select: { syncConflicts: true } },
+    // Fetch owned datasets and shared access grants in parallel.
+    // This replaces the previous pattern where getAccessibleDatasetIds() did
+    // a SELECT id-only query for owned datasets, then the route did a second
+    // full SELECT — two round-trips where one suffices for owned data.
+    const [ownedDatasets, orgGrants, userGrants] = await Promise.all([
+      db.dataset.findMany({
+        where: { organizationId },
+        include: {
+          schema: { include: { fields: true } },
+          sources: { select: { id: true } },
+          sheetMappings: {
+            where: { status: { not: "unlinked" } },
+            take: 1,
+            select: {
+              id: true,
+              status: true,
+              syncState: { select: { lastSyncAt: true } },
+              _count: { select: { syncConflicts: true } },
+            },
           },
         },
-      },
-      orderBy: { createdAt: "desc" },
-    });
+        orderBy: { createdAt: "desc" },
+      }),
+      db.datasetAccess.findMany({
+        where: { granteeOrgId: organizationId, status: "active", isPaused: false },
+        select: { id: true, datasetId: true, level: true, ownerOrgId: true },
+      }),
+      db.datasetAccess.findMany({
+        where: { granteeUserId: user.id, status: "active", isPaused: false },
+        select: { id: true, datasetId: true, level: true, ownerOrgId: true },
+      }),
+    ]);
+
+    // Build shared access map (org grant takes precedence over user grant)
+    const ownedIds = new Set(ownedDatasets.map((d) => d.id));
+    const sharedMap = new Map<string, { datasetId: string; level: string; accessId: string; ownerOrgId: string }>();
+    for (const g of [...orgGrants, ...userGrants]) {
+      if (!ownedIds.has(g.datasetId) && !sharedMap.has(g.datasetId)) {
+        sharedMap.set(g.datasetId, { datasetId: g.datasetId, level: g.level, accessId: g.id, ownerOrgId: g.ownerOrgId });
+      }
+    }
+    const sharedAccesses = Array.from(sharedMap.values());
 
     // Fetch shared datasets (only if there are any)
     const sharedDatasets =

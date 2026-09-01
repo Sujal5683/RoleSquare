@@ -97,7 +97,20 @@ const NAV_ITEMS: NavItem[] = [
   { id: "settings", label: "Settings", icon: Settings, group: "Account" },
 ];
 
-export function AppShell({ children }: { children: React.ReactNode }) {
+export function AppShell({ children, initialSession }: { 
+  children: React.ReactNode;
+  initialSession?: {
+    user: SessionUser;
+    organizations: {
+      id: string;
+      name: string;
+      slug: string;
+      plan: string;
+      role: string;
+      status: string;
+    }[];
+  } | null;
+}) {
   const queryClient = useQueryClient();
   const view = useAppStore((s) => s.view);
   const setView = useAppStore((s) => s.setView);
@@ -113,15 +126,36 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   const router = useRouter();
 
-  const [session, setSession] = useState<SessionUser | null>(null);
-  const [sessionLoading, setSessionLoading] = useState(true);
+  // Session state — initialized from server-prefetched data when available.
+  // If initialSession is provided (SSR path), we skip the useEffect fetch below
+  // and show the shell immediately without a loading screen.
+  const [session, setSession] = useState<SessionUser | null>(
+    initialSession?.user ?? null
+  );
+  const [sessionLoading, setSessionLoading] = useState(!initialSession);
   const [orgs, setOrgs] = useState<
     { id: string; name: string; slug: string; plan: string; role: string }[]
-  >([]);
+  >(initialSession?.organizations ?? []);
   const activeOrgId = useAppStore((s) => s.selectedOrganizationId);
   const setActiveOrgId = useAppStore((s) => s.setOrganization);
 
+  // Bootstrap: sync orgs to Zustand store from server-prefetched data (or
+  // from a /api/session fetch if initialSession wasn't provided).
   useEffect(() => {
+    // If we already have the session from SSR, just sync the org to the store
+    // and skip the network call entirely.
+    if (initialSession) {
+      const currentActiveOrgId = useAppStore.getState().selectedOrganizationId;
+      const isValid = initialSession.organizations.some(
+        (o) => o.id === currentActiveOrgId
+      );
+      if (!isValid && initialSession.organizations.length > 0) {
+        setActiveOrgId(initialSession.organizations[0].id);
+      }
+      return;
+    }
+
+    // Fallback: no SSR session (e.g. dev, direct navigation) — fetch from API.
     api
       .get<{
         user: {
@@ -158,7 +192,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         // api-client will handle 401→/login redirect automatically
       })
       .finally(() => setSessionLoading(false));
-  }, [setActiveOrgId]);
+  }, [setActiveOrgId, initialSession]);
 
   // ── Supabase Realtime: push-based cache invalidation for ALL major tables ────
   //

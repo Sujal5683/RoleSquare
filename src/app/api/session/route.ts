@@ -9,19 +9,30 @@ export const dynamic = "force-dynamic";
 export async function GET() {
   try {
     const user = await getCurrentUser();
-    return NextResponse.json({
-      user: {
-        id: user.id,
-        email: user.email,
-        name: user.name,
-        avatarUrl: user.avatarUrl,
-        role: user.role,
-        plan: user.plan,
-        notificationPrefs: user.notificationPrefs,
-        twoFactorEnabled: user.twoFactorEnabled,
+    return NextResponse.json(
+      {
+        user: {
+          id: user.id,
+          email: user.email,
+          name: user.name,
+          avatarUrl: user.avatarUrl,
+          role: user.role,
+          plan: user.plan,
+          notificationPrefs: user.notificationPrefs,
+          twoFactorEnabled: user.twoFactorEnabled,
+        },
+        organizations: user.organizations,
       },
-      organizations: user.organizations,
-    });
+      {
+        headers: {
+          // Cache the session in the browser for 30s. During this window
+          // subsequent navigations within the same tab skip the network call.
+          // Supabase Realtime handles org membership changes in real-time.
+          // `private` ensures CDN/proxies never cache this response.
+          "Cache-Control": "private, max-age=30",
+        },
+      }
+    );
   } catch (err: any) {
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Failed to load session" },

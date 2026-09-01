@@ -34,6 +34,12 @@ export async function GET(
   try {
     const { id } = await params;
     const { user, organizationId } = await requireOrgContext(req);
+
+    // Fetch dataset (for schema+access check) and query params in parallel
+    // with the actual records queries by splitting the work:
+    //   Step 1: auth (requireOrgContext) — already done above
+    //   Step 2: dataset access check (sequential, needs orgId)
+    //   Step 3: records + count + columnDefs (parallel with each other)
     const dataset = await requireDataset(id, organizationId, user.id);
     if (!dataset) {
       return NextResponse.json(
@@ -52,7 +58,8 @@ export async function GET(
     const where: any = { datasetId: id };
     if (status) where.status = status;
 
-    const [total, records] = await Promise.all([
+    // Run count, records, AND column defs in parallel — they are independent.
+    const [total, records, columnDefs] = await Promise.all([
       db.datasetRecord.count({ where }),
       db.datasetRecord.findMany({
         where,
@@ -61,13 +68,11 @@ export async function GET(
         skip: (page - 1) * pageSize,
         take: pageSize,
       }),
+      db.datasetColumnDef.findMany({
+        where: { datasetId: id, isDeleted: false },
+        orderBy: { position: "asc" },
+      }),
     ]);
-
-    // Load per-dataset column definitions (independent of schema)
-    const columnDefs = await db.datasetColumnDef.findMany({
-      where: { datasetId: id, isDeleted: false },
-      orderBy: { position: "asc" },
-    });
     // Merge: DatasetColumnDef takes precedence over SchemaField for display
     // This preserves data visibility even after schema fields are deleted
     const fieldsMap = mergedFieldsMap(dataset?.schema?.fields ?? [], columnDefs);

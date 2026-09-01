@@ -5,7 +5,6 @@
 //     { name, description?, sourceType, googleConnectionId, schemaId?,
 //       datasetId?, scheduleMode?, scheduleExpr?, config?, rules?: [{filterType, operator, value, position?}] }
 
-export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { requireOrgContext, requireRole, AuthError, authErrorResponse } from "@/lib/auth";
@@ -121,24 +120,27 @@ export async function POST(req: NextRequest) {
     const { ensureDefaultDataset } = await import("@/lib/dataset-provisioner");
     await ensureDefaultDataset(source.id);
 
-    const full = await db.source.findUnique({
-      where: { id: source.id },
-      include: {
-        googleConnection: true,
-        schema: { include: { fields: true } },
-        dataset: { select: { id: true, name: true } },
-        rules: { orderBy: { position: "asc" } },
-      },
-    });
-
-    await logAudit({
-      organizationId,
-      actorId: user.id,
-      action: "create",
-      entity: "source",
-      entityId: source.id,
-      after: { name, sourceType: body?.sourceType ?? "gmail", ruleCount: rulesInput.length },
-    });
+    // Fetch the full source with relations AND write the audit log in parallel —
+    // they are fully independent of each other.
+    const [full] = await Promise.all([
+      db.source.findUnique({
+        where: { id: source.id },
+        include: {
+          googleConnection: true,
+          schema: { include: { fields: true } },
+          dataset: { select: { id: true, name: true } },
+          rules: { orderBy: { position: "asc" } },
+        },
+      }),
+      logAudit({
+        organizationId,
+        actorId: user.id,
+        action: "create",
+        entity: "source",
+        entityId: source.id,
+        after: { name, sourceType: body?.sourceType ?? "gmail", ruleCount: rulesInput.length },
+      }),
+    ]);
 
     return NextResponse.json(serializeSource(full), { status: 201 });
   } catch (err) {
