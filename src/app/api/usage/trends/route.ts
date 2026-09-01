@@ -1,4 +1,4 @@
-﻿// GET /api/usage/trends — returns detailed usage analytics for charts:
+// GET /api/usage/trends — returns detailed usage analytics for charts:
 //   - daily AI token consumption for the last 30 days
 //   - job type distribution (counts by type)
 //   - job status distribution (counts by status)
@@ -46,7 +46,7 @@ export async function GET(req: NextRequest) {
         orderBy: { createdAt: "asc" },
       }),
       db.aiOutput.findMany({
-        where: { job: { organizationId } },
+        where: { job: { organizationId }, createdAt: { gte: thirtyDaysAgo } },
         select: {
           id: true,
           jobId: true,
@@ -188,18 +188,16 @@ export async function GET(req: NextRequest) {
     });
     
     // Count jobs created by this user
-    const userJobs = await db.aiJob.findMany({
-        where: { userId: user.id, createdAt: { gte: startOfMonth } },
-        select: { id: true }
+    const currentMonthJobs = await db.aiJob.count({
+      where: { userId: user.id, createdAt: { gte: startOfMonth } },
     });
-    const currentMonthJobs = userJobs.length;
 
     // Count tokens used by this user's jobs
-    const userOutputs = await db.aiOutput.findMany({
-        where: { job: { userId: user.id }, createdAt: { gte: startOfMonth } },
-        select: { tokensUsed: true }
+    const userOutputsAgg = await db.aiOutput.aggregate({
+      where: { job: { userId: user.id }, createdAt: { gte: startOfMonth } },
+      _sum: { tokensUsed: true },
     });
-    const currentMonthUserTokens = userOutputs.reduce((sum, o) => sum + o.tokensUsed, 0);
+    const currentMonthUserTokens = userOutputsAgg._sum.tokensUsed || 0;
 
     const quotas = [
       {

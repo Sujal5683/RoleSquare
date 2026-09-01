@@ -28,9 +28,7 @@ export async function POST(
 
     try {
       const { checkUserLimits } = await import("@/lib/usage");
-      await checkUserLimits(user.id, "jobs");
-      await checkUserLimits(user.id, "tokens");
-      await checkUserLimits(user.id, "records");
+      await checkUserLimits(user.id, ["jobs", "tokens", "records"]);
     } catch (limitErr) {
       return NextResponse.json(
         { error: limitErr instanceof Error ? limitErr.message : "Usage limit exceeded" },

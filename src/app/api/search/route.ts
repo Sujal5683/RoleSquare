@@ -1,4 +1,4 @@
-﻿// GET /api/search?q=<query> — global search across sources, datasets,
+// GET /api/search?q=<query> — global search across sources, datasets,
 // schemas, and records. Returns a grouped result set so the frontend
 // can render them by category in the command palette or a search page.
 
@@ -50,7 +50,7 @@ export async function GET(req: NextRequest) {
         take: limit,
         include: {
           googleConnection: true,
-          schema: { include: { fields: true } },
+          schema: { select: { id: true, name: true, version: true } },
           dataset: { select: { id: true, name: true } },
         },
         orderBy: { createdAt: "desc" },
@@ -64,7 +64,7 @@ export async function GET(req: NextRequest) {
           ],
         },
         take: limit,
-        include: { schema: { include: { fields: true } } },
+        include: { schema: { select: { id: true, name: true, version: true } } },
         orderBy: { createdAt: "desc" },
       }),
       db.schema.findMany({

@@ -67,8 +67,8 @@ export function ExtractionWizard() {
     enabled: !!jobId && step === 5,
     refetchInterval: (query) => {
       const status = query.state.data?.status;
-      // Fast polling (1.5s) while active; stop on terminal states
-      return (status === "success" || status === "failed" || status === "dlq") ? false : 1500;
+      // Normal polling (5s) while active; stop on terminal states
+      return (status === "success" || status === "failed" || status === "dlq") ? false : 5000;
     },
   });
 
@@ -536,8 +536,8 @@ function LiveLogs({ jobId, isJobFinished }: { jobId: string | null, isJobFinishe
     queryKey: ["agent-logs", jobId],
     queryFn: () => api.get<{ data: AgentLogDTO[] }>(`/api/agent-logs?jobId=${jobId}&pageSize=50`),
     enabled: !!jobId,
-    // 1500ms matches the rest of the app — was 3000ms before
-    refetchInterval: isJobFinished ? false : 1500,
+    // Normal polling (5s) matches the rest of the app now
+    refetchInterval: isJobFinished ? false : 5000,
   });
 
   if (!data?.data?.length) return <span className="text-muted-foreground/50">Waiting for logs...</span>;

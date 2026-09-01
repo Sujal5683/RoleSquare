@@ -50,9 +50,7 @@ export async function GET(req: NextRequest) {
       usageRaw,
       connectionAlertsRaw,
       pendingRequestsRaw,
-      roleChangeAlertsRaw,
       recordsExtracted,
-      schemaFields,
       recentRecords,
       recentJobs,
     ] = await Promise.all([
@@ -81,14 +79,14 @@ export async function GET(req: NextRequest) {
         where: { status: "needs_review", dataset: { organizationId } },
         include: {
           values: true,
-          dataset: { select: { id: true, name: true } },
+          dataset: { select: { id: true, name: true, schemaId: true } },
         },
       }),
       db.dataset.findMany({
         take: 5,
         orderBy: { createdAt: "desc" },
         where: { organizationId },
-        include: { schema: { include: { fields: true } } },
+        include: { schema: { select: { id: true, name: true, version: true } } },
       }),
       db.aiJob.groupBy({
         by: ["type", "status"],
@@ -119,32 +117,28 @@ export async function GET(req: NextRequest) {
           requester: { select: { id: true, name: true, email: true } },
         },
       }),
-      db.auditLog.findMany({
-        where: {
-          entity: "member",
-          entityId: { in: user.memberships.map((m: any) => m.id) },
-          action: "update",
-          createdAt: { gte: new Date(Date.now() - 30 * 86400_000) },
-        },
-        orderBy: { createdAt: "desc" },
-        take: 20,
-        include: {
-          actor: { select: { id: true, name: true, email: true } },
-          organization: { select: { id: true, name: true } },
-        },
-      }),
       db.datasetRecord.count({ where: { dataset: { organizationId } } }),
-      db.schemaField.findMany({ where: { schema: { organizationId } } }),
-      // Only select createdAt — we only need the date for chart grouping.
-      db.datasetRecord.findMany({
-        where: { dataset: { organizationId }, createdAt: { gte: rangeAgo } },
-        select: { createdAt: true },
-      }),
-      db.aiJob.findMany({
-        where: { organizationId, createdAt: { gte: rangeAgo } },
-        select: { createdAt: true },
-      }),
+      db.$queryRaw<{date: string, count: bigint}[]>`
+        SELECT DATE("createdAt")::text as date, COUNT(*) as count 
+        FROM "DatasetRecord" 
+        WHERE "datasetId" IN (SELECT id FROM "Dataset" WHERE "organizationId" = ${organizationId})
+        AND "createdAt" >= ${rangeAgo}
+        GROUP BY DATE("createdAt")
+      `,
+      db.$queryRaw<{date: string, count: bigint}[]>`
+        SELECT DATE("createdAt")::text as date, COUNT(*) as count 
+        FROM "AiJob" 
+        WHERE "organizationId" = ${organizationId}
+        AND "createdAt" >= ${rangeAgo}
+        GROUP BY DATE("createdAt")
+      `,
     ]);
+
+    // Fetch schema fields only for the schemas used by the review queue
+    const schemaIds = Array.from(new Set(reviewQueueRaw.map(r => r.dataset.schemaId).filter(Boolean))) as string[];
+    const schemaFields = schemaIds.length > 0 
+      ? await db.schemaField.findMany({ where: { schemaId: { in: schemaIds } } })
+      : [];
 
     const fieldsMap = fieldsByIdMap(schemaFields);
     const reviewQueueEnriched = attachFieldsToRecords(reviewQueueRaw, fieldsMap);
@@ -163,16 +157,14 @@ export async function GET(req: NextRequest) {
     }
 
     for (const r of recentRecords) {
-      const dateStr = r.createdAt.toISOString().split("T")[0];
-      if (chartDataMap.has(dateStr)) {
-        chartDataMap.get(dateStr)!.records += 1;
+      if (chartDataMap.has(r.date)) {
+        chartDataMap.get(r.date)!.records += Number(r.count);
       }
     }
 
     for (const j of recentJobs) {
-      const dateStr = j.createdAt.toISOString().split("T")[0];
-      if (chartDataMap.has(dateStr)) {
-        chartDataMap.get(dateStr)!.jobs += 1;
+      if (chartDataMap.has(j.date)) {
+        chartDataMap.get(j.date)!.jobs += Number(j.count);
       }
     }
 
@@ -204,27 +196,6 @@ export async function GET(req: NextRequest) {
       usageMetrics: usageRaw.map(serializeUsageMetric),
       connectionAlerts: connectionAlertsRaw.map(serializeGoogleConnection),
       pendingSharingRequests: pendingRequestsRaw.map(serializeSharingRequest),
-      roleChangeAlerts: roleChangeAlertsRaw
-        .map((log) => {
-          try {
-            const before = log.before ? JSON.parse(log.before) : {};
-            const after = log.after ? JSON.parse(log.after) : {};
-            if (before.role && after.role && before.role !== after.role) {
-              return {
-                id: log.id,
-                organizationId: log.organizationId,
-                organizationName: log.organization.name,
-                actorName:
-                  log.actor?.name || log.actor?.email || "System",
-                oldRole: before.role,
-                newRole: after.role,
-                createdAt: log.createdAt.toISOString(),
-              };
-            }
-          } catch (e) {}
-          return null;
-        })
-        .filter(Boolean) as any,
       chartData,
     };
 

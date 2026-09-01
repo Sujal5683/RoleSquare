@@ -27,7 +27,7 @@ import { NextRequest, NextResponse, after } from "next/server";
 import { db } from "@/lib/db";
 import { requireOrgContext, AuthError, authErrorResponse, requireRole } from "@/lib/auth";
 import { getSheetsClient, withRetry } from "@/lib/services/google-sheets-client";
-import { getCurrentColumns } from "@/lib/services/schema-versioning";
+
 import {
   writeFormattedSheet,
   applyTableFormatting,
@@ -174,17 +174,14 @@ export async function POST(req: NextRequest) {
       const sheetId = sheetIdMap.get(tabTitle);
       if (sheetId === undefined) continue;
 
-      // Get column definitions
-      let columns = await getCurrentColumns(dataset.id);
-      if (!columns.length && dataset.columnDefs.length > 0) {
-        columns = dataset.columnDefs.map((c) => ({
-          columnId: c.columnId,
-          name: c.name,
-          dataType: c.dataType,
-          position: c.position,
-          required: c.required,
-        }));
-      }
+      // Get column definitions (pre-loaded)
+      const columns = dataset.columnDefs.map((c) => ({
+        columnId: c.columnId,
+        name: c.name,
+        dataType: c.dataType,
+        position: c.position,
+        required: c.required,
+      }));
 
       if (!columns.length) {
         console.warn(`[org-export] Dataset ${dataset.id} has no columns, skipping data write`);
@@ -299,29 +296,13 @@ export async function POST(req: NextRequest) {
             },
           });
 
-          // Create external ID mappings for all written rows
+            // Create external ID mappings for all written rows
           if (tabData) {
-            let columns = await getCurrentColumns(dataset.id);
-            if (!columns.length && dataset.columnDefs.length > 0) {
-              columns = dataset.columnDefs.map((c) => ({
-                columnId: c.columnId,
-                name: c.name,
-                dataType: c.dataType,
-                position: c.position,
-                required: c.required,
-              }));
-            }
-
-            const records = await db.datasetRecord.findMany({
-              where: { datasetId: dataset.id },
-              select: { id: true },
-            });
-
             const externalIdPayloads: any[] = [];
-            for (let i = 0; i < records.length && i < tabData.dataRows.length; i++) {
+            for (let i = 0; i < dataset.records.length && i < tabData.dataRows.length; i++) {
               externalIdPayloads.push({
                 datasetId: dataset.id,
-                recordId: records[i].id,
+                recordId: dataset.records[i].id,
                 sheetMappingId: m.id,
                 externalId: tabData.dataRows[i].externalId,
                 sheetRowIndex: i + 2, // 1-based, row 1 = header
@@ -337,7 +318,7 @@ export async function POST(req: NextRequest) {
 
             await db.sheetMapping.update({
               where: { id: m.id },
-              data: { rowIdColumnIndex: columns.length },
+              data: { rowIdColumnIndex: dataset.columnDefs.length },
             });
           }
         }

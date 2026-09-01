@@ -66,7 +66,7 @@ import { PLANS } from "./plans";
 
 export async function checkUserLimits(
   userId: string,
-  type: "tokens" | "jobs" | "records" = "jobs"
+  types: ("tokens" | "jobs" | "records")[] = ["jobs"]
 ) {
   const user = await db.user.findUnique({
     where: { id: userId },
@@ -76,45 +76,48 @@ export async function checkUserLimits(
   const limits = (PLANS[plan] || PLANS.free).limits;
   const { start } = monthWindow();
 
-  if (type === "records") {
-    if (limits.maxRecordsPerMonth === -1) return true;
-    const records = await db.datasetRecord.count({
-      where: { dataset: { createdBy: userId }, createdAt: { gte: start } },
-    });
-    if (records >= limits.maxRecordsPerMonth) {
-      throw new Error(
-        `Monthly limit reached for records extracted (${limits.maxRecordsPerMonth}) on ${plan} plan.`
-      );
+  const checks = types.map(async (type) => {
+    if (type === "records") {
+      if (limits.maxRecordsPerMonth === -1) return true;
+      const records = await db.datasetRecord.count({
+        where: { dataset: { createdBy: userId }, createdAt: { gte: start } },
+      });
+      if (records >= limits.maxRecordsPerMonth) {
+        throw new Error(
+          `Monthly limit reached for records extracted (${limits.maxRecordsPerMonth}) on ${plan} plan.`
+        );
+      }
     }
-  }
 
-  if (type === "jobs") {
-    if (limits.maxAiJobsPerMonth === -1) return true;
-    const jobs = await db.aiJob.count({
-      where: { userId, createdAt: { gte: start } },
-    });
-    if (jobs >= limits.maxAiJobsPerMonth) {
-      throw new Error(
-        `Monthly limit reached for AI jobs (${limits.maxAiJobsPerMonth}) on ${plan} plan.`
-      );
+    if (type === "jobs") {
+      if (limits.maxAiJobsPerMonth === -1) return true;
+      const jobs = await db.aiJob.count({
+        where: { userId, createdAt: { gte: start } },
+      });
+      if (jobs >= limits.maxAiJobsPerMonth) {
+        throw new Error(
+          `Monthly limit reached for AI jobs (${limits.maxAiJobsPerMonth}) on ${plan} plan.`
+        );
+      }
     }
-  }
 
-  if (type === "tokens") {
-    if (limits.maxAiTokensPerMonth === -1) return true;
-    // Use aggregate SUM instead of findMany + JS reduce to avoid loading
-    // potentially thousands of rows into memory.
-    const agg = await db.aiOutput.aggregate({
-      where: { job: { userId }, createdAt: { gte: start } },
-      _sum: { tokensUsed: true },
-    });
-    const tokens = agg._sum.tokensUsed ?? 0;
-    if (tokens >= limits.maxAiTokensPerMonth) {
-      throw new Error(
-        `Monthly limit reached for AI tokens (${limits.maxAiTokensPerMonth}) on ${plan} plan.`
-      );
+    if (type === "tokens") {
+      if (limits.maxAiTokensPerMonth === -1) return true;
+      const agg = await db.aiOutput.aggregate({
+        where: { job: { userId }, createdAt: { gte: start } },
+        _sum: { tokensUsed: true },
+      });
+      const tokens = agg._sum.tokensUsed ?? 0;
+      if (tokens >= limits.maxAiTokensPerMonth) {
+        throw new Error(
+          `Monthly limit reached for AI tokens (${limits.maxAiTokensPerMonth}) on ${plan} plan.`
+        );
+      }
     }
-  }
 
+    return true;
+  });
+
+  await Promise.all(checks);
   return true;
 }

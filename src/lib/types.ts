@@ -97,6 +97,7 @@ export interface OrganizationDTO {
   retentionDocs?: string;
   retentionAuditLogs?: string;
   exportFileExpiry?: string;
+  topMembers?: MemberDTO[];
 }
 
 export interface MemberDTO {

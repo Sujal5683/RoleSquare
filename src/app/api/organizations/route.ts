@@ -16,9 +16,16 @@ export async function GET() {
     const orgIds = user.memberships.map((m) => m.organizationId);
     const orgs = await db.organization.findMany({
       where: { id: { in: orgIds } },
-      include: { _count: { select: { members: true } } },
+      include: { 
+        _count: { select: { members: true } },
+        members: {
+          take: 5,
+          include: { user: true }
+        }
+      },
       orderBy: { createdAt: "asc" },
     });
+    const { serializeMember } = await import("@/lib/serialize");
     return NextResponse.json(
       orgs.map((o) => {
         const mem = user.memberships.find((m) => m.organizationId === o.id);
@@ -26,6 +33,7 @@ export async function GET() {
           ...serializeOrganization(o, o._count?.members ?? 0),
           userStatus: mem?.status,
           userRole: mem?.role,
+          topMembers: o.members.map((m: any) => serializeMember(m))
         };
       })
     );

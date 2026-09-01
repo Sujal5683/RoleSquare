@@ -18,7 +18,7 @@ export async function GET(req: NextRequest) {
       where: { organizationId },
       include: {
         googleConnection: true,
-        schema: { include: { fields: true } },
+        schema: { select: { id: true, name: true, version: true } },
         dataset: { select: { id: true, name: true } },
         rules: { orderBy: { position: "asc" } },
       },

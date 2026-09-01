@@ -47,34 +47,42 @@ export async function POST(
       return NextResponse.json({ message: "No active scan found, source reset" });
     }
 
-    // Cancel the job
-    await db.aiJob.update({
-      where: { id: jobToCancel.id },
-      data: {
-        status: "cancelled",
-        errorMessage: "Cancelled by user",
-        finishedAt: new Date(),
-      },
-    });
+    // Cancel the job, source run, and reset source state in parallel
+    const promises: Promise<any>[] = [
+      db.aiJob.update({
+        where: { id: jobToCancel.id },
+        data: {
+          status: "cancelled",
+          errorMessage: "Cancelled by user",
+          finishedAt: new Date(),
+        },
+      })
+    ];
 
-    // Also cancel the source run
     try {
       const payload = JSON.parse(jobToCancel.payload || "{}");
       if (payload.runId) {
-        await db.sourceRun.update({
-          where: { id: payload.runId },
-          data: {
-            status: "failed",
-            errorMessage: "Cancelled by user",
-            finishedAt: new Date(),
-          },
-        });
-        await db.source.update({
-          where: { id },
-          data: { runState: "idle" },
-        });
+        promises.push(
+          db.sourceRun.update({
+            where: { id: payload.runId },
+            data: {
+              status: "failed",
+              errorMessage: "Cancelled by user",
+              finishedAt: new Date(),
+            },
+          })
+        );
       }
     } catch {}
+
+    promises.push(
+      db.source.update({
+        where: { id },
+        data: { runState: "idle" },
+      })
+    );
+
+    await Promise.all(promises);
 
     await logAudit({
       organizationId,

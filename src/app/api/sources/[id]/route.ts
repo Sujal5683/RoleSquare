@@ -13,7 +13,7 @@ async function loadSourceInOrg(id: string, organizationId: string) {
     where: { id },
     include: {
       googleConnection: true,
-      schema: { include: { fields: true } },
+      schema: { select: { id: true, name: true, version: true } },
       dataset: { select: { id: true, name: true } },
       rules: { orderBy: { position: "asc" } },
     },

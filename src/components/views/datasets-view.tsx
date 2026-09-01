@@ -448,7 +448,7 @@ export function DatasetsView() {
                               queryFn: () => api.get(`/api/datasets/${d.id}`),
                             });
                             queryClient.prefetchQuery({
-                              queryKey: ["dataset-records", d.id, 1, "all"],
+                              queryKey: ["dataset-records", d.id, 1, "all", ""],
                               queryFn: () => api.get(`/api/datasets/${d.id}/records?page=1&pageSize=50`),
                             });
                           }}

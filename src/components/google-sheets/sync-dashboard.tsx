@@ -120,8 +120,7 @@ export function SyncDashboard({
     queryFn: () => api.get(`/api/google-sheets/mappings/${sheetMappingId}`),
     refetchInterval: (query) => {
       const lastStatus = query.state.data?.syncState?.lastSyncStatus;
-      // Poll at 3s during an active sync; stop when idle/completed/error
-      return lastStatus === "running" ? 3000 : false;
+      return lastStatus === "running" ? 5000 : false;
     },
   });
 

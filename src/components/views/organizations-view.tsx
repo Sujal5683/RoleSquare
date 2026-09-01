@@ -199,27 +199,7 @@ export function OrganizationsView() {
   });
 
   // Fetch members per org (small N — fan out in parallel)
-  const orgIds = useMemo(() => (orgs ?? []).map((o) => o.id), [orgs]);
-  const { data: membersByOrg } = useQuery({
-    queryKey: ["organizations", "members", orgIds],
-    queryFn: async () => {
-      const results: Record<string, MemberDTO[]> = {};
-      await Promise.all(
-        orgIds.map(async (id) => {
-          try {
-            const list = await api.get<MemberDTO[]>(
-              `/api/organizations/${id}/members`
-            );
-            results[id] = list;
-          } catch {
-            results[id] = [];
-          }
-        })
-      );
-      return results;
-    },
-    enabled: orgIds.length > 0,
-  });
+
 
   // ── Delete mutation ────────────────────────────────────────────────────
   const deleteMutation = useMutation({
@@ -419,7 +399,7 @@ export function OrganizationsView() {
       ) : (
         <div className={viewMode === "list" ? "flex flex-col gap-3" : "grid gap-4 sm:grid-cols-2 lg:grid-cols-3"}>
           {filtered.map((org) => {
-            const members = membersByOrg?.[org.id] ?? [];
+            const members = org.topMembers ?? [];
             const rolePriority: Record<string, number> = {
               owner: 1,
               admin: 2,
@@ -433,7 +413,7 @@ export function OrganizationsView() {
               return pA - pB;
             });
             const firstFive = sortedMembers.slice(0, 5);
-            const extra = Math.max(0, sortedMembers.length - 5);
+            const extra = Math.max(0, (org.memberCount ?? members.length) - 5);
             return (
               <Card
                 key={org.id}

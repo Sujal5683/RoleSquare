@@ -790,7 +790,7 @@ export async function executeTool(
       const jobId = requireString(args.jobId, "jobId");
       const job = await db.aiJob.findUnique({ where: { id: jobId } });
       if (!job || job.organizationId !== organizationId) throw new Error(`Job ${jobId} not found`);
-      const logs = await db.agentLog.findMany({ where: { jobId }, orderBy: { createdAt: "asc" } });
+      const logs = await db.agentLog.findMany({ where: { jobId }, orderBy: { createdAt: "asc" }, take: 200 });
       return logs;
     }
 

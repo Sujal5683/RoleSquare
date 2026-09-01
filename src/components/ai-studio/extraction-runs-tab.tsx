@@ -86,7 +86,7 @@ export function ExtractionRunsTab() {
     enabled: !!orgId,
     refetchInterval: (query) => {
       const active = query.state.data?.data?.filter((j: any) => j.status === "running" || j.status === "queued") || [];
-      return active.length > 0 ? 1500 : false;
+      return active.length > 0 ? 5000 : false;
     },
   });
 

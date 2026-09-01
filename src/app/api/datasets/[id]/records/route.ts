@@ -55,8 +55,20 @@ export async function GET(
       Math.min(500, Number(url.searchParams.get("pageSize") ?? 50))
     );
 
+    const search = url.searchParams.get("search");
+
     const where: any = { datasetId: id };
     if (status) where.status = status;
+    if (search) {
+      where.values = {
+        some: {
+          value: {
+            contains: search,
+            mode: "insensitive",
+          },
+        },
+      };
+    }
 
     // Run count, records, AND column defs in parallel — they are independent.
     const [total, records, columnDefs] = await Promise.all([

@@ -64,16 +64,11 @@ export async function POST(
     // Get or create the target Custom Dataset
     let targetDatasetId: string;
     if (existingDatasetId) {
-      const ds = await db.dataset.findUnique({ where: { id: existingDatasetId } });
-      if (!ds) {
-        return NextResponse.json({ error: "Target dataset not found" }, { status: 404 });
-      }
-      
       const { verifyDatasetWriteAccess } = await import("@/lib/dataset-access");
       const canEdit = await verifyDatasetWriteAccess(existingDatasetId, user.id, organizationId);
       if (!canEdit) {
         return NextResponse.json(
-          { error: "You do not have write access to the selected target dataset." },
+          { error: "Target dataset not found or you do not have write access to it." },
           { status: 403 }
         );
       }
@@ -97,14 +92,37 @@ export async function POST(
     // Queue the AI_EXTRACTION job (Mode B)
     try {
       const { checkUserLimits } = await import("@/lib/usage");
-      await checkUserLimits(user.id, "jobs");
-      await checkUserLimits(user.id, "tokens");
-      await checkUserLimits(user.id, "records");
+      await checkUserLimits(user.id, ["jobs", "tokens", "records"]);
     } catch (limitErr) {
       return NextResponse.json(
         { error: limitErr instanceof Error ? limitErr.message : "Usage limit exceeded" },
         { status: 403 }
       );
+    }
+
+    // Prevent duplicate active extraction jobs for the same source -> target pair
+    const activeExtractJob = await db.aiJob.findFirst({
+      where: {
+        organizationId,
+        type: "AI_EXTRACTION",
+        status: { in: ["queued", "running", "paused"] },
+        payload: {
+          contains: `"sourceDatasetId":"${source.datasetId}"`,
+        },
+      },
+    });
+
+    if (activeExtractJob) {
+      // For PostgreSQL JSONB, payload path matching works, but we can also check in JS if needed.
+      // Assuming Prisma's JSON filtering is supported.
+      // If we find an active job, block it to prevent wasting AI tokens and duplicate inserts.
+      const payloadObj = activeExtractJob.payload as any;
+      if (payloadObj.targetDatasetId === targetDatasetId) {
+        return NextResponse.json(
+          { error: "An extraction is already running for this source to the target dataset." },
+          { status: 409 }
+        );
+      }
     }
 
     const jobId = await enqueueJob({

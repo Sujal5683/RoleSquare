@@ -506,6 +506,12 @@ export function DatasetDetailView() {
 
   const cannotEdit = dataset?.accessLevel === "read" || dataset?.accessLevel === "comment";
 
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(search), 300);
+    return () => clearTimeout(t);
+  }, [search]);
+
   // ── Records (paginated) ───────────────────────────────────────────────
   const {
     data: recordsPage,
@@ -519,6 +525,7 @@ export function DatasetDetailView() {
       datasetId,
       page,
       statusFilter,
+      debouncedSearch,
     ],
     queryFn: () =>
       api.get<{
@@ -528,7 +535,8 @@ export function DatasetDetailView() {
         pageSize: number;
       }>(
         `/api/datasets/${datasetId}/records?page=${page}&pageSize=${PAGE_SIZE}` +
-          (statusFilter !== "all" ? `&status=${statusFilter}` : "")
+          (statusFilter !== "all" ? `&status=${statusFilter}` : "") +
+          (debouncedSearch ? `&search=${encodeURIComponent(debouncedSearch)}` : "")
       ),
     enabled: !!datasetId,
   });
@@ -870,21 +878,14 @@ export function DatasetDetailView() {
 
   // ── Derived: filtered records (client-side search & confidence filtering) ──
   const filteredRecords = useMemo(() => {
-    const q = search.trim().toLowerCase();
     const minConf = minConfidence[0] / 100;
     
     return records.filter((r) => {
-      // Filter by confidence
+      // Filter by confidence (still client-side for immediate slider feedback)
       if (r.confidence < minConf) return false;
-      
-      // Filter by search query
-      if (!q) return true;
-      return r.values.some((v) => {
-        const txt = formatValueCompact(v.value, v.fieldType ?? "text").text;
-        return txt.toLowerCase().includes(q);
-      });
+      return true;
     });
-  }, [records, search, minConfidence]);
+  }, [records, minConfidence]);
 
   // ── Clipboard Copy (Ctrl+C / Cmd+C) ──────────────────────────────────
   useEffect(() => {

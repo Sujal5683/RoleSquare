@@ -165,7 +165,7 @@ export function ImportWizard({
     enabled: !!importJobId,
     refetchInterval: (query) => {
       const status = query.state.data?.status;
-      return status === "running" || status === "pending" ? 1500 : false;
+      return status === "running" || status === "pending" ? 5000 : false;
     },
   });
 
