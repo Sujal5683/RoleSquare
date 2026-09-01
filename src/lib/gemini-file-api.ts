@@ -15,7 +15,7 @@
 //   application/pdf, image/*, application/vnd.openxmlformats-*,
 //   text/plain, text/csv, text/html
 
-import { GoogleAIFileManager, FileState } from "@google/generative-ai/server";
+import { GoogleGenAI } from "@google/genai";
 import crypto from "crypto";
 import os from "os";
 import path from "path";
@@ -104,27 +104,32 @@ export async function uploadBufferToGemini(
   await fs.writeFile(tmpFilePath, buffer);
 
   try {
-    const fileManager = new GoogleAIFileManager(apiKey);
+    const ai = new GoogleGenAI({ apiKey });
 
-    const uploadResponse = await fileManager.uploadFile(tmpFilePath, {
-      mimeType: normalizedMime,
-      displayName: fileName,
+    const uploadResponse = await ai.files.upload({
+      file: tmpFilePath,
+      config: {
+        mimeType: normalizedMime,
+        displayName: fileName,
+      }
     });
 
+    if (!uploadResponse.name) throw new Error("Upload response missing name");
+
     // Wait until Gemini finishes processing the file (usually < 2s for PDFs)
-    let fileInfo = await fileManager.getFile(uploadResponse.file.name);
+    let fileInfo = await ai.files.get({ name: uploadResponse.name });
     let waitMs = 500;
-    while (fileInfo.state === FileState.PROCESSING) {
+    while (fileInfo.state === "PROCESSING") {
       await sleep(waitMs);
       waitMs = Math.min(waitMs * 1.5, 5000); // exponential backoff, cap 5s
-      fileInfo = await fileManager.getFile(uploadResponse.file.name);
+      fileInfo = await ai.files.get({ name: uploadResponse.name });
     }
 
-    if (fileInfo.state === FileState.FAILED) {
+    if (fileInfo.state === "FAILED") {
       throw new Error(`Gemini File API processing failed for ${fileName}: ${fileInfo.state}`);
     }
 
-    const fileUri = fileInfo.uri;
+    const fileUri = fileInfo.uri ?? "";
 
     // Store in in-process cache
     IN_PROCESS_CACHE.set(hash, {

@@ -300,7 +300,7 @@ async function processAiExtractionMaster(
  * previous rows. Cross-row hallucination is architecturally impossible.
  */
 async function processSingleRowExtraction(
-  job: { id: string; organizationId: string },
+  job: { id: string; organizationId: string; userId?: string | null },
   payload: Record<string, unknown>
 ): Promise<Record<string, unknown>> {
   // ── Mode B: two-step pipeline row ──
@@ -317,7 +317,7 @@ async function processSingleRowExtraction(
 // ── Mode B single row ─────────────────────────────────────────────────────────
 
 async function processSingleRowModeB(
-  job: { id: string; organizationId: string },
+  job: { id: string; organizationId: string; userId?: string | null },
   payload: Record<string, unknown>
 ): Promise<Record<string, unknown>> {
   const sourceRecordId   = payload.sourceRecordId   as string;
@@ -326,6 +326,12 @@ async function processSingleRowModeB(
   const exploreDriveLinks = payload.exploreDriveLinks !== false;
   const driveConnectionId = payload.driveConnectionId as string | undefined;
   const maxContentBytes   = typeof payload.maxContentBytes === "number" ? payload.maxContentBytes : 200_000;
+
+  if (job.userId && targetDatasetId) {
+    const { verifyDatasetWriteAccess } = await import("./dataset-access");
+    const canEdit = await verifyDatasetWriteAccess(targetDatasetId, job.userId, job.organizationId);
+    if (!canEdit) throw new Error("Access to target dataset was revoked");
+  }
 
   // Load schema fields
   const schemaFields = await db.schemaField.findMany({
@@ -523,12 +529,18 @@ async function processSingleRowModeB(
 // ── Mode A single row (legacy) ────────────────────────────────────────────────
 
 async function processSingleRowModeA(
-  job: { id: string; organizationId: string },
+  job: { id: string; organizationId: string; userId?: string | null },
   payload: Record<string, unknown>
 ): Promise<Record<string, unknown>> {
   const emailId   = payload.emailId   as string;
   const datasetId = payload.datasetId as string;
   const sourceId  = payload.sourceId  as string;
+
+  if (job.userId && datasetId) {
+    const { verifyDatasetWriteAccess } = await import("./dataset-access");
+    const canEdit = await verifyDatasetWriteAccess(datasetId, job.userId, job.organizationId);
+    if (!canEdit) throw new Error("Access to target dataset was revoked");
+  }
 
   const email = await db.email.findUnique({ where: { id: emailId } });
   if (!email) throw new Error(`Email ${emailId} not found`);

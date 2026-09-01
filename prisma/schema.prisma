@@ -213,6 +213,7 @@ model SourceRun {
 
   @@index([sourceId])
   @@index([status])
+  @@index([sourceId, startedAt])
 }
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -384,6 +385,7 @@ model Dataset {
   rowExternalIds  DatasetRowExternalId[]
 
   @@index([organizationId])
+  @@index([organizationId, createdAt])
 }
 
 model DatasetRecord {
@@ -400,6 +402,8 @@ model DatasetRecord {
 
   @@index([datasetId])
   @@index([status])
+  @@index([datasetId, createdAt])
+  @@index([datasetId, status])
 }
 
 model DatasetValue {
@@ -636,6 +640,8 @@ model DatasetAccess {
   @@index([granteeOrgId])
   @@index([granteeUserId])
   @@index([status])
+  @@index([granteeOrgId, status, isPaused])
+  @@index([granteeUserId, status, isPaused])
 }
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -767,6 +773,7 @@ model SheetMapping {
   @@index([organizationId])
   @@index([datasetId])
   @@index([spreadsheetConnectionId])
+  @@index([datasetId, status])
 }
 
 /// Schema version snapshot — created before every schema-changing operation.

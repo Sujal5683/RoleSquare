@@ -41,8 +41,8 @@ export async function POST(
       },
     });
 
-    // Also cancel any associated source run
-    if (existing.type === "GMAIL_SCAN") {
+    // Also cancel any associated source run or child jobs
+    if (existing.type === "GMAIL_SCAN" || existing.type === "DRIVE_SCAN" || existing.type === "DOCS_SCAN" || existing.type === "SHEETS_SCAN" || existing.type === "FORMS_SCAN") {
       try {
         const payload = JSON.parse(existing.payload || "{}");
         if (payload.runId) {
@@ -65,6 +65,20 @@ export async function POST(
       } catch {
         // Payload parse error — ignore
       }
+    } else if (existing.type === "AI_EXTRACTION") {
+      // Cancel all fan-out child jobs to prevent runaway LLM costs
+      await db.aiJob.updateMany({
+        where: {
+          type: "EXTRACT_SINGLE_ROW",
+          payload: { contains: id }, // `id` is the master job ID
+          status: { in: ["queued", "running", "retry"] },
+        },
+        data: {
+          status: "cancelled",
+          errorMessage: "Master job was cancelled",
+          finishedAt: new Date(),
+        },
+      });
     }
 
     await logAudit({

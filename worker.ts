@@ -136,7 +136,9 @@ async function processBullJob(bullJob: Job): Promise<void> {
     const errorMessage = err instanceof Error ? err.message : "Unknown error";
     const retryable    = isRetryableError(err);
     const attempts     = bullJob.attemptsMade + 1;
-    const isDlq        = attempts >= MAX_ATTEMPTS && !retryable;
+    // If it reaches MAX_ATTEMPTS, it's a DLQ regardless of whether the error type is typically retryable,
+    // because BullMQ will drop it from the active queue after throwing.
+    const isDlq        = attempts >= MAX_ATTEMPTS;
 
     const finalStatus = isDlq ? "dlq" : retryable ? "queued" : "failed";
 

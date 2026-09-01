@@ -179,6 +179,36 @@ export async function DELETE(
     }
     await db.dataset.delete({ where: { id } });
 
+    // Cancel active AI extraction jobs targeting this dataset
+    await db.aiJob.updateMany({
+      where: {
+        type: "AI_EXTRACTION",
+        payload: { contains: id },
+        status: { in: ["queued", "running", "retry"] },
+      },
+      data: {
+        status: "cancelled",
+        errorMessage: "Target dataset was deleted",
+        finishedAt: new Date(),
+      }
+    });
+
+    // We don't necessarily need to explicitly cancel child EXTRACT_SINGLE_ROW jobs 
+    // because they will naturally fail when they can't find the dataset,
+    // but the next time the cancel endpoint is called, they will be cleaned up.
+    await db.aiJob.updateMany({
+      where: {
+        type: "EXTRACT_SINGLE_ROW",
+        payload: { contains: id },
+        status: { in: ["queued", "running", "retry"] },
+      },
+      data: {
+        status: "cancelled",
+        errorMessage: "Target dataset was deleted",
+        finishedAt: new Date(),
+      }
+    });
+
     await logAudit({
       organizationId,
       actorId: user.id,

@@ -149,6 +149,20 @@ export async function DELETE(
     }
     await db.source.delete({ where: { id } });
 
+    // Cancel any active jobs for this source
+    await db.aiJob.updateMany({
+      where: {
+        type: { in: ["GMAIL_SCAN", "DRIVE_SCAN", "DOCS_SCAN", "SHEETS_SCAN", "FORMS_SCAN"] },
+        payload: { contains: id },
+        status: { in: ["queued", "running", "retry"] },
+      },
+      data: {
+        status: "cancelled",
+        errorMessage: "Source was deleted",
+        finishedAt: new Date(),
+      }
+    });
+
     await logAudit({
       organizationId,
       actorId: user.id,

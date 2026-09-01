@@ -28,8 +28,15 @@ export async function GET(req: NextRequest) {
       db.dataset.findMany({
         where: { organizationId },
         include: {
-          schema: { include: { fields: true } },
-          sources: { select: { id: true } },
+          schema: {
+            include: {
+              fields: {
+                select: { id: true, name: true, type: true, required: true, position: true, options: true },
+                orderBy: { position: "asc" },
+              },
+            },
+          },
+          sources: { take: 1, select: { id: true } },
           sheetMappings: {
             where: { status: { not: "unlinked" } },
             take: 1,
@@ -71,8 +78,15 @@ export async function GET(req: NextRequest) {
               id: { in: sharedAccesses.map((a) => a.datasetId) },
             },
             include: {
-              schema: { include: { fields: true } },
-              sources: { select: { id: true } },
+              schema: {
+                include: {
+                  fields: {
+                    select: { id: true, name: true, type: true, required: true, position: true, options: true },
+                    orderBy: { position: "asc" },
+                  },
+                },
+              },
+              sources: { take: 1, select: { id: true } },
               organization: { select: { id: true, name: true } },
               sheetMappings: {
                 where: { status: { not: "unlinked" } },
@@ -151,8 +165,15 @@ export async function POST(req: NextRequest) {
         recordCount: 0,
       },
       include: {
-        schema: { include: { fields: true } },
-        sources: { select: { id: true } },
+        schema: {
+          include: {
+            fields: {
+              select: { id: true, name: true, type: true, required: true, position: true, options: true },
+              orderBy: { position: "asc" },
+            },
+          },
+        },
+        sources: { take: 1, select: { id: true } },
       },
     });
 

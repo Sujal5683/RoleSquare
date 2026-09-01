@@ -18,7 +18,7 @@
 //   4. gemini-3.6-flash          Fallback 3
 //   5. gemini-3.5-flash-lite     Fallback 4
 
-import { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } from "@google/generative-ai";
+import { GoogleGenAI } from "@google/genai";
 
 // ── Model definitions ────────────────────────────────────────────────────────
 
@@ -159,7 +159,7 @@ export async function callGeminiWithFallback(
     throw new Error("GEMINI_API_KEY (or GOOGLE_API_KEY) is not set in environment variables.");
   }
 
-  const genAI = new GoogleGenerativeAI(apiKey);
+  const ai = new GoogleGenAI({ apiKey });
   const timeoutMs = opts.timeoutMs ?? 25_000;
 
   const rateLimitErrors: string[] = [];
@@ -178,51 +178,38 @@ export async function callGeminiWithFallback(
     try {
       console.info(`[gemini] trying model ${modelDef.id}`);
 
-      // Use an AbortController to natively cancel the underlying fetch request
-      // and stop any internal SDK retries if the model hangs.
       const abortController = new AbortController();
       timeoutId = setTimeout(() => abortController.abort(new Error(`Timeout: ${modelDef.id} did not respond within ${timeoutMs / 1000}s`)), timeoutMs);
 
-      const model = genAI.getGenerativeModel(
-          {
-            model: modelDef.id,
-            systemInstruction: opts.system,
-            generationConfig: {
-              temperature: opts.temperature ?? 0.2,
-              maxOutputTokens: opts.maxOutputTokens ?? 4096,
-            },
-            safetySettings: [
-              { category: HarmCategory.HARM_CATEGORY_HARASSMENT,        threshold: HarmBlockThreshold.BLOCK_NONE },
-              { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH,       threshold: HarmBlockThreshold.BLOCK_NONE },
-              { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_NONE },
-              { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_NONE },
-            ],
-          },
-          // Pass signal to requestOptions so the SDK natively cancels the request
-          { apiClient: "rolesquare", signal: abortController.signal } as any
-        );
+      const history = messages.slice(0, -1).map((m) => ({
+        role: m.role,
+        parts: [{ text: m.content }],
+      }));
+      const lastMessage = messages[messages.length - 1];
 
-        const history = messages.slice(0, -1).map((m) => ({
-          role: m.role,
-          parts: [{ text: m.content }],
-        }));
-        const lastMessage = messages[messages.length - 1];
-        const chat = model.startChat({ history });
+      const messagePayloadParts =
+        opts.fileParts && opts.fileParts.length > 0
+          ? [...opts.fileParts, { text: lastMessage.content }]
+          : [{ text: lastMessage.content }];
 
-        // Multimodal message: prepend file parts before the text instruction
-        const messagePayload =
-          opts.fileParts && opts.fileParts.length > 0
-            ? { parts: [...opts.fileParts, { text: lastMessage.content }] }
-            : lastMessage.content;
+      const contents = [...history, { role: "user", parts: messagePayloadParts }];
 
-        const result = await chat.sendMessage(messagePayload as any);
+      const result = await ai.models.generateContent({
+        model: modelDef.id,
+        contents,
+        config: {
+          systemInstruction: opts.system,
+          temperature: opts.temperature ?? 0.2,
+          maxOutputTokens: opts.maxOutputTokens ?? 4096,
+          httpOptions: { signal: abortController.signal } as any
+        }
+      });
 
-        const response = result.response;
-        const text = response.text();
-        const usageMetadata = response.usageMetadata;
-        const promptTokens     = usageMetadata?.promptTokenCount     ?? 0;
-        const completionTokens = usageMetadata?.candidatesTokenCount ?? 0;
-        const tokensUsed       = promptTokens + completionTokens;
+      const text = result.text ?? "";
+      const usageMetadata = result.usageMetadata;
+      const promptTokens     = usageMetadata?.promptTokenCount     ?? 0;
+      const completionTokens = usageMetadata?.candidatesTokenCount ?? 0;
+      const tokensUsed       = usageMetadata?.totalTokenCount ?? (promptTokens + completionTokens);
 
       clearTimeout(timeoutId);
       markSuccess(modelDef.id);

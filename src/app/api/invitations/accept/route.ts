@@ -62,35 +62,45 @@ export async function POST(req: NextRequest) {
     const organizationId = invitation.organizationId;
     const now = new Date();
 
-    // Upsert the OrganizationMember row
-    const existingMember = await db.organizationMember.findUnique({
-      where: { organizationId_userId: { organizationId, userId: user.id } },
-    });
+    // Upsert the OrganizationMember row and update invitation atomically
+    const [member] = await db.$transaction(async (tx) => {
+      // Re-verify invitation status inside transaction to prevent race conditions
+      const currentInv = await tx.invitation.findUnique({ where: { token } });
+      if (!currentInv || currentInv.status !== "pending") {
+        throw new Error("Invitation is no longer pending");
+      }
 
-    let member;
-    if (existingMember) {
-      member = await db.organizationMember.update({
+      const existingMember = await tx.organizationMember.findUnique({
         where: { organizationId_userId: { organizationId, userId: user.id } },
-        data: { status: "active", role: invitation.role },
-        include: { user: true },
       });
-    } else {
-      member = await db.organizationMember.create({
-        data: {
-          organizationId,
-          userId: user.id,
-          role: invitation.role,
-          status: "active",
-          invitedBy: invitation.invitedBy,
-        },
-        include: { user: true },
-      });
-    }
 
-    // Mark invitation accepted
-    await db.invitation.update({
-      where: { token },
-      data: { status: "accepted", acceptedAt: now },
+      let m;
+      if (existingMember) {
+        m = await tx.organizationMember.update({
+          where: { organizationId_userId: { organizationId, userId: user.id } },
+          data: { status: "active", role: currentInv.role },
+          include: { user: true },
+        });
+      } else {
+        m = await tx.organizationMember.create({
+          data: {
+            organizationId,
+            userId: user.id,
+            role: currentInv.role,
+            status: "active",
+            invitedBy: currentInv.invitedBy,
+          },
+          include: { user: true },
+        });
+      }
+
+      // Mark invitation accepted
+      await tx.invitation.update({
+        where: { token },
+        data: { status: "accepted", acceptedAt: now },
+      });
+
+      return [m];
     });
 
     await logAudit({

@@ -442,6 +442,16 @@ export function DatasetsView() {
                       <div className="min-w-0 w-full">
                         <button
                           onClick={isTemp ? undefined : () => openDataset(d.id, d.name)}
+                          onMouseEnter={isTemp ? undefined : () => {
+                            queryClient.prefetchQuery({
+                              queryKey: ["dataset", d.id],
+                              queryFn: () => api.get(`/api/datasets/${d.id}`),
+                            });
+                            queryClient.prefetchQuery({
+                              queryKey: ["dataset-records", d.id, 1, "all"],
+                              queryFn: () => api.get(`/api/datasets/${d.id}/records?page=1&pageSize=50`),
+                            });
+                          }}
                           disabled={isTemp}
                           className={`block w-full text-left text-base font-semibold leading-tight truncate ${isTemp ? "text-muted-foreground" : "hover:underline"}`}
                           title={d.name}
