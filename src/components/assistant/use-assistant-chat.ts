@@ -315,11 +315,15 @@ export function useAssistantChat(initialSessionId?: string) {
         prev.map((m) => (m.id === msgId ? { ...m, actionResolved: true } : m))
       );
 
+      const selectedOrganizationId = useAppStore.getState().selectedOrganizationId;
       setIsLoading(true);
       try {
         const res = await fetch("/api/assistant/confirm", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: { 
+            "Content-Type": "application/json",
+            ...(selectedOrganizationId ? { "x-organization-id": selectedOrganizationId } : {})
+          },
           body: JSON.stringify({
             tool: action.tool,
             args: action.args,
@@ -415,11 +419,15 @@ export function useAssistantChat(initialSessionId?: string) {
 
   const undoAction = useCallback(
     async (undoToken: string, msgId?: string) => {
+      const selectedOrganizationId = useAppStore.getState().selectedOrganizationId;
       setIsLoading(true);
       try {
         const res = await fetch("/api/assistant/undo", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: { 
+            "Content-Type": "application/json",
+            ...(selectedOrganizationId ? { "x-organization-id": selectedOrganizationId } : {})
+          },
           body: JSON.stringify({ undoToken }),
         });
 
