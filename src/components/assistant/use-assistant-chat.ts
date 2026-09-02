@@ -179,10 +179,15 @@ export function useAssistantChat(initialSessionId?: string) {
 
       history.push({ role: "user", content: text.trim() });
 
+      const selectedOrganizationId = useAppStore.getState().selectedOrganizationId;
+
       try {
         const response = await fetch("/api/assistant/chat", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: { 
+            "Content-Type": "application/json",
+            ...(selectedOrganizationId ? { "x-organization-id": selectedOrganizationId } : {})
+          },
           body: JSON.stringify({
             messages: history,
             context: { view, sourceId: selectedSourceId, datasetId: selectedDatasetId, schemaId: selectedSchemaId },
