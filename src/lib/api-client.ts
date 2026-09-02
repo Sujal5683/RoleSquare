@@ -37,6 +37,8 @@ interface RequestOptions extends Omit<RequestInit, "signal"> {
   timeoutMs?: number;
 }
 
+import { useAppStore } from "@/lib/store";
+
 /**
  * Returns the active organization ID from Zustand's in-memory store.
  * Avoids the previous approach of `localStorage.getItem + JSON.parse` on every
@@ -45,10 +47,6 @@ interface RequestOptions extends Omit<RequestInit, "signal"> {
 function getStoredOrgId(): string | null {
   if (typeof window === "undefined") return null;
   try {
-    // Import inline to avoid circular dependencies — this module is loaded before
-    // the store module in some bundler orderings.
-
-    const { useAppStore } = require("@/lib/store");
     return useAppStore.getState().selectedOrganizationId ?? null;
   } catch {
     // Final fallback: parse localStorage (same as before, only reached on error)
