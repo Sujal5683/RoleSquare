@@ -1,4 +1,4 @@
-﻿// GET /api/google-connections?organizationId=... — list connections for org.
+// GET /api/google-connections?organizationId=... — list connections for org.
 // POST /api/google-connections — returns the OAuth authorization URL.
 //   The client should navigate to the returned `authorizeUrl` to start the
 //   real Google OAuth flow (consent screen → /api/google/callback).
@@ -16,7 +16,7 @@ export async function GET(req: NextRequest) {
   try {
     const { organizationId } = await requireOrgContext(req);
     const connections = await db.googleConnection.findMany({
-      where: { organizationId },
+      where: { organizationId, status: { not: "revoked" } },
       orderBy: { createdAt: "desc" },
     });
     return NextResponse.json(connections.map(serializeGoogleConnection));

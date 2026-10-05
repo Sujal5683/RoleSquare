@@ -89,9 +89,14 @@ export interface OAuthState {
  */
 export function buildGoogleOAuthUrl(state: OAuthState): string {
   const clientId = process.env.GOOGLE_CLIENT_ID;
-  const redirectUri = process.env.GOOGLE_REDIRECT_URI;
-  if (!clientId || !redirectUri) {
-    throw new Error("GOOGLE_CLIENT_ID and GOOGLE_REDIRECT_URI must be set in .env");
+  // GOOGLE_REDIRECT_URI can be set explicitly, or derived from NEXT_PUBLIC_APP_URL.
+  // This lets the same .env work locally (localhost) and on Render (production URL).
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+  const redirectUri =
+    process.env.GOOGLE_REDIRECT_URI ?? `${appUrl}/api/google/callback`;
+
+  if (!clientId) {
+    throw new Error("GOOGLE_CLIENT_ID must be set in .env");
   }
 
   const params = new URLSearchParams({
@@ -140,7 +145,9 @@ export interface TokenSet {
 export async function exchangeCodeForTokens(code: string): Promise<TokenSet> {
   const clientId = process.env.GOOGLE_CLIENT_ID!;
   const clientSecret = process.env.GOOGLE_CLIENT_SECRET!;
-  const redirectUri = process.env.GOOGLE_REDIRECT_URI!;
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+  const redirectUri =
+    process.env.GOOGLE_REDIRECT_URI ?? `${appUrl}/api/google/callback`;
 
   const res = await fetch(GOOGLE_TOKEN_URL, {
     method: "POST",

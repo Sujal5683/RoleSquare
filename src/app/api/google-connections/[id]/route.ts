@@ -89,10 +89,9 @@ export async function DELETE(
         { status: 404 }
       );
     }
-    const connection = await db.googleConnection.update({
-      where: { id },
-      data: { status: "revoked", watchExpiresAt: null },
-    });
+    // Hard-delete the connection — soft-revoke was confusing the UI
+    // (revoked rows kept showing up with a "Disconnect" button).
+    await db.googleConnection.delete({ where: { id } });
 
     await logAudit({
       organizationId,
@@ -100,16 +99,16 @@ export async function DELETE(
       action: "delete",
       entity: "connection",
       entityId: id,
-      before: { status: before.status },
-      after: { status: "revoked" },
-      reason: "revoke",
+      before: { status: before.status, googleEmail: before.googleEmail },
+      after: { status: "deleted" },
+      reason: "user_disconnect",
     });
 
-    return NextResponse.json(serializeGoogleConnection(connection));
+    return NextResponse.json({ id, googleEmail: before.googleEmail, status: "deleted" });
   } catch (err) {
     if (err instanceof AuthError) return authErrorResponse(err);
     return NextResponse.json(
-      { error: err instanceof Error ? err.message : "Failed to revoke connection" },
+      { error: err instanceof Error ? err.message : "Failed to disconnect connection" },
       { status: 500 }
     );
   }

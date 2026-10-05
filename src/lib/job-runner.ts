@@ -673,31 +673,52 @@ async function processDeterministicSync(
     };
 
     if (email.bodyText) {
-      const fullText = email.bodyText;
-      const sigDelimiters = [
-        /^--\s*$/m, /^_{3,}/m, /^-{3,}/m,
-        /^(regards|sincerely|cheers|best|thanks?)[,.]?\s*$/im,
-        /^sent from my (iphone|ipad|android|samsung|gmail)/im,
-      ];
-      let mainBody = fullText.trim();
+      // For threads (messageCount > 1), do not truncate on the first signature found, 
+      // as it would destroy subsequent messages in the combined body.
+      // @ts-ignore - messageCount exists on Email model
+      const isThread = (email.messageCount ?? 1) > 1;
+      let mainBody = email.bodyText.trim();
       let signature = "";
-      for (const p of sigDelimiters) {
-        const match = fullText.match(p);
-        if (match && match.index !== undefined) {
-          mainBody  = fullText.slice(0, match.index).trim();
-          signature = fullText.slice(match.index).trim();
-          break;
+      
+      if (!isThread) {
+        const sigDelimiters = [
+          /^--\s*$/m, /^_{3,}/m, /^-{3,}/m,
+          /^(regards|sincerely|cheers|best|thanks?)[,.]?\s*$/im,
+          /^sent from my (iphone|ipad|android|samsung|gmail)/im,
+        ];
+        for (const p of sigDelimiters) {
+          const match = email.bodyText.match(p);
+          if (match && match.index !== undefined) {
+            mainBody  = email.bodyText.slice(0, match.index).trim();
+            signature = email.bodyText.slice(match.index).trim();
+            break;
+          }
         }
       }
+      
       parsedFields.Body      = mainBody;
       parsedFields.Signature = signature;
-
-      // Use the canonical link categoriser from email-parser.ts (single source of truth)
-      const { driveLinks, formLinks, otherLinks } = categoriseLinks(fullText);
-      parsedFields["Drive Links"] = driveLinks.join(", ");
-      parsedFields["Form Links"]  = formLinks.join(", ");
-      parsedFields["Other Links"] = otherLinks.join(", ");
     }
+
+    // Fetch links from DB (which correctly includes HTML-only drive links discovered during scan)
+    const dbLinks = await db.emailLink.findMany({
+      where: { emailId: email.id },
+      select: { url: true, resourceType: true }
+    });
+    
+    const driveLinks = dbLinks
+      .filter(l => ["drive", "docs", "sheets", "slides", "script"].includes(l.resourceType))
+      .map(l => l.url);
+    const formLinks = dbLinks
+      .filter(l => l.resourceType === "forms")
+      .map(l => l.url);
+    const otherLinks = dbLinks
+      .filter(l => l.resourceType === "external")
+      .map(l => l.url);
+
+    parsedFields["Drive Links"] = driveLinks.join(", ");
+    parsedFields["Form Links"]  = formLinks.join(", ");
+    parsedFields["Other Links"] = otherLinks.join(", ");
 
     const attachments = await db.emailAttachment.findMany({
       where: { emailId: email.id },

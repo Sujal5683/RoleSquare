@@ -365,6 +365,7 @@ function ConnectedAccountsSection() {
   const [connectOpen, setConnectOpen] = useState(false);
   const [disconnectTarget, setDisconnectTarget] =
     useState<GoogleConnectionDTO | null>(null);
+  const [reconnectLoading, setReconnectLoading] = useState<string | null>(null);
 
   const activeOrgId = useActiveOrg();
 
@@ -381,43 +382,55 @@ function ConnectedAccountsSection() {
     enabled: !!activeOrgId,
   });
 
-  const refreshMutation = useMutation({
-    mutationFn: ({ id, watchExpirePref }: { id: string; watchExpirePref?: string }) =>
-      api.patch<GoogleConnectionDTO>(`/api/google-connections/${id}`, watchExpirePref ? { watchExpirePref } : {}),
-    onSuccess: (c) => {
-      toast.success("Connection refreshed", {
-        description: `${c.googleEmail} is now active until ${relativeTime(c.watchExpiresAt)}.`,
-      });
+  // Only used for watchExpirePref changes now — NOT for "Reconnect"
+  const updatePrefMutation = useMutation({
+    mutationFn: ({ id, watchExpirePref }: { id: string; watchExpirePref: string }) =>
+      api.patch<GoogleConnectionDTO>(`/api/google-connections/${id}`, { watchExpirePref }),
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["google-connections"] });
-      queryClient.invalidateQueries({ queryKey: ["dashboard"] });
     },
     onError: (err: unknown) => {
-      const msg = err instanceof Error ? err.message : "Failed to refresh";
-      toast.error("Refresh failed", { description: msg });
+      const msg = err instanceof Error ? err.message : "Failed to update preference";
+      toast.error("Update failed", { description: msg });
     },
   });
 
+  // Reconnect = full OAuth re-auth flow (same as "Connect new account")
+  async function handleReconnect(c: GoogleConnectionDTO) {
+    setReconnectLoading(c.id);
+    try {
+      const result = await api.post<{ authorizeUrl: string }>("/api/google-connections");
+      if (result.authorizeUrl) {
+        window.location.href = result.authorizeUrl;
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Failed to start re-authorization";
+      toast.error("Re-authorization failed", { description: msg });
+      setReconnectLoading(null);
+    }
+  }
+
   const disconnectMutation = useMutation({
     mutationFn: (id: string) =>
-      api.delete<GoogleConnectionDTO>(`/api/google-connections/${id}`),
+      api.delete<{ id: string; googleEmail: string; status: string }>(`/api/google-connections/${id}`),
     onMutate: async (id: string) => {
       await queryClient.cancelQueries({ queryKey: ["google-connections", activeOrgId] });
       const previousConnections = queryClient.getQueryData(["google-connections", activeOrgId]);
+      // Optimistically remove from cache immediately
       queryClient.setQueryData(["google-connections", activeOrgId], (old: any) =>
         (old || []).filter((c: any) => c.id !== id)
       );
       setDisconnectTarget(null);
       return { previousConnections };
     },
-    onSuccess: (c) => {
-      toast.success("Connection disconnected", {
-        description: `${c.googleEmail} has been revoked.`,
+    onSuccess: (result) => {
+      toast.success("Account disconnected", {
+        description: `${result.googleEmail} has been removed.`,
       });
     },
-    onError: (err: unknown, variables, context: any) => {
+    onError: (err: unknown, _variables, context: any) => {
       queryClient.setQueryData(["google-connections", activeOrgId], context?.previousConnections);
-      const msg =
-        err instanceof Error ? err.message : "Failed to disconnect";
+      const msg = err instanceof Error ? err.message : "Failed to disconnect";
       toast.error("Disconnect failed", { description: msg });
     },
     onSettled: () => {
@@ -433,8 +446,8 @@ function ConnectedAccountsSection() {
           <div>
             <CardTitle className="text-base">Connected Google accounts</CardTitle>
             <CardDescription>
-              Google accounts used as ingestion sources. Refresh to extend the
-              watch, reconnect to re-authenticate, or disconnect to revoke.
+              Google accounts used as ingestion sources. Reconnect to re-authenticate,
+              or disconnect to permanently remove.
             </CardDescription>
           </div>
           <div className="flex items-center gap-2">
@@ -478,107 +491,138 @@ function ConnectedAccountsSection() {
           />
         ) : (
           <div className="space-y-3 max-h-[28rem] overflow-y-auto pr-1">
-            {connections.map((c) => (
-              <div
-                key={c.id}
-                className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-lg border p-4"
-              >
-                <div className="flex items-start gap-3 min-w-0">
-                  <div className="mt-0.5 flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                    <Mail className="h-4 w-4" />
-                  </div>
-                  <div className="min-w-0 space-y-1">
-                    <div className="flex items-center gap-2">
-                      <p className="font-medium truncate">{c.googleEmail}</p>
-                      {c.status === "active" && c.watchExpiresAt && new Date(c.watchExpiresAt).getTime() > Date.now() + 86400000 ? (
-                        <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-400 gap-1 h-5 text-[10px]">
-                          <ShieldCheck className="h-3 w-3" /> Healthy
-                        </Badge>
-                      ) : (
-                        <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/30 dark:text-amber-400 gap-1 h-5 text-[10px]">
-                          <AlertTriangle className="h-3 w-3" /> Re-auth needed
-                        </Badge>
-                      )}
+            {connections.map((c) => {
+              // "Healthy" = status is "active" AND token not about to expire
+              const isHealthy =
+                c.status === "active" &&
+                (!c.watchExpiresAt || new Date(c.watchExpiresAt).getTime() > Date.now() + 86400000);
+              const needsReauth = c.status === "degraded" || c.status === "revoked";
+
+              return (
+                <div
+                  key={c.id}
+                  className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-lg border p-4"
+                >
+                  <div className="flex items-start gap-3 min-w-0">
+                    <div className="mt-0.5 flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                      <Mail className="h-4 w-4" />
                     </div>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <StatusBadge status={c.status} />
-                      <span className="text-xs text-muted-foreground">
-                        Connection expires {c.watchExpirePref === 'never' ? 'never' : relativeTime(c.watchExpiresAt)}
-                      </span>
-                      <span className="text-xs text-muted-foreground">
-                        · Last sync {relativeTime(c.lastSyncAt)}
-                      </span>
-                    </div>
-                    <div className="flex flex-wrap gap-1 pt-1">
-                      {c.scopes.map((s) => (
-                        <Badge
-                          key={s}
-                          variant="outline"
-                          className="font-mono text-[10px] font-normal"
-                        >
-                          {s}
-                        </Badge>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2 shrink-0">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="border-destructive text-destructive hover:bg-destructive/10 hover:text-destructive h-8"
-                    onClick={() => setDisconnectTarget(c)}
-                    disabled={disconnectMutation.isPending}
-                  >
-                    <Unplug className="mr-1.5 h-3.5 w-3.5" />
-                    Disconnect
-                  </Button>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                        <MoreHorizontal className="h-4 w-4" />
-                        <span className="sr-only">More options</span>
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuSub>
-                        <DropdownMenuSubTrigger>
-                          <Clock className="mr-2 h-4 w-4" />
-                          <span>Connection Expiry</span>
-                        </DropdownMenuSubTrigger>
-                        <DropdownMenuSubContent>
-                          <DropdownMenuRadioGroup
-                            value={c.watchExpirePref}
-                            onValueChange={(val) => refreshMutation.mutate({ id: c.id, watchExpirePref: val })}
+                    <div className="min-w-0 space-y-1">
+                      <div className="flex items-center gap-2">
+                        <p className="font-medium truncate">{c.googleEmail}</p>
+                        {isHealthy ? (
+                          <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-400 gap-1 h-5 text-[10px]">
+                            <ShieldCheck className="h-3 w-3" /> Healthy
+                          </Badge>
+                        ) : needsReauth ? (
+                          <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200 dark:bg-red-950/30 dark:text-red-400 gap-1 h-5 text-[10px]">
+                            <AlertTriangle className="h-3 w-3" /> Re-auth needed
+                          </Badge>
+                        ) : (
+                          <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/30 dark:text-amber-400 gap-1 h-5 text-[10px]">
+                            <AlertTriangle className="h-3 w-3" /> Expiring soon
+                          </Badge>
+                        )}
+                      </div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <StatusBadge status={c.status} />
+                        <span className="text-xs text-muted-foreground">
+                          {c.watchExpirePref === "never"
+                            ? "No expiry set"
+                            : `Expires ${relativeTime(c.watchExpiresAt)}`}
+                        </span>
+                        <span className="text-xs text-muted-foreground">
+                          · Last sync {relativeTime(c.lastSyncAt)}
+                        </span>
+                      </div>
+                      <div className="flex flex-wrap gap-1 pt-1">
+                        {c.scopes.map((s) => (
+                          <Badge
+                            key={s}
+                            variant="outline"
+                            className="font-mono text-[10px] font-normal"
                           >
-                            <DropdownMenuRadioItem value="never">Never</DropdownMenuRadioItem>
-                            <DropdownMenuRadioItem value="weekly">Weekly</DropdownMenuRadioItem>
-                            <DropdownMenuRadioItem value="monthly">Monthly</DropdownMenuRadioItem>
-                            <DropdownMenuRadioItem value="yearly">Yearly</DropdownMenuRadioItem>
-                          </DropdownMenuRadioGroup>
-                        </DropdownMenuSubContent>
-                      </DropdownMenuSub>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem
-                        onClick={() => refreshMutation.mutate({ id: c.id })}
-                        disabled={refreshMutation.isPending}
+                            {s}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    {/* Primary action depends on status */}
+                    {needsReauth ? (
+                      <Button
+                        size="sm"
+                        onClick={() => handleReconnect(c)}
+                        disabled={reconnectLoading === c.id}
+                        className="h-8"
                       >
-                        <RefreshCw className="mr-2 h-4 w-4" />
+                        {reconnectLoading === c.id ? (
+                          <RefreshCw className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <RefreshCw className="mr-1.5 h-3.5 w-3.5" />
+                        )}
                         Reconnect
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        className="text-destructive focus:text-destructive focus:bg-destructive/10"
+                      </Button>
+                    ) : (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="border-destructive text-destructive hover:bg-destructive/10 hover:text-destructive h-8"
                         onClick={() => setDisconnectTarget(c)}
                         disabled={disconnectMutation.isPending}
                       >
-                        <X className="mr-2 h-4 w-4" />
+                        <Unplug className="mr-1.5 h-3.5 w-3.5" />
                         Disconnect
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
+                      </Button>
+                    )}
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                          <MoreHorizontal className="h-4 w-4" />
+                          <span className="sr-only">More options</span>
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuSub>
+                          <DropdownMenuSubTrigger>
+                            <Clock className="mr-2 h-4 w-4" />
+                            <span>Connection Expiry</span>
+                          </DropdownMenuSubTrigger>
+                          <DropdownMenuSubContent>
+                            <DropdownMenuRadioGroup
+                              value={c.watchExpirePref}
+                              onValueChange={(val) => updatePrefMutation.mutate({ id: c.id, watchExpirePref: val })}
+                            >
+                              <DropdownMenuRadioItem value="never">Never</DropdownMenuRadioItem>
+                              <DropdownMenuRadioItem value="weekly">Weekly</DropdownMenuRadioItem>
+                              <DropdownMenuRadioItem value="monthly">Monthly</DropdownMenuRadioItem>
+                              <DropdownMenuRadioItem value="yearly">Yearly</DropdownMenuRadioItem>
+                            </DropdownMenuRadioGroup>
+                          </DropdownMenuSubContent>
+                        </DropdownMenuSub>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          onClick={() => handleReconnect(c)}
+                          disabled={reconnectLoading === c.id}
+                        >
+                          <RefreshCw className="mr-2 h-4 w-4" />
+                          Reconnect (re-authorize)
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          className="text-destructive focus:text-destructive focus:bg-destructive/10"
+                          onClick={() => setDisconnectTarget(c)}
+                          disabled={disconnectMutation.isPending}
+                        >
+                          <X className="mr-2 h-4 w-4" />
+                          Remove account
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </CardContent>
@@ -598,14 +642,14 @@ function ConnectedAccountsSection() {
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Disconnect Google account?</AlertDialogTitle>
+            <AlertDialogTitle>Remove Google account?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will revoke access for{" "}
+              This will permanently remove{" "}
               <span className="font-medium text-foreground">
                 {disconnectTarget?.googleEmail}
-              </span>
-              . All sources using this connection will stop running until a new
-              account is connected.
+              </span>{" "}
+              from this workspace. All sources using this connection will stop
+              running. You can reconnect it again at any time.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -622,8 +666,8 @@ function ConnectedAccountsSection() {
               }}
             >
               {disconnectMutation.isPending
-                ? "Disconnecting…"
-                : "Disconnect"}
+                ? "Removing…"
+                : "Remove account"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
