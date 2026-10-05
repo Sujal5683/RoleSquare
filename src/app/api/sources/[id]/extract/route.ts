@@ -116,7 +116,13 @@ export async function POST(
       // For PostgreSQL JSONB, payload path matching works, but we can also check in JS if needed.
       // Assuming Prisma's JSON filtering is supported.
       // If we find an active job, block it to prevent wasting AI tokens and duplicate inserts.
-      const payloadObj = activeExtractJob.payload as any;
+      const payloadStr = typeof activeExtractJob.payload === "string" ? activeExtractJob.payload : JSON.stringify(activeExtractJob.payload);
+      let payloadObj: any = {};
+      try {
+        payloadObj = JSON.parse(payloadStr);
+      } catch (e) {
+        // ignore parsing error
+      }
       if (payloadObj.targetDatasetId === targetDatasetId) {
         return NextResponse.json(
           { error: "An extraction is already running for this source to the target dataset." },

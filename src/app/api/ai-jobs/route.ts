@@ -60,6 +60,17 @@ export async function POST(req: NextRequest) {
         { status: 400 }
       );
     }
+    
+    // Security: Only allow user-facing job types to be manually queued.
+    // Internal job types like AI_EXTRACTION, GMAIL_SCAN, WEBHOOK_DISPATCH, EXTRACT_SINGLE_ROW
+    // must be queued by their respective backend services, not spoofed directly.
+    const allowedManualTypes = ["EXPORT_DATA", "DATASET_SYNC"];
+    if (!allowedManualTypes.includes(body.type)) {
+      return NextResponse.json(
+        { error: `Job type ${body.type} cannot be manually queued.` },
+        { status: 400 }
+      );
+    }
 
     try {
       const { checkUserLimits } = await import("@/lib/usage");

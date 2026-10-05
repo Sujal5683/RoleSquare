@@ -74,12 +74,24 @@ export async function POST(
       });
     });
 
-    const jobId = await enqueueJob({
-      organizationId,
-      userId: user.id,
-      type:   getJobTypeForSource(source.sourceType as any),
-      payload: { sourceId: id, runId: run.id, mode, triggeredBy: "scan" },
-    });
+    let jobId;
+    try {
+      jobId = await enqueueJob({
+        organizationId,
+        userId: user.id,
+        type:   getJobTypeForSource(source.sourceType as any),
+        payload: { sourceId: id, runId: run.id, mode, triggeredBy: "scan" },
+      });
+    } catch (err) {
+      await db.$transaction([
+        db.source.update({ where: { id }, data: { runState: "idle" } }),
+        db.sourceRun.update({
+          where: { id: run.id },
+          data: { status: "failed", errorMessage: "Failed to queue scan job" }
+        })
+      ]);
+      throw err;
+    }
 
     await logAudit({
       organizationId,

@@ -344,11 +344,17 @@ export async function requireOrgContext(
       );
     }
   } else if (headerHint) {
-    // 2. x-organization-id header — SOFT hint, fall through on mismatch
+    // 2. x-organization-id header — used by the frontend to declare intent
     membership = user.memberships.find(
       (m) => m.organizationId === headerHint && m.status === "active"
     );
-    // If stale/invalid header, fall through to step 3 (no error)
+    if (!membership && req.method !== "GET") {
+      throw new AuthError(
+        "Invalid x-organization-id header. You are not an active member of this organization.",
+        403
+      );
+    }
+    // If stale/invalid header and it is a GET request, fall through to step 3
   }
 
   // 3. Fallback to first active org (only allowed for GET requests for backward compat)

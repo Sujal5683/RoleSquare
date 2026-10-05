@@ -133,9 +133,10 @@ export async function processGmailScan(
   const threadIdToMessageIds = new Map<string, string[]>();
   const chunkSize = 10;
 
-  await updateRunProgress(runId, 30, "grouping");
-
   for (let i = 0; i < messageRefs.length; i += chunkSize) {
+    const pct = 20 + Math.floor((i / Math.max(messageRefs.length, 1)) * 10);
+    await updateRunProgress(runId, pct, "grouping");
+
     const chunk = messageRefs.slice(i, i + chunkSize);
     await Promise.all(chunk.map(async (ref) => {
       if (!ref.id) return;
@@ -243,36 +244,54 @@ export async function processGmailScan(
         const dedupHash = crypto.createHash("sha256").update(threadId).digest("hex");
 
         // ── Upsert a single Email row per thread ──────────────────────────────
-        const email = await db.email.upsert({
-          where: { sourceId_googleMessageId: { sourceId, googleMessageId: lastMessageId } },
-          create: {
+        let email = await db.email.findFirst({
+          where: {
             sourceId,
-            googleMessageId: lastMessageId,
-            threadId,
-            fromAddress,
-            toAddress,
-            ccAddresses,
-            subject,
-            snippet,
-            bodyText: combinedBodyText || null,
-            bodyHtml: combinedBodyHtml || null,
-            receivedAt,
-            messageCount: messages.length,
-            dedupHash,
-            processingStatus: "matched",
-          },
-          update: {
-            fromAddress,
-            toAddress,
-            subject,
-            snippet,
-            bodyText: combinedBodyText || null,
-            bodyHtml: combinedBodyHtml || null,
-            receivedAt,
-            messageCount: messages.length,
-            processingStatus: "matched",
-          },
+            OR: [
+              { threadId },
+              { googleMessageId: lastMessageId }
+            ]
+          }
         });
+
+        if (email) {
+          email = await db.email.update({
+            where: { id: email.id },
+            data: {
+              googleMessageId: lastMessageId,
+              threadId,
+              fromAddress,
+              toAddress,
+              ccAddresses,
+              subject,
+              snippet,
+              bodyText: combinedBodyText || null,
+              bodyHtml: combinedBodyHtml || null,
+              receivedAt,
+              messageCount: messages.length,
+              processingStatus: "matched",
+            }
+          });
+        } else {
+          email = await db.email.create({
+            data: {
+              sourceId,
+              googleMessageId: lastMessageId,
+              threadId,
+              fromAddress,
+              toAddress,
+              ccAddresses,
+              subject,
+              snippet,
+              bodyText: combinedBodyText || null,
+              bodyHtml: combinedBodyHtml || null,
+              receivedAt,
+              messageCount: messages.length,
+              dedupHash,
+              processingStatus: "matched",
+            }
+          });
+        }
         emailsMatched++;
 
         // ── Attachments (union across all messages in the thread) ─────────────

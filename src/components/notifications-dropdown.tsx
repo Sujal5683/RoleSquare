@@ -102,7 +102,7 @@ export function NotificationsDropdown() {
   // Failed jobs
   if (data?.kpis && data.kpis.aiJobsFailed > 0) {
     notifications.push({
-      id: `failed-jobs-${data.kpis.aiJobsFailed}`,
+      id: `failed-jobs`,
       type: "job",
       icon: AlertTriangle,
       title: `${data.kpis.aiJobsFailed} failed job${data.kpis.aiJobsFailed === 1 ? "" : "s"}`,
@@ -116,7 +116,7 @@ export function NotificationsDropdown() {
   // Running jobs
   if (data?.kpis && data.kpis.aiJobsRunning > 0) {
     notifications.push({
-      id: `running-jobs-${data.kpis.aiJobsRunning}`,
+      id: `running-jobs`,
       type: "job",
       icon: RefreshCw,
       title: `${data.kpis.aiJobsRunning} job${data.kpis.aiJobsRunning === 1 ? "" : "s"} running`,

@@ -179,6 +179,10 @@ async function processBullJob(bullJob: Job): Promise<void> {
     // Re-throw so BullMQ knows the job failed and can apply its retry backoff
     // For retryable errors: BullMQ retries with exponential backoff
     // For terminal errors: BullMQ moves to failed set (no more retries)
+    if (!retryable) {
+      const { UnrecoverableError } = require("bullmq");
+      throw new UnrecoverableError(err instanceof Error ? err.message : String(err));
+    }
     throw err;
   }
 }

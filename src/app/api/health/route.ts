@@ -53,6 +53,7 @@ export async function GET() {
         where: {
           status: "running",
           startedAt: { lt: staleThreshold },
+          type: { not: "AI_EXTRACTION" } // Exclude deferred master jobs
         },
       });
 
