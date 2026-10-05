@@ -137,6 +137,9 @@ export async function processGmailScan(
     const pct = 20 + Math.floor((i / Math.max(messageRefs.length, 1)) * 10);
     await updateRunProgress(runId, pct, "grouping");
 
+    // Sleep between chunks to respect Gmail API rate limits (250 quota units / sec)
+    if (i > 0) await new Promise(r => setTimeout(r, 500));
+
     const chunk = messageRefs.slice(i, i + chunkSize);
     await Promise.all(chunk.map(async (ref) => {
       if (!ref.id) return;
@@ -152,6 +155,7 @@ export async function processGmailScan(
         threadIdToMessageIds.get(tid)!.push(ref.id);
       } catch (err) {
         console.warn(`[gmail] Failed to get metadata for message ${ref.id}:`, err instanceof Error ? err.message : err);
+        throw err; // Do not silently swallow errors, otherwise data is lost!
       }
     }));
   }
@@ -174,6 +178,9 @@ export async function processGmailScan(
     const chunk = uniqueThreadIds.slice(i, i + chunkSize);
     const pct = 40 + Math.floor(((i + 1) / Math.max(total, 1)) * 50);
     await updateRunProgress(runId, pct, "parsing");
+
+    // Sleep between chunks to respect Gmail API rate limits
+    if (i > 0) await new Promise(r => setTimeout(r, 1000));
 
     await Promise.all(chunk.map(async (threadId) => {
       try {
@@ -338,6 +345,7 @@ export async function processGmailScan(
 
       } catch (err) {
         console.warn(`[gmail] Failed to process thread ${threadId}:`, err instanceof Error ? err.message : err);
+        throw err; // Fail the job rather than silently swallowing data loss
       }
     }));
   }
