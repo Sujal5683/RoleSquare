@@ -43,7 +43,7 @@ import {
   extractDriveLinks,
   getHeader,
 }                                       from "@/lib/google-client";
-import { parseEmailFields }             from "@/lib/email-parser";
+import { parseEmailFields, categoriseLinks } from "@/lib/email-parser";
 import type { ParsedEmailFields }       from "@/lib/email-parser";
 import { ensureDefaultDataset, writeDefaultDatasetRecord, writeDefaultDatasetRecordsBulk } from "@/lib/dataset-provisioner";
 import { extractWithLLM }               from "@/lib/extraction";
@@ -692,15 +692,8 @@ async function processDeterministicSync(
       parsedFields.Body      = mainBody;
       parsedFields.Signature = signature;
 
-      const allUrls   = [...new Set((fullText.match(/https?:\/\/[^\s"'<>)]+/g) ?? []))];
-      const driveLinks: string[] = [];
-      const formLinks:  string[] = [];
-      const otherLinks: string[] = [];
-      for (const url of allUrls) {
-        if (url.includes("docs.google.com/forms") || url.includes("forms.gle")) formLinks.push(url);
-        else if (url.includes("docs.google.com") || url.includes("drive.google.com")) driveLinks.push(url);
-        else otherLinks.push(url);
-      }
+      // Use the canonical link categoriser from email-parser.ts (single source of truth)
+      const { driveLinks, formLinks, otherLinks } = categoriseLinks(fullText);
       parsedFields["Drive Links"] = driveLinks.join(", ");
       parsedFields["Form Links"]  = formLinks.join(", ");
       parsedFields["Other Links"] = otherLinks.join(", ");

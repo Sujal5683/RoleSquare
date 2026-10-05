@@ -226,9 +226,13 @@ export function extractAttachments(
 }
 
 /**
- * Extracts Google Drive / Docs / Sheets URLs from email body text.
+ * Extracts Google Drive / Docs / Slides / Script URLs from email body text.
+ * Strips HTML tags first so href attributes are matched correctly.
  */
 export function extractDriveLinks(text: string): string[] {
-  const pattern = /https?:\/\/(?:docs|drive|sheets|forms)\.google\.com\/[^\s"'>)]+/g;
-  return [...new Set(text.match(pattern) ?? [])];
+  // Strip HTML tags so href="https://..." attributes don't get truncated by quote chars
+  const stripped = text.replace(/<[^>]+>/g, " ");
+  // Match all real Google productivity domains (NOT sheets.google.com — that's not a real URL)
+  const pattern = /https?:\/\/(?:docs|drive|slides|script)\.google\.com\/[^\s"'<>)\]]+/g;
+  return [...new Set(stripped.match(pattern) ?? [])];
 }

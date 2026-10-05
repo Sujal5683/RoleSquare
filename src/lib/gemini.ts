@@ -1,22 +1,34 @@
 // RoleSquare — Gemini Fallback Client
 //
 // Provides callGeminiWithFallback() — cycles through a priority chain of
-// 5 Gemini models, automatically falling back on 429/503/rate-limit errors.
+// 6 Gemini models, following these rules:
 //
-// Key invariants:
-//   1. NEVER silently returns empty results. When all models are exhausted it
-//      THROWS GeminiRateLimitExhaustedError so job-runner can re-queue the row.
-//   2. Supports multimodal fileParts (Gemini File API URIs) alongside text —
-//      pass them via opts.fileParts[] to read PDFs/images/DOCX natively.
-//   3. Timeout defaults to 120s (not 8s) to handle large documents.
-//   4. 503 MODEL_CAPACITY_EXHAUSTED is treated the same as 429 (retryable).
+//  RATE LIMIT (429 / RESOURCE_EXHAUSTED):
+//    → Instantly switch to the next model. NO wait. The blocked model cools
+//      down for 60 s then automatically becomes available again.
 //
-// Model chain:
-//   1. gemini-3.5-flash          Primary
-//   2. gemini-3.1-flash-lite     Fallback 1
-//   3. gemini-3.7-flash          Fallback 2
-//   4. gemini-3.6-flash          Fallback 3
-//   5. gemini-3.5-flash-lite     Fallback 4
+//  SERVICE UNAVAILABLE (503 / MODEL_CAPACITY_EXHAUSTED):
+//    → Wait 10 s, retry the SAME model once. If still failing, switch to next.
+//
+//  TIMEOUT / NO RESPONSE:
+//    → Switch to next model immediately (same as rate limit).
+//
+//  ALL MODELS EXHAUSTED:
+//    → Throw GeminiRateLimitExhaustedError so job-runner re-queues the row.
+//      Zero data lost.
+//
+//  RESET / COOL-DOWN:
+//    → Each model tracks its own blockedUntil timestamp. Once it expires the
+//      model is automatically re-promoted to "active" and used first again if
+//      it's the highest-priority available model.
+//
+// Model chain (highest priority → lowest):
+//   1. gemini-3.8-flash       Primary
+//   2. gemini-3.7-flash       Fallback 1
+//   3. gemini-3.6-flash       Fallback 2
+//   4. gemini-3.5-flash       Fallback 3
+//   5. gemini-3.5-flash-lite  Fallback 4
+//   6. gemini-3.1-flash-lite  Fallback 5 (last resort)
 
 import { GoogleGenAI } from "@google/genai";
 
@@ -26,23 +38,29 @@ interface ModelDef {
   id: string;
   displayName: string;
   role: string;
-  rpmCooldownMs: number;
+  /** How long (ms) to block a model after a rate-limit hit */
+  rateLimitCooldownMs: number;
 }
 
 const MODEL_CHAIN: ModelDef[] = [
-  { id: "gemini-3.5-flash",      displayName: "Gemini 3.5 Flash",      role: "Primary",    rpmCooldownMs: 60_000 },
-  { id: "gemini-3.1-flash-lite", displayName: "Gemini 3.1 Flash Lite", role: "Fallback 1", rpmCooldownMs: 60_000 },
-  { id: "gemini-3.7-flash",      displayName: "Gemini 3.7 Flash",      role: "Fallback 2", rpmCooldownMs: 60_000 },
-  { id: "gemini-3.6-flash",      displayName: "Gemini 3.6 Flash",      role: "Fallback 3", rpmCooldownMs: 60_000 },
-  { id: "gemini-3.5-flash-lite", displayName: "Gemini 3.5 Flash Lite", role: "Fallback 4", rpmCooldownMs: 60_000 },
+  { id: "gemini-3.8-flash",      displayName: "Gemini 3.8 Flash",      role: "Primary",    rateLimitCooldownMs: 60_000 },
+  { id: "gemini-3.7-flash",      displayName: "Gemini 3.7 Flash",      role: "Fallback 1", rateLimitCooldownMs: 60_000 },
+  { id: "gemini-3.6-flash",      displayName: "Gemini 3.6 Flash",      role: "Fallback 2", rateLimitCooldownMs: 60_000 },
+  { id: "gemini-3.5-flash",      displayName: "Gemini 3.5 Flash",      role: "Fallback 3", rateLimitCooldownMs: 60_000 },
+  { id: "gemini-3.5-flash-lite", displayName: "Gemini 3.5 Flash Lite", role: "Fallback 4", rateLimitCooldownMs: 60_000 },
+  { id: "gemini-3.1-flash-lite", displayName: "Gemini 3.1 Flash Lite", role: "Fallback 5", rateLimitCooldownMs: 60_000 },
 ];
 
-// ── Rate-limit state (in-process, resets on server restart) ─────────────────
+// ── Per-model runtime state (in-process; resets on worker restart) ─────────
 
 interface ModelState {
+  /** Epoch ms until which this model must not be tried (rate-limited) */
   blockedUntil: number;
+  /** Total 429/503 hits ever */
   rateLimitHits: number;
+  /** Total successful completions */
   successCount: number;
+  /** Epoch ms of last successful call */
   lastUsedAt: number | null;
 }
 
@@ -64,17 +82,31 @@ function isBlocked(modelId: string): boolean {
   return getState(modelId).blockedUntil > Date.now();
 }
 
-function markBlocked(modelId: string, cooldownMs: number) {
+function markRateLimited(modelId: string, cooldownMs: number) {
   const state = getState(modelId);
   state.blockedUntil = Date.now() + cooldownMs;
   state.rateLimitHits += 1;
-  console.warn(`[gemini] ${modelId} blocked for ${cooldownMs / 1000}s (total hits: ${state.rateLimitHits})`);
+  const def = MODEL_CHAIN.find((m) => m.id === modelId);
+  console.warn(
+    `[gemini] RATE LIMITED: ${modelId} — blocked for ${cooldownMs / 1000}s (total hits: ${state.rateLimitHits}). ` +
+    `Switching to next model instantly.`
+  );
+  if (def) {
+    const nextIdx = MODEL_CHAIN.indexOf(def) + 1;
+    if (nextIdx < MODEL_CHAIN.length) {
+      console.info(`[gemini] → Next model: ${MODEL_CHAIN[nextIdx].id}`);
+    }
+  }
 }
 
 function markSuccess(modelId: string) {
   const state = getState(modelId);
   state.successCount += 1;
   state.lastUsedAt = Date.now();
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 // ── Public types ─────────────────────────────────────────────────────────────
@@ -118,7 +150,7 @@ export interface GeminiResult {
   completionTokens: number;
 }
 
-// ── Sentinel error ────────────────────────────────────────────────────────────
+// ── Sentinel error ─────────────────────────────────────────────────────────
 
 /**
  * Thrown when ALL models in the fallback chain are simultaneously blocked by
@@ -135,17 +167,19 @@ export class GeminiRateLimitExhaustedError extends Error {
   }
 }
 
-// ── Core fallback function ────────────────────────────────────────────────────
+// ── Core fallback function ───────────────────────────────────────────────────
 
 /**
  * Calls Gemini with automatic model fallback.
  *
- * Tries each model in priority order. On 429/503/RESOURCE_EXHAUSTED, marks the
- * model as blocked (60s cooldown) and tries the next one immediately.
- *
- * Multimodal: when opts.fileParts is set, the last user turn is sent as a
- * multi-part content array [filePart, filePart, ..., textPart] so Gemini reads
- * PDFs and images natively via the File API — no local text extraction needed.
+ * Fallback rules:
+ *  - RATE LIMIT (429 / RESOURCE_EXHAUSTED): instantly switch to next model,
+ *    block the current model for 60 s.
+ *  - SERVICE UNAVAILABLE (503 / MODEL_CAPACITY_EXHAUSTED): wait 10 s, retry
+ *    SAME model ONCE, then switch if still failing.
+ *  - TIMEOUT / NO RESPONSE: instantly switch to next model.
+ *  - RESET: once a model's 60 s cooldown expires it is available again and
+ *    will be used first if it is the highest-priority unblocked model.
  *
  * @throws GeminiRateLimitExhaustedError  — retryable; all models blocked
  * @throws Error                          — non-retryable; malformed request etc.
@@ -166,86 +200,139 @@ export async function callGeminiWithFallback(
   const otherErrors: string[] = [];
 
   for (const modelDef of MODEL_CHAIN) {
+    // Skip models still in their rate-limit cooldown window
     if (isBlocked(modelDef.id)) {
       const state = getState(modelDef.id);
       const remainingSec = Math.ceil((state.blockedUntil - Date.now()) / 1000);
       rateLimitErrors.push(`${modelDef.id}: cooling down (${remainingSec}s left)`);
-      console.info(`[gemini] skipping ${modelDef.id} — cooling down`);
+      console.info(`[gemini] ⏭ skipping ${modelDef.id} — still rate-limited (${remainingSec}s left)`);
       continue;
     }
 
-    let timeoutId: NodeJS.Timeout | undefined;
-    try {
-      console.info(`[gemini] trying model ${modelDef.id}`);
+    // Each model gets up to 2 attempts: 1 normal + 1 retry only for 503 UNAVAILABLE
+    let attempts = 0;
+    const maxAttemptsForThisModel = 2;
 
-      const abortController = new AbortController();
-      timeoutId = setTimeout(() => abortController.abort(new Error(`Timeout: ${modelDef.id} did not respond within ${timeoutMs / 1000}s`)), timeoutMs);
+    while (attempts < maxAttemptsForThisModel) {
+      attempts++;
+      let timeoutId: NodeJS.Timeout | undefined;
 
-      const history = messages.slice(0, -1).map((m) => ({
-        role: m.role,
-        parts: [{ text: m.content }],
-      }));
-      const lastMessage = messages[messages.length - 1];
+      try {
+        console.info(`[gemini] 🔄 trying ${modelDef.id} (attempt ${attempts})`);
 
-      const messagePayloadParts =
-        opts.fileParts && opts.fileParts.length > 0
-          ? [...opts.fileParts, { text: lastMessage.content }]
-          : [{ text: lastMessage.content }];
+        const abortController = new AbortController();
+        timeoutId = setTimeout(
+          () => abortController.abort(new Error(`Timeout: ${modelDef.id} did not respond within ${timeoutMs / 1000}s`)),
+          timeoutMs
+        );
 
-      const contents = [...history, { role: "user", parts: messagePayloadParts }];
+        const history = messages.slice(0, -1).map((m) => ({
+          role: m.role,
+          parts: [{ text: m.content }],
+        }));
+        const lastMessage = messages[messages.length - 1];
 
-      const result = await ai.models.generateContent({
-        model: modelDef.id,
-        contents,
-        config: {
-          systemInstruction: opts.system,
-          temperature: opts.temperature ?? 0.2,
-          maxOutputTokens: opts.maxOutputTokens ?? 4096,
-          httpOptions: { signal: abortController.signal } as any
+        const messagePayloadParts =
+          opts.fileParts && opts.fileParts.length > 0
+            ? [...opts.fileParts, { text: lastMessage.content }]
+            : [{ text: lastMessage.content }];
+
+        const contents = [...history, { role: "user", parts: messagePayloadParts }];
+
+        const result = await ai.models.generateContent({
+          model: modelDef.id,
+          contents,
+          config: {
+            systemInstruction: opts.system,
+            temperature: opts.temperature ?? 0.2,
+            maxOutputTokens: opts.maxOutputTokens ?? 4096,
+            httpOptions: { signal: abortController.signal } as any,
+          },
+        });
+
+        const text = result.text ?? "";
+        const usageMetadata = result.usageMetadata;
+        const promptTokens     = usageMetadata?.promptTokenCount     ?? 0;
+        const completionTokens = usageMetadata?.candidatesTokenCount ?? 0;
+        const tokensUsed       = usageMetadata?.totalTokenCount ?? (promptTokens + completionTokens);
+
+        clearTimeout(timeoutId);
+        markSuccess(modelDef.id);
+        console.info(
+          `[gemini] ✅ ${modelDef.id} OK — ${tokensUsed} tokens (${promptTokens}p + ${completionTokens}c)`
+        );
+
+        return {
+          text,
+          modelUsed: modelDef.id,
+          modelDisplayName: modelDef.displayName,
+          tokensUsed,
+          promptTokens,
+          completionTokens,
+        };
+
+      } catch (err) {
+        clearTimeout(timeoutId);
+        const errMsg = err instanceof Error ? err.message : String(err);
+
+        // ── Rate limit: instant switch, no retry on this model ─────────────
+        const isRateLimit =
+          errMsg.includes("429") ||
+          errMsg.includes("RESOURCE_EXHAUSTED") ||
+          errMsg.includes("rate limit") ||
+          errMsg.toLowerCase().includes("quota");
+
+        if (isRateLimit) {
+          markRateLimited(modelDef.id, modelDef.rateLimitCooldownMs);
+          rateLimitErrors.push(`${modelDef.id}: rate limited`);
+          // Break inner while — move to next model immediately
+          break;
         }
-      });
 
-      const text = result.text ?? "";
-      const usageMetadata = result.usageMetadata;
-      const promptTokens     = usageMetadata?.promptTokenCount     ?? 0;
-      const completionTokens = usageMetadata?.candidatesTokenCount ?? 0;
-      const tokensUsed       = usageMetadata?.totalTokenCount ?? (promptTokens + completionTokens);
+        // ── Timeout / no response: instant switch ─────────────────────────
+        const isTimeout =
+          errMsg.includes("Timeout") ||
+          errMsg.includes("AbortError") ||
+          errMsg.includes("signal");
 
-      clearTimeout(timeoutId);
-      markSuccess(modelDef.id);
-      console.info(`[gemini] ${modelDef.id} OK — ${tokensUsed} tokens (${promptTokens}p + ${completionTokens}c)`);
+        if (isTimeout) {
+          console.warn(`[gemini] ⏱ ${modelDef.id} timed out — switching to next model instantly`);
+          rateLimitErrors.push(`${modelDef.id}: timeout`);
+          break;
+        }
 
-      return { text, modelUsed: modelDef.id, modelDisplayName: modelDef.displayName, tokensUsed, promptTokens, completionTokens };
+        // ── Service unavailable: wait 10 s then retry ONCE ────────────────
+        const isUnavailable =
+          errMsg.includes("503") ||
+          errMsg.includes("UNAVAILABLE") ||
+          errMsg.includes("MODEL_CAPACITY_EXHAUSTED");
 
-    } catch (err) {
-      clearTimeout(timeoutId);
-      const errMsg = err instanceof Error ? err.message : String(err);
+        if (isUnavailable) {
+          if (attempts < maxAttemptsForThisModel) {
+            console.warn(
+              `[gemini] ⚠ ${modelDef.id} service unavailable — waiting 10 s before retry...`
+            );
+            await sleep(10_000);
+            // Loop again (attempt 2)
+            continue;
+          } else {
+            // Second attempt also failed → switch to next model
+            console.warn(`[gemini] ⚠ ${modelDef.id} still unavailable after retry — switching to next model`);
+            rateLimitErrors.push(`${modelDef.id}: unavailable (2 attempts)`);
+            break;
+          }
+        }
 
-      const isRateLimit =
-        errMsg.includes("429") ||
-        errMsg.includes("RESOURCE_EXHAUSTED") ||
-        errMsg.includes("rate limit") ||
-        errMsg.toLowerCase().includes("quota");
-
-      const isOverloaded =
-        errMsg.includes("503") ||
-        errMsg.includes("UNAVAILABLE") ||
-        errMsg.includes("MODEL_CAPACITY_EXHAUSTED") ||
-        errMsg.includes("Timeout");
-
-      if (isRateLimit || isOverloaded) {
-        markBlocked(modelDef.id, modelDef.rpmCooldownMs);
-        rateLimitErrors.push(`${modelDef.id}: ${errMsg}`);
-        continue;
+        // ── Non-retryable error (bad request, auth issue, etc.) ───────────
+        console.error(`[gemini] ✗ ${modelDef.id} non-recoverable error:`, errMsg);
+        otherErrors.push(`${modelDef.id}: ${errMsg}`);
+        break;
       }
+    } // end while
+  } // end for
 
-      console.error(`[gemini] ${modelDef.id} non-recoverable error:`, errMsg);
-      otherErrors.push(`${modelDef.id}: ${errMsg}`);
-      continue;
-    }
-  }
-
-  // All models tried. If everything was rate-limits, throw retryable error.
+  // All models tried.
+  // If all failures were rate-limits/timeouts → throw retryable so job re-queues.
   if (rateLimitErrors.length > 0 && otherErrors.length === 0) {
     throw new GeminiRateLimitExhaustedError(`\n${rateLimitErrors.join("\n")}`);
   }
@@ -255,7 +342,7 @@ export async function callGeminiWithFallback(
   );
 }
 
-// ── Model status export (for /api/ai/model-status) ──────────────────────────
+// ── Model status export (for /api/ai/model-status) ─────────────────────────
 
 export interface ModelStatus {
   modelId: string;

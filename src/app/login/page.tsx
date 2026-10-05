@@ -45,7 +45,7 @@ function LoginPageContent() {
       if (session) {
         fetch("/api/session", { cache: "no-store" }).then(async (res) => {
           if (res.ok) {
-            router.replace(next);
+            window.location.href = next;
           } else if (res.status === 403) {
             const data = await res.json();
             if (data.error === "2FA_REQUIRED") {
@@ -77,8 +77,7 @@ function LoginPageContent() {
           const data = await res.json();
           throw new Error(data.error || "Invalid 2FA token");
         }
-        router.push(next);
-        router.refresh();
+        window.location.href = next;
         return;
       }
 
@@ -116,22 +115,9 @@ function LoginPageContent() {
       const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
       if (signInError) throw signInError;
 
-      // Check if 2FA is required
-      const res = await fetch("/api/session", { cache: "no-store" });
-      if (!res.ok) {
-        if (res.status === 403) {
-          const data = await res.json();
-          if (data.error === "2FA_REQUIRED") {
-            setMode("2fa");
-            return;
-          }
-        }
-        throw new Error("Failed to initialize session");
-      }
-
-      // Session is set — redirect to the app
-      router.push(next);
-      router.refresh();
+      // Session is set — redirect to the app instantly!
+      // Using window.location.href guarantees a hard reload so cookies are reliably sent.
+      window.location.href = next;
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Something went wrong");
     } finally {
@@ -185,7 +171,16 @@ function LoginPageContent() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background px-4">
+    <div className="min-h-screen flex items-center justify-center bg-background px-4 relative">
+      {/* Back to Home Button */}
+      <Link 
+        href="/" 
+        className="absolute top-4 left-4 md:top-8 md:left-8 flex items-center text-sm font-medium border border-input bg-background shadow-sm hover:bg-accent hover:text-accent-foreground px-3 py-1.5 rounded-md transition-colors z-10"
+      >
+        <ArrowLeft className="mr-2 h-4 w-4" />
+        Back to Home
+      </Link>
+
       {/* Background glow */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div className="absolute top-0 left-1/3 h-96 w-96 rounded-full bg-violet-500/8 blur-3xl" />
@@ -193,14 +188,6 @@ function LoginPageContent() {
       </div>
 
       <div className="relative w-full max-w-md space-y-8">
-        {/* Back to Home Button */}
-        <Link 
-          href="/" 
-          className="absolute -top-16 left-0 flex items-center text-sm font-medium border border-input bg-background shadow-sm hover:bg-accent hover:text-accent-foreground px-3 py-1.5 rounded-md transition-colors"
-        >
-          <ArrowLeft className="mr-2 h-4 w-4" />
-          Back to Home
-        </Link>
 
         {/* Logo */}
         <div className="text-center">

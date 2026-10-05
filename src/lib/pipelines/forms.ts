@@ -101,7 +101,7 @@ export async function processFormsScan(
 
   await updateRunProgress(runId, 95, "finalizing");
 
-  const stats = { responsesMatched, recordsExtracted: 0 };
+  const stats = { responsesMatched, recordsExtracted: responsesMatched };
 
   await db.sourceRun.update({
     where: { id: runId },

@@ -107,7 +107,7 @@ export async function processSheetsScan(
 
   await updateRunProgress(runId, 95, "finalizing");
 
-  const stats = { rowsMatched, recordsExtracted: 0 };
+  const stats = { rowsMatched, recordsExtracted: rowsMatched };
 
   await db.sourceRun.update({
     where: { id: runId },

@@ -13,81 +13,25 @@ export interface ModelPricing {
   displayName: string;
 }
 
-/** Pricing map keyed by the exact model string returned by the Gemini API */
+/** Pricing map keyed by the exact model string returned by the Gemini API.
+ *  These are the exact same 6 models used in callGeminiWithFallback() (gemini.ts),
+ *  in the same priority order: 3.8 → 3.7 → 3.6 → 3.5 → 3.5-lite → 3.1-lite
+ */
 export const MODEL_PRICING: Record<string, ModelPricing> = {
-  // ── Gemini 1.5 Family ───────────────────────────────────────────────────────
-  "gemini-1.5-pro": {
-    displayName: "Gemini 1.5 Pro",
-    promptCostPer1k: 0.00125,
-    completionCostPer1k: 0.005,
-  },
-  "gemini-1.5-pro-latest": {
-    displayName: "Gemini 1.5 Pro (Latest)",
-    promptCostPer1k: 0.00125,
-    completionCostPer1k: 0.005,
-  },
-  "gemini-1.5-flash": {
-    displayName: "Gemini 1.5 Flash",
-    promptCostPer1k: 0.000075,
-    completionCostPer1k: 0.0003,
-  },
-  "gemini-1.5-flash-latest": {
-    displayName: "Gemini 1.5 Flash (Latest)",
-    promptCostPer1k: 0.000075,
-    completionCostPer1k: 0.0003,
-  },
-  // ── Gemini 2.0 Family ───────────────────────────────────────────────────────
-  "gemini-2.0-flash": {
-    displayName: "Gemini 2.0 Flash",
-    promptCostPer1k: 0.0001,
-    completionCostPer1k: 0.0004,
-  },
-  "gemini-2.0-flash-exp": {
-    displayName: "Gemini 2.0 Flash (Exp)",
-    promptCostPer1k: 0.0001,
-    completionCostPer1k: 0.0004,
-  },
-  "gemini-2.0-flash-lite": {
-    displayName: "Gemini 2.0 Flash Lite",
-    promptCostPer1k: 0.000075,
-    completionCostPer1k: 0.0003,
-  },
-  // ── Gemini 2.5 Family ───────────────────────────────────────────────────────
-  "gemini-2.5-pro": {
-    displayName: "Gemini 2.5 Pro",
-    promptCostPer1k: 0.00125,
-    completionCostPer1k: 0.01,
-  },
-  "gemini-2.5-pro-preview": {
-    displayName: "Gemini 2.5 Pro Preview",
-    promptCostPer1k: 0.00125,
-    completionCostPer1k: 0.01,
-  },
-  "gemini-2.5-flash": {
-    displayName: "Gemini 2.5 Flash",
-    promptCostPer1k: 0.0003,
-    completionCostPer1k: 0.0025,
-  },
-  "gemini-2.5-flash-lite": {
-    displayName: "Gemini 2.5 Flash Lite",
-    promptCostPer1k: 0.000075,
-    completionCostPer1k: 0.0003,
-  },
-  // ── Gemini 3.x Family ───────────────────────────────────────────────────────
-  "gemini-3.0-flash": {
-    displayName: "Gemini 3.0 Flash",
+  "gemini-3.8-flash": {
+    displayName: "Gemini 3.8 Flash",
     promptCostPer1k: 0.0003,
     completionCostPer1k: 0.001,
   },
-  "gemini-3.1-flash": {
-    displayName: "Gemini 3.1 Flash",
+  "gemini-3.7-flash": {
+    displayName: "Gemini 3.7 Flash",
     promptCostPer1k: 0.0003,
     completionCostPer1k: 0.001,
   },
-  "gemini-3.1-flash-lite": {
-    displayName: "Gemini 3.1 Flash Lite",
-    promptCostPer1k: 0.0001,
-    completionCostPer1k: 0.0004,
+  "gemini-3.6-flash": {
+    displayName: "Gemini 3.6 Flash",
+    promptCostPer1k: 0.0003,
+    completionCostPer1k: 0.001,
   },
   "gemini-3.5-flash": {
     displayName: "Gemini 3.5 Flash",
@@ -99,25 +43,10 @@ export const MODEL_PRICING: Record<string, ModelPricing> = {
     promptCostPer1k: 0.0001,
     completionCostPer1k: 0.0004,
   },
-  "gemini-3.6-flash": {
-    displayName: "Gemini 3.6 Flash",
-    promptCostPer1k: 0.0003,
-    completionCostPer1k: 0.001,
-  },
-  "gemini-3.7-flash": {
-    displayName: "Gemini 3.7 Flash",
-    promptCostPer1k: 0.0003,
-    completionCostPer1k: 0.001,
-  },
-  "gemini-3.7-flash-exp": {
-    displayName: "Gemini 3.7 Flash (Exp)",
-    promptCostPer1k: 0.0003,
-    completionCostPer1k: 0.001,
-  },
-  "gemini-3.7-pro": {
-    displayName: "Gemini 3.7 Pro",
-    promptCostPer1k: 0.00125,
-    completionCostPer1k: 0.01,
+  "gemini-3.1-flash-lite": {
+    displayName: "Gemini 3.1 Flash Lite",
+    promptCostPer1k: 0.0001,
+    completionCostPer1k: 0.0004,
   },
 };
 

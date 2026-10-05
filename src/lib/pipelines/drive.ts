@@ -138,7 +138,7 @@ export async function processDriveScan(
 
   await updateRunProgress(runId, 95, "finalizing");
 
-  const stats = { filesMatched, recordsExtracted: 0 };
+  const stats = { filesMatched, recordsExtracted: filesMatched };
 
   await db.sourceRun.update({
     where: { id: runId },

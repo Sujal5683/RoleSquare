@@ -223,16 +223,17 @@ model SourceRun {
 model Email {
   id               String   @id @default(cuid())
   sourceId         String
-  googleMessageId  String
-  threadId         String?
-  fromAddress      String
+  googleMessageId  String   // ID of the most recent message in the thread (used for dedup within a re-scan)
+  threadId         String?  // Gmail thread ID — one row per thread after migration
+  fromAddress      String   // Sender of the ORIGINAL (first) message in the thread
   toAddress        String
   ccAddresses      String?
-  subject          String
+  subject          String   // Subject of the original message
   snippet          String
-  bodyText         String?
-  bodyHtml         String?
-  receivedAt       DateTime
+  bodyText         String?  // Combined plain-text bodies of ALL messages in the thread
+  bodyHtml         String?  // Combined HTML bodies (used for drive link extraction only)
+  receivedAt       DateTime // Date of the LATEST message in the thread
+  messageCount     Int      @default(1) // Number of messages combined into this thread row
   dedupHash        String
   processingStatus String   @default("pending") // pending | matched | parsed | extracted | rejected
   createdAt        DateTime @default(now())
@@ -242,7 +243,9 @@ model Email {
   links       EmailLink[]
 
   @@unique([sourceId, googleMessageId])
+  @@unique([sourceId, threadId])      // one thread row per source — prevents duplicate thread processing
   @@index([sourceId])
+  @@index([threadId])
   @@index([receivedAt])
 }
 
@@ -418,7 +421,7 @@ model DatasetValue {
   sourceFile         String?
   pageNumber         Int?
   chunkId            String?
-  modelUsed          String    @default("gemini-1.5-pro")
+  modelUsed          String    @default("gemini-3.8-flash")
   promptVersion      String    @default("v1")
   extractedAt        DateTime  @default(now())
   correctedAt        DateTime?

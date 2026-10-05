@@ -53,13 +53,15 @@ function splitSignature(body: string): [string, string] {
 
 // ── Link categorisation ───────────────────────────────────────────────────────
 
-function categoriseLinks(text: string): {
+export function categoriseLinks(text: string): {
   driveLinks: string[];
   formLinks: string[];
   otherLinks: string[];
 } {
-  const allUrlPattern = /https?:\/\/[^\s"'<>)]+/g;
-  const allUrls = [...new Set(text.match(allUrlPattern) ?? [])];
+  // Strip HTML tags so href="..." attributes don't get truncated at the quote char
+  const stripped = text.replace(/<[^>]+>/g, " ");
+  const allUrlPattern = /https?:\/\/[^\s"'<>)\]]+/g;
+  const allUrls = [...new Set(stripped.match(allUrlPattern) ?? [])];
 
   const driveLinks: string[] = [];
   const formLinks: string[] = [];
@@ -71,7 +73,8 @@ function categoriseLinks(text: string): {
     } else if (
       url.includes("docs.google.com") ||
       url.includes("drive.google.com") ||
-      url.includes("sheets.google.com")
+      url.includes("slides.google.com") ||
+      url.includes("script.google.com")
     ) {
       driveLinks.push(url);
     } else {
